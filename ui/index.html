@@ -23,7 +23,7 @@
     </div>
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
     <button id="council-report" class="council-note" type="button" hidden title="A council report: the Chief thinks you should know something. Click to read it." aria-label="Read the council report">★ REPORT</button>
-    <button id="call-council" type="button" title="Call the crew to the Ring to review recent work. The Chief tells you only if something is significant. Uses a little of today's budget.">Council</button>
+    <button id="call-council" type="button" title="Call the crew to the Ring to review recent work. You choose how long the meeting lasts.">Council</button>
     <button id="open-settings" type="button">Settings</button>
     <button id="stop" class="stop" type="button" title="Stop every job right now">STOP</button>
   </header>
@@ -64,6 +64,18 @@
     </form>
   </aside>
 </div>
+<dialog id="council-dialog" class="settings council-dialog" aria-labelledby="council-title">
+  <form method="dialog" id="council-form">
+    <h2 id="council-title">Call a council</h2>
+    <p class="hint">The crew gather at the Ring to look back on the work since the last council. They can discuss as much as they like until the meeting's time is up, and the Chief tells you only if something is significant. It uses a little of today's budget.</p>
+    <label class="limits"><span>How long the meeting lasts</span>
+      <select id="council-minutes"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="3" selected>3 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select>
+    </label>
+    <p class="hint">The daily council (at most once a day, after 3 finished jobs) always lasts 3 minutes.</p>
+    <p class="error" id="council-error" hidden></p>
+    <div class="settings-btns"><button type="button" id="council-cancel">Cancel</button><button type="submit" id="council-go" class="primary">Call the council</button></div>
+  </form>
+</dialog>
 <dialog id="settings" class="settings" aria-labelledby="settings-title">
   <form method="dialog" id="settings-form">
     <h2 id="settings-title">Settings</h2>

@@ -271,13 +271,22 @@ $('council-report').onclick = () => {
   try { localStorage.setItem('mc-council-read', JSON.stringify([...read].slice(-50))); } catch {}
   syncCouncil();
 };
-$('call-council').onclick = async () => {
-  const b = $('call-council'); b.disabled = true;
-  const r = await post('/api/council');
-  b.disabled = false;
-  if (!r.ok) alert(r.data.error || 'The council could not meet just now.');
-  else { station.toStory(1); station.scrollTo(480); syncThumb(); }   // look up at the Ring
+// the Council button asks how long the meeting should last (remembered in this browser), then calls it
+$('call-council').onclick = () => {
+  try { const m = localStorage.getItem('mc-council-minutes'); if (m && $('council-minutes').querySelector(`option[value="${m}"]`)) $('council-minutes').value = m; } catch {}
+  $('council-error').hidden = true; $('council-dialog').showModal();
 };
+$('council-cancel').onclick = () => $('council-dialog').close();
+$('council-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const minutes = +$('council-minutes').value, go = $('council-go'); go.disabled = true;
+  try { localStorage.setItem('mc-council-minutes', String(minutes)); } catch {}
+  const r = await post('/api/council', { minutes });
+  go.disabled = false;
+  if (!r.ok) { $('council-error').textContent = r.data.error || 'The council could not meet just now.'; $('council-error').hidden = false; return; }
+  $('council-dialog').close();
+  station.toStory(1); station.scrollTo(480); syncThumb();   // look up at the Ring
+});
 
 // ---------- spend, roster, controls ----------
 async function loadSpend() {

@@ -8,15 +8,16 @@
 //                   points becomes a council.say event.
 //   council.report  the Chief's verdict: a short report for the user, flagged significant or not.
 //                   The user is only told about the significant ones.
-// There is no cap on how much the council discusses except the meeting's time (COUNCIL.meetingMs):
+// There is no cap on how much the council discusses except the meeting's time (3 minutes by default;
+// the user can choose the length when calling one):
 // members hear what has been said so far and can answer each other, the Chief can ask follow-ups,
-// and when the time is up the Chief is asked for his verdict (and the job ends soon after).
+// and when the time is up the Chief is asked for his verdict (the job ends a minute later).
 // The usual per-job and daily spending limits still apply, as for every job.
 // It meets when the user calls it, or by itself at most once a day, and only if at least
 // COUNCIL.minJobs jobs have finished since the last council and nothing is running.
 // Pure: fsp, clock and the run host are injected.
 
-export const COUNCIL = { memberModel: 'claude-haiku-5-5', minJobs: 3, maxJobs: 8, hearWaitMs: 300_000, meetingMs: 20 * 60_000, graceMs: 3 * 60_000 };
+export const COUNCIL = { memberModel: 'claude-haiku-5-5', minJobs: 3, maxJobs: 8, hearWaitMs: 300_000, meetingMs: 3 * 60_000, graceMs: 60_000, minMinutes: 1, maxMinutes: 60 };
 const mins = ms => Math.max(0, Math.round(ms / 60_000));
 
 const CHIEF_SYSTEM = `You are the Chief, a silverback gorilla who leads the MonkeyCraft crew, a crew of AI apes who do jobs on the user's computer. Right now you are chairing a council at the Ring on the great tree, not doing a job. You can't do any work, read files or send tasks: you can only hear crew members with council.hear and give your verdict with council.report. Be brief and plain. The user isn't a programmer.`;
@@ -31,7 +32,7 @@ Make as many points as you have, each on its own line, each starting with SIGNIF
 
 const CHIEF_TASK = (digest, memberIds, minutes) => `${digest}
 
-Hold the council. There is no limit on how much the council discusses: the only limit is the meeting's time, about ${minutes} minutes.
+Hold the council. There is no limit on how much the council discusses: the only limit is the meeting's time, about ${minutes} minute${minutes === 1 ? '' : 's'}.
 1. Hear from the crew members who took part in this work with council.hear, one at a time (awake members: ${memberIds.join(', ')}). If nobody took part, hear from members you choose. Each member hears what has been said so far, so they can answer each other. Ask follow-up questions, or hear someone again, whenever it would help.
 2. Weigh what they said. Something is significant only if the user would want to know: a real problem, a risk, something that keeps going wrong, or an idea that would clearly save time or money. Ordinary praise and small tips are not significant.
 3. Finish by calling council.report once. If anything is significant, set significant to true and write a short report for the user (a few plain sentences or bullet points: what, why it matters, what you suggest). Otherwise set significant to false with a one-line note.`;
@@ -139,19 +140,21 @@ export function makeCouncil({ fsp, file, clock, runs, roster, ledger, journal, l
   return {
     councils,
     async load() { try { const s = JSON.parse(await fsp.readFile(file, 'utf8')); if (Number.isFinite(s.lastTs)) state = { lastTs: s.lastTs, lastDay: String(s.lastDay || '') }; } catch (e) { if (e.code !== 'ENOENT') log(`[council] couldn't read ${file}: ${e.message}`); } },
-    /** Call a council. trigger: 'user' (the button) or 'schedule'. */
-    async call({ trigger = 'user' } = {}) {
+    /** Call a council. trigger: 'user' (the button) or 'schedule'. minutes: how long the meeting lasts (default 3). */
+    async call({ trigger = 'user', minutes = null } = {}) {
       if (running) return { error: 'The council is already meeting.' };
+      if (minutes != null && !(Number.isInteger(minutes) && minutes >= COUNCIL.minMinutes && minutes <= COUNCIL.maxMinutes)) return { error: `A meeting lasts ${COUNCIL.minMinutes} to ${COUNCIL.maxMinutes} minutes.` };
+      const meetingMs = minutes != null ? minutes * 60_000 : COUNCIL.meetingMs;
       const now = clock.now(), jobs = await jobsSince(state.lastTs), digest = digestOf(jobs);
       const members = roster.public().filter(c => c.awake && c.id !== 'chief').map(c => c.id);
-      const r = runs.start({ agentId: 'chief', prompt: CHIEF_TASK(digest, members, mins(COUNCIL.meetingMs)), source: 'council', trigger, agentOverride: councilChief(roster.get('chief')) });
+      const r = runs.start({ agentId: 'chief', prompt: CHIEF_TASK(digest, members, mins(meetingMs)), source: 'council', trigger, agentOverride: councilChief(roster.get('chief')) });
       if (r.error) return r;
-      running = r.runId; councils.set(r.runId, { digest, heard: new Set(), said: [], reported: false, endsAt: now + COUNCIL.meetingMs });
+      running = r.runId; councils.set(r.runId, { digest, heard: new Set(), said: [], reported: false, endsAt: now + meetingMs });
       // the meeting's time is its only limit: after it (and a little grace for the verdict) the job ends
-      const hard = setTimer(() => runs.cancel(r.runId), COUNCIL.meetingMs + COUNCIL.graceMs);
+      const hard = setTimer(() => runs.cancel(r.runId), meetingMs + COUNCIL.graceMs);
       state = { lastTs: now, lastDay: dayOf(now) }; await save();
       r.done.finally(() => { running = null; clearTimer(hard); setTimer(() => councils.delete(r.runId), 60_000); });
-      return { runId: r.runId, jobs: jobs.length, done: r.done };
+      return { runId: r.runId, jobs: jobs.length, minutes: mins(meetingMs), done: r.done };
     },
     /** The daily council: at most once a day, after enough finished jobs, and only when nothing is running. */
     async tick() {
@@ -160,6 +163,6 @@ export function makeCouncil({ fsp, file, clock, runs, roster, ledger, journal, l
       if (n < COUNCIL.minJobs) return null;
       return this.call({ trigger: 'schedule' });
     },
-    async status() { return { lastTs: state.lastTs || null, running, jobsSince: (await jobsSince(state.lastTs)).length, minJobs: COUNCIL.minJobs }; }
+    async status() { return { lastTs: state.lastTs || null, running, jobsSince: (await jobsSince(state.lastTs)).length, minJobs: COUNCIL.minJobs, defaultMinutes: mins(COUNCIL.meetingMs), minMinutes: COUNCIL.minMinutes, maxMinutes: COUNCIL.maxMinutes }; }
   };
 }

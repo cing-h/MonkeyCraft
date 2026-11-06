@@ -160,6 +160,7 @@ textarea::placeholder { color: #7f8a74; }
 .crew-table thead th { font: 10px var(--label); color: var(--muted); letter-spacing: .06em; }
 .settings select, .settings input { font: 14px var(--body); color: var(--fg); background: #0a120c; border: 2px solid var(--bark); padding: 3px 6px; max-width: 100%; }
 .limits { display: grid; grid-template-columns: minmax(0, 1fr) 140px; gap: 6px 10px; align-items: center; font-size: 14px; }
+.council-dialog { width: min(480px, calc(100vw - 32px)); }
 .settings-btns { display: flex; justify-content: flex-end; gap: 8px; }
 .settings .primary { border-color: var(--leaf); }
 @media (max-width: 560px) { .limits { grid-template-columns: 1fr; } }

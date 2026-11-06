@@ -154,5 +154,13 @@ test('no cap but the meeting\'s time: members hear what was said so far, follow-
   assert.match(prompts.smith[1], /The Chief asks you: Do you agree with the Writer\?[\s\S]*/); assert.match(prompts.smith[1], /The Writer \(significant\): I disagree/);
   assert.match(prompts.smith[0], /no limit on how much you may say|minutes? of the meeting are left/);
   assert.ok(late.isError && /time is up/.test(late.content), 'after the meeting time, no more hearing: give the verdict');
-  assert.ok(w.agents.find(a => a.id === 'chief' && isCouncil(a.prompt)).prompt.includes('the only limit is the meeting\'s time'));
+  assert.ok(w.agents.find(a => a.id === 'chief' && isCouncil(a.prompt)).prompt.includes('the only limit is the meeting\'s time, about 3 minutes'), 'the default meeting is 3 minutes');
+  assert.equal(COUNCIL.meetingMs, 3 * 60_000);
+});
+
+test('the user chooses how long a meeting lasts; the length is checked', async () => {
+  const w = await world({ chief: async ({ call }) => { await call('council_report', { significant: false, report: 'ok' }); return 'bye'; } });
+  for (const bad of [0, 61, 2.5, 'ten']) assert.match((await w.council.call({ minutes: bad })).error, /1 to 60 minutes/);
+  const c = await w.council.call({ minutes: 10 }); assert.equal(c.minutes, 10); await c.done;
+  assert.match(w.agents.find(a => a.id === 'chief').prompt, /about 10 minutes/);
 });
