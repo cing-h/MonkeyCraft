@@ -9,9 +9,9 @@ const Lw = (() => { const v = [-0.45, 1, 0.6], n = Math.hypot(...v); return v.ma
 
 // ---------- materials (ramp: dark -> light) ----------
 const MAT = {
-  obsidian: { r: ['#0d0a15', '#1b1429', '#2b2042', '#433366', '#66529a'], n: 0.12 },
-  belly:    { r: ['#1c1426', '#2f2340', '#4a3a5f', '#6b5a84', '#9483ad'], n: 0.1 },
-  membrane: { r: ['#140a22', '#241238', '#371b55', '#50287c', '#6f3fab'], n: 0.05 },
+  obsidian: { r: ['#0a0811', '#151022', '#221a36', '#362a54', '#52437e'], n: 0.12 },
+  belly:    { r: ['#17101f', '#271d36', '#3d3050', '#594b6f', '#7b6d92'], n: 0.1 },
+  membrane: { r: ['#10081c', '#1d0e2e', '#2c1646', '#412066', '#5a338d'], n: 0.05 },
   horn:     { r: ['#2a2433', '#4a4158', '#756a86', '#a69bb6', '#d8cfe4'], n: 0 },
   stone:    { r: ['#100d15', '#1d1925', '#2b2537', '#3e364e', '#5a506c'], n: 0.35 },
   floor:    { r: ['#0f0d14', '#1a1721', '#25212e', '#2f2a3a', '#3b3548'], n: 0 },
@@ -386,34 +386,36 @@ function buildWyrm() {
     const a = k * 1.05 + 0.4, r = 14, px = Math.cos(a) * r, pz = Math.sin(a) * r;
     isl.line([[px, 1, pz], [px + 0.6, 3 + (k % 2) * 2, pz + 0.4]], 0.9, 0.3, 'violet');
   }
-  const body = new Vox().ell(0, 6, 0, 6.5, 5, 8.5, 'obsidian');
+  // a long body: the tail coils most of the way round its perch, then winds down the front of the tower
+  const body = new Vox().ell(0, 6, 0, 6.5, 5, 11, 'obsidian');
   const coil = [];
-  for (let i = 0; i <= 28; i++) { const u = i / 28, a = Math.PI + u * 1.3 * Math.PI; coil.push([Math.sin(a) * 11, 3.5 - u * 2, Math.cos(a) * 11]); }
-  body.line([[0, 4, -7], ...coil], 3.2, 0.8, 'obsidian');
-  for (let i = 0; i < coil.length - 4; i += 3) { const [x, y, z] = coil[i], r = 3.2 * (1 - i / 28) + 0.8; body.line([[x, y + r - 0.5, z], [x, y + r + 1.5, z]], 0.7, 0.25, 'horn'); }
-  for (const z of [-5, -2, 1, 4]) body.line([[0, 10.5, z], [0, 13, z - 1]], 0.9, 0.3, 'horn');
-  body.recolor((x, y, z, m) => (m === 'obsidian' && y <= 4 && z >= 2 && Math.abs(x) < 5) ? 'belly' : null);
+  for (let i = 0; i <= 36; i++) { const u = i / 36, a = Math.PI + u * 1.55 * Math.PI; coil.push([Math.sin(a) * 12.5, 3.5 - u * 2.5, Math.cos(a) * 12.5]); }
+  const tail = [[0, 4, -10], ...coil, [15, -3, -2], [14.5, -12, 4], [11.5, -20, 9], [6.5, -27, 12], [2, -31, 13]]; // down the tower's face
+  body.line(tail, 3.4, 0.7, 'obsidian');
+  for (let i = 0; i < coil.length - 4; i += 3) { const [x, y, z] = coil[i], r = 3.4 * (1 - i / 40) + 0.7; body.line([[x, y + r - 0.5, z], [x, y + r + 1.5, z]], 0.7, 0.25, 'horn'); }
+  for (const z of [-8, -5, -2, 1, 4, 7]) body.line([[0, 10.5, z], [0, 13, z - 1]], 0.9, 0.3, 'horn');
+  body.recolor((x, y, z, m) => (m === 'obsidian' && y <= 4 && z >= 3 && Math.abs(x) < 5) ? 'belly' : null);
   body.recolor((x, y, z, m) => (m === 'obsidian' && hash3(x, y, z) < 0.035) ? 'violet' : null);
-  const neck = new Vox().line([[0, 9, 5], [0, 15, 8], [0, 19, 9.5]], 3, 2.3, 'obsidian');
-  neck.recolor((x, y, z, m) => (z >= 9 + (y - 9) * 0.1 && Math.abs(x) <= 1) ? 'belly' : null);
-  const head = new Vox().ell(0, 21, 11, 3.6, 3, 4.5, 'obsidian').box(-2, 19, 14, 1, 21, 18, 'obsidian').box(-2, 18, 13, 1, 18, 17, 'obsidian')
-    .line([[-2, 23, 9], [-4, 26, 5], [-5, 28, 2]], 0.9, 0.35, 'horn').line([[2, 23, 9], [4, 26, 5], [5, 28, 2]], 0.9, 0.35, 'horn');
-  head.set(-4, 22, 13, 'violet').set(3, 22, 13, 'violet').set(-2, 20, 18, 'violet').set(1, 20, 18, 'violet');
+  const neck = new Vox().line([[0, 9, 8], [0, 16, 11.5], [0, 21, 13.5]], 3.1, 2.3, 'obsidian');
+  neck.recolor((x, y, z, m) => (z >= 12 + (y - 9) * 0.1 && Math.abs(x) <= 1) ? 'belly' : null);
+  const head = new Vox().ell(0, 23, 15, 3.6, 3, 4.5, 'obsidian').box(-2, 21, 18, 1, 23, 22, 'obsidian').box(-2, 20, 17, 1, 20, 21, 'obsidian')
+    .line([[-2, 25, 13], [-4, 28, 9], [-5, 30, 6]], 0.9, 0.35, 'horn').line([[2, 25, 13], [4, 28, 9], [5, 30, 6]], 0.9, 0.35, 'horn');
+  head.set(-4, 24, 17, 'violet').set(3, 24, 17, 'violet').set(-2, 22, 22, 'violet').set(1, 22, 22, 'violet');
   const wing = sign => {
-    const v = new Vox();
-    for (let i = 0; i <= 17; i++) {
-      const x = sign < 0 ? -6 - i : 5 + i, top = 11 + i * 0.85 + Math.sin(i / 17 * Math.PI) * 2, bot = 10.5 + i * 0.25 + Math.abs(Math.sin(i * 0.9)) * 2.2;
+    const v = new Vox(), N = 24;
+    for (let i = 0; i <= N; i++) {
+      const x = sign < 0 ? -6 - i : 5 + i, top = 11 + i * 0.85 + Math.sin(i / N * Math.PI) * 3, bot = 10.5 + i * 0.22 + Math.abs(Math.sin(i * 0.7)) * 2.6;
       for (let y = Math.floor(bot); y <= Math.floor(top); y++) v.set(x, y, -1, 'membrane');
     }
-    v.line([[sign * 5.5, 11.5, -0.5], [sign * 23, 26, -0.5]], 1, 0.6, 'obsidian');
-    v.line([[sign * 5.5, 11.5, -0.5], [sign * 22.5, 19, -0.5]], 0.8, 0.5, 'obsidian');
-    v.line([[sign * 5.5, 11.5, -0.5], [sign * 17.5, 13.5, -0.5]], 0.8, 0.5, 'obsidian');
-    v.line([[sign * 23, 26, -0.5], [sign * 24, 28, -0.5]], 0.6, 0.3, 'horn');
+    v.line([[sign * 5.5, 11.5, -0.5], [sign * 30, 32.5, -0.5]], 1.1, 0.6, 'obsidian');
+    v.line([[sign * 5.5, 11.5, -0.5], [sign * 29.5, 23, -0.5]], 0.85, 0.5, 'obsidian');
+    v.line([[sign * 5.5, 11.5, -0.5], [sign * 23, 15.5, -0.5]], 0.85, 0.5, 'obsidian');
+    v.line([[sign * 30, 32.5, -0.5], [sign * 31, 35, -0.5]], 0.6, 0.3, 'horn');
     return v;
   };
   return {
-    shadowR: 17,
-    parts: [part('island', isl, [0, 0, 0]), part('body', body, [0, 0, 0]), part('neck', neck, [0, 9, 5]), part('head', head, [0, 9, 5]),
+    shadowR: 20,
+    parts: [part('island', isl, [0, 0, 0]), part('body', body, [0, 0, 0]), part('neck', neck, [0, 9, 8]), part('head', head, [0, 9, 8]),
       part('wingL', wing(-1), [-5, 11, 0]), part('wingR', wing(1), [5, 11, 0])],
     pose(s) {
       const sway = Math.sin(s.t * 0.6) * (s.on ? 0.35 : 0.15), breathe = Math.sin(s.t * 1.2) * 0.3;
