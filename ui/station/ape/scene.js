@@ -155,6 +155,34 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   }
 
   const heads = {};
+  // A soft glowing outline round each crew member, so the agents stand out from the scenery.
+  // Pixels just outside an ape are eased toward a warm light tinted with its own colour:
+  // strongest one pixel out, fading by two. Background villagers never glow, so they read as scenery.
+  const GLOW_RING = [[1, 0, 0.62], [-1, 0, 0.62], [0, 1, 0.62], [0, -1, 0.62], [1, 1, 0.42], [-1, 1, 0.42], [1, -1, 0.42], [-1, -1, 0.42],
+    [2, 0, 0.24], [-2, 0, 0.24], [0, 2, 0.24], [0, -2, 0.24], [2, 1, 0.15], [-2, 1, 0.15], [2, -1, 0.15], [-2, -1, 0.15], [1, 2, 0.15], [-1, 2, 0.15], [1, -2, 0.15], [-1, -2, 0.15]];
+  const GLOW_C = CREW.map(k => mixc([255, 238, 200], LIGHT[k], 0.35));
+  const glowW = new Float32Array(W * H), glowWho = new Uint8Array(W * H), glowHit = [];
+  function glowOutline() {
+    const id = fb.id, d = fb.d;
+    // stamp the ring round every crew pixel, keeping the strongest weight each neighbour gets
+    for (let i = 0; i < id.length; i++) {
+      const n = id[i]; if (n <= 0) continue;
+      const x = i % W, y = (i / W) | 0;
+      for (const [dx, dy, k] of GLOW_RING) {
+        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
+        const j = yy * W + xx; if (id[j] > 0 || k <= glowW[j]) continue;
+        if (!glowW[j]) glowHit.push(j);
+        glowW[j] = k; glowWho[j] = n;
+      }
+    }
+    for (const j of glowHit) {
+      const w = glowW[j], c = GLOW_C[glowWho[j] - 1], o = j * 4;
+      d[o] += (c[0] - d[o]) * w; d[o + 1] += (c[1] - d[o + 1]) * w; d[o + 2] += (c[2] - d[o + 2]) * w;
+      glowW[j] = 0;
+    }
+    glowHit.length = 0;
+  }
+
   const blit = (src, f) => {
     const off = Math.round(cam * f);
     for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
@@ -215,6 +243,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       heads[k] = drawApe(fb, k, q, at, a.facing, 1, t);
     }
     fb.pid = -1;
+    glowOutline();
     for (const s of sparks) { if (s.steam) { fb.add(Math.round(s.x - cam), Math.round(s.y), s.c, 0.35 * s.life); fb.add(Math.round(s.x - cam) + 1, Math.round(s.y), s.c, 0.2 * s.life); } else fb.put(s.x - cam, s.y, s.c); }
     for (const f of flies) { const x = Math.round(f.x - cam), y = Math.round(f.y), up = Math.sin(f.ph * 18) > 0; fb.put(x, y, [40, 30, 30]); fb.put(x - 1, y - (up ? 1 : 0), f.c); fb.put(x + 1, y - (up ? 1 : 0), f.c); }
     for (let i = 0; i < 14; i++) { const x = ((hash(i, 93) * WORLD + Math.sin(t * 0.3 + i) * 20) - cam), y = 70 + hash(i, 94) * 40 + Math.sin(t * 0.8 + i * 2) * 5; if (x > -2 && x < W + 2 && Math.sin(t * 2.3 + i * 1.7) > 0.3) fb.add(x, y, [200, 255, 140], 0.7); } // fireflies
