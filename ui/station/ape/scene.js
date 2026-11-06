@@ -19,7 +19,7 @@ import { AGILE, CREW, LIGHT, P, SPECIES, TAU, blendPose, bodyLen, drawApe, place
 import { noise1 } from './scenery.js';
 import { DOORS, PERCH_Y, TRUNKS, WATER, branchY, buildLayers, groundY } from './world.js';
 import { makeVillagers, stepVillager, villagerPose } from './villagers.js';
-import { buildFrame, drawFronds, drawVines } from './frame.js';
+import { buildFrame, drawVines } from './frame.js';
 import { makeBrachiator, stepPose, brachiatePose } from './swing.js';
 import { makeChatter } from './chatter.js';
 import { LADDER_X, makeChiefIdle } from './chief.js';
@@ -389,7 +389,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       }
     }
     blit(L.fore, 1.3);
-    fb.oy = 0; drawFronds(fb, t, cam); blit(frame, 0, true); drawVines(fb, t); fb.oy = cy;   // the foliage frame and the hanging fronds keep to the screen
+    fb.oy = 0; blit(frame, 0, true); drawVines(fb, t); fb.oy = cy;   // the foliage frame is fixed to the screen
     // plates over heads
     for (const k of CREW) { const a = actors[k], h = heads[k]; if (!h) continue; const p = PLATE[a.mode]; if (!p) continue;
       let x = Math.round(h.headX - cam) - 4, y = Math.round(h.headY) - 11;

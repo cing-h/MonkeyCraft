@@ -173,7 +173,7 @@ export function buildLayers() {
   for (let i = 0; i < 70; i++) { const x = hash(i, 91) * WORLD, kinds = ['hibiscus', 'plumeria', 'orchid', 'heliconia', 'bird']; flower(mid, x, groundY(x) - 1 - hash(i, 92) * 3, kinds[i % 5]); }
   for (const x of [120, 226, 362, 582, 700, 818]) lamp(x, GROUND - 12);
   for (const g of paintCulture(mid)) lamps.push(g);   // the villagers' culture: totems, bunting, glyphs, the market, art and the Council Ring
-  // foreground (parallax 1.3): reeds and lily pads in the water (the fronds hanging from the top of the view are in frame.js)
+  // foreground (parallax 1.3): reeds and lily pads in the water
   const fore = layer(1.3);
   for (let i = 0; i < 60; i++) {
     const x = hash(i, 40) * fore.w, y = H - 1 - hash(i, 41) * 30, n = 3 + Math.floor(hash(i, 42) * 4);

@@ -57,22 +57,3 @@ export function drawVines(fb, t) {
     if (i % 3 === 1) flower(fb, x, y + 1, 'orchid');
   });
 }
-
-// Leaf clusters hanging into view from the top edge, close to the eye. They keep to the top of the
-// screen (like the frame) whichever story is in view, and slide sideways a little faster than the
-// village (parallax 1.3), so they read as foreground. Each cluster is a few broad drooping leaves on
-// short stems from one hanging vine, drawn like the frame's leaves, swaying gently in the breeze.
-export const FRONDS = [138, 541, 921].map((x, i) => ({ x, seed: 300 + i * 17, leaves: [[-1.25, 14, 4], [-0.6, 19, 4.6], [0.05, 23, 5], [0.65, 18, 4.5], [1.25, 13, 3.8]] }));
-export function drawFronds(fb, t, cam) {
-  const pal = FRAME.pal, stem = FRAME.vine;
-  for (const c of FRONDS) {
-    const sx = c.x - cam * 1.3; if (sx < -40 || sx > W + 40) continue;
-    const sway = Math.sin(t * 0.8 + c.seed) * 0.06;
-    for (let y = -2; y < 6; y++) fb.put(sx + Math.sin(y * 0.4 + c.seed) * 0.6, y, stem);        // the hanging vine they grow from
-    c.leaves.forEach(([spread, len, wid], k) => {
-      const a = Math.PI / 2 - spread * 0.85 + sway * (1 + k * 0.3), bx = sx + spread * 6, by = 4 + Math.abs(spread) * 1.5;
-      for (let s = 0; s <= 8; s++) fb.put(sx + (bx - sx) * s / 8, 5 + (by - 5) * s / 8 - Math.sin(Math.PI * s / 8), stem);      // the twig the leaves fan out from
-      leafBlade(fb, bx, by, a, len, wid, pal, c.seed + k, k % 2 === 0);
-    });
-  }
-}
