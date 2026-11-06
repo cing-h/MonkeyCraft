@@ -17,3 +17,13 @@ The user directs and never writes code; Claude writes all of it. Explain changes
 - Reach is the whole computer, so every path or shell change goes through: hardline list → outside-workspace prompt → undo copy (see PLAN.md).
 - No runtime dependencies without a reason. Pin exact versions when one is added.
 - Remove the Claude Co-author line after any changes or additions to the Repo.
+
+## Seeing the UI
+You can't see a browser, so take a screenshot with the user's Windows Chrome in headless mode, using a throwaway profile under `%LOCALAPPDATA%\Temp\acshot`. Then Read the PNG.
+```
+W=$(wslpath "$(cmd.exe /c 'echo %LOCALAPPDATA%' | tr -d '\r')")/Temp/acshot; mkdir -p "$W"; WW=$(wslpath -w "$W")
+"/mnt/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu --no-first-run --hide-scrollbars \
+  --user-data-dir="$WW\\profile" --window-size=1500,900 --timeout=3000 "--screenshot=$WW\\shot.png" http://localhost:8787/
+```
+- Don't use `--virtual-time-budget`: the SSE stream never goes idle, so it hangs.
+- Never `pkill -f <pattern>` with a pattern that also appears in your own command line, because it kills your own shell.

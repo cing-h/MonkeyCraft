@@ -11,27 +11,41 @@
 <div class="app">
   <header class="top">
     <div class="brand"><span class="logo" aria-hidden="true"></span><h1>AutoCraft</h1></div>
+    <div class="cam">
+      <button id="rot-l" type="button" aria-label="Rotate view left">⟲</button>
+      <span id="cam-label">CAMERA 0°</span>
+      <button id="rot-r" type="button" aria-label="Rotate view right">⟳</button>
+    </div>
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
     <button id="stop" class="stop" type="button" title="Stop every job right now">STOP</button>
   </header>
 
-  <aside class="crew" aria-label="The crew"><h2>Crew</h2><ul id="crew"></ul></aside>
+  <section class="floor" aria-label="The station floor">
+    <div class="stage" id="stage">
+      <canvas id="scene" aria-describedby="crew-status"></canvas>
+      <div class="overlay" id="overlay"></div>
+    </div>
+    <ul class="crew" id="crew-status" aria-label="What each crew member is doing" aria-live="polite"></ul>
+    <details class="events">
+      <summary>Live events</summary>
+      <p class="hint">Everything the crew really does, as it happens. The floor animates only from these.</p>
+      <ol id="events"></ol>
+    </details>
+  </section>
 
-  <main class="chat">
+  <aside class="side" aria-label="Job log">
+    <div class="side-head">
+      <h2>Job log</h2>
+      <button id="filter" class="chip" type="button" hidden>Showing one crew member · show all</button>
+    </div>
     <div id="log" class="log" aria-live="polite">
-      <p class="empty" id="empty">Give the <b>Cinder Smith</b> a job. Try: <em>"List what's in my workspace, then tell me how much disk space is free."</em> It will ask before running any command.</p>
+      <p class="empty" id="empty">Give the <b>Cinder Smith</b> a job. Try: <em>"List what's in my workspace, then tell me how much disk space is free."</em> Watch it walk to the forge. It will ask before running any command.</p>
     </div>
     <form id="composer" class="composer">
       <label for="prompt" class="sr">Job for the Cinder Smith</label>
       <textarea id="prompt" rows="2" placeholder="A job for the Cinder Smith…" maxlength="20000"></textarea>
       <button type="submit" id="send">Send</button>
     </form>
-  </main>
-
-  <aside class="events" aria-label="Live events">
-    <h2>Live events</h2>
-    <p class="hint">Everything the crew really does, as it happens.</p>
-    <ol id="events"></ol>
   </aside>
 </div>
 <script type="module" src="/ui/app.js"></script>

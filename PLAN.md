@@ -143,7 +143,13 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
    - Original scope:
    - the Claude Code adapter, the MCP tool server, the registry with `fs.read` and `shell.exec`, the bus, the chat UI and the ledger;
    - *check:* the user asks the Smith to `ls` the workspace; the events stream; the ledger row is written; killing the sidecar mid-run leaves a consistent journal.
-3. **M2 Station:**
+3. **M2 Station — DONE 2026-11-06.** 32 tests pass.
+   - The voxel engine now lives in `ui/station/engine.js`.
+   - `ui/station/state.js` is a pure event→mode reducer: asleep, asking, working, error, talking, ready, idle. A fast tool's work pose is held 1.2 s so it can be seen.
+   - `ui/station/scene.js` renders the floor: plates (? ! … Z), sparks and lights only in working mode, and a question bubble anchored over the asking creature.
+   - Clicking a creature or its strip chip filters the job log.
+   - Verified in real headless Chrome screenshots: idle floor, and the live permission bubble over the Smith.
+   - Original scope:
    - port the renderer, then add the event → animation mapping and the consent plate;
    - *check:* no animation fires without a matching event (tested with a scripted event feed).
 4. **M3 Safety:**
