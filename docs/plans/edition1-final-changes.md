@@ -1,6 +1,7 @@
 # Edition 1: final changes (waiting list)
 
-Status: COLLECTING. The user adds items here while testing MonkeyCraft. **Don't build any of them until the user says to make the final changes to Edition 1.** After that comes Edition 2.
+Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 → 1, one branch each, checking in after each.
+- Item 2: DONE on `feature/swing-reanimation`.
 
 Each item records what the user asked for, the decisions already made, and an outline of how to build it.
 
@@ -42,7 +43,18 @@ Added 2026-11-06.
 
 ## 2. Reanimate the swinging and movement, as smoothly and dynamically as possible
 
-Added 2026-11-06.
+Added 2026-11-06. **DONE** (branch `feature/swing-reanimation`). What was built:
+- `ui/station/ape/swing.js`: one pendulum brachiation engine for the crew and the villagers.
+  - Energy pumping (speed builds and fades).
+  - Continuous catches at the forward peak.
+  - Ricochetal flight for the gibbon: release near the top of the forward swing, a ballistic arc under the same gravity, and a catch nearest the reaching hand once past the top of the arc.
+  - A catch spring (the dip).
+  - The reaching hand aims at the hold predicted from the swing's energy.
+  - Hands ease (only the gripping hand is pinned), the torso swings on a spring, the legs tuck and trail, and the head stays steadier.
+- Leaves shake loose at catches.
+- The gibbon runs upright with its arms raised; the knuckle-walkers shift their weight more clearly; branch-walkers crouch before a jump; letting go of a swing carries its speed into the fall.
+- Measured over a 70 s trip: the gibbon flies before 43 of its 58 catches; the body moves at most about 4 px a frame; the gripping hand is always on the hold; catch hand-offs are ≤ ~7 px. Tests are in `test/swing.test.js`.
+- Not done: branches don't visibly bend, because they are pre-painted. Falling leaves show the catches instead.
 
 **What the user wants:** watch https://www.youtube.com/watch?v=9rdn26Hpdwo ("How Fast Can Gibbons Swing Through the Forest?") and reanimate the swinging and movement of the monkeys in the village, crew and background villagers alike, as smoothly and dynamically as possible.
 

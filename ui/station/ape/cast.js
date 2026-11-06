@@ -40,12 +40,12 @@ export const P = {
     const L = lean0(sp), A = sp.posture === 'quad' ? 0.42 : 0.5, pa = p + Math.PI * 0.55;
     if (sp.posture === 'biped') return P.bipedWalk(sp, p);
     return {
-      torso: L + Math.sin(2 * p) * 0.045, plant: 'all', head: -L * 0.6 - Math.sin(2 * p) * 0.05,
+      torso: L + Math.sin(2 * p) * (sp.posture === 'quad' ? 0.045 : 0.085), plant: 'all', head: -L * 0.6 - Math.sin(2 * p) * (sp.posture === 'quad' ? 0.05 : 0.08),
       hip: [A * Math.sin(p), A * Math.sin(p + Math.PI)],
       kn: [-pos(Math.cos(p)) * 0.95 * A, -pos(Math.cos(p + Math.PI)) * 0.95 * A],
       sh: [L * 0.12 + A * 0.9 * Math.sin(pa), L * 0.12 + A * 0.9 * Math.sin(pa + Math.PI)],
       el: [-pos(Math.cos(pa)) * 0.75 * A, -pos(Math.cos(pa + Math.PI)) * 0.75 * A],
-      lift: 0.55 * pos(Math.sin(2 * p)), tail: 0.55 + 0.15 * Math.sin(p)
+      lift: (sp.posture === 'quad' ? 0.55 : 0.9) * pos(Math.sin(2 * p)), tail: 0.55 + 0.15 * Math.sin(p)
     };
   },
   // bounding gallop: hind pair then fore pair, the spine flexes and there's a flight phase
@@ -73,6 +73,12 @@ export const P = {
   },
   bipedRun(sp, p) {
     const A = 0.95;
+    if (sp.canopy === 'brachiate-fast') return {   // the gibbon runs upright with both long arms held high for balance
+      torso: 0.22 + Math.sin(2 * p) * 0.05, plant: 'feet', head: -0.2,
+      hip: [A * Math.sin(p), A * Math.sin(p + Math.PI)], kn: [-0.15 - pos(Math.cos(p)) * 1.5, -0.15 - pos(Math.cos(p + Math.PI)) * 1.5],
+      sh: [2.6 + 0.22 * Math.sin(p + 0.6), 2.4 + 0.22 * Math.sin(p + Math.PI + 0.6)], el: [0.45 + 0.15 * Math.sin(p + 1.5), 0.55 + 0.15 * Math.sin(p + Math.PI + 1.5)],
+      lift: 1.7 * pos(Math.sin(2 * p)), tail: 0.3
+    };
     return {
       torso: 0.36 + Math.sin(2 * p) * 0.05, plant: 'feet', head: -0.3,
       hip: [A * Math.sin(p), A * Math.sin(p + Math.PI)], kn: [-0.15 - pos(Math.cos(p)) * 1.6, -0.15 - pos(Math.cos(p + Math.PI)) * 1.6],

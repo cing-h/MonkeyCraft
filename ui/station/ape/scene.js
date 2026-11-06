@@ -19,6 +19,7 @@ import { noise1 } from './scenery.js';
 import { DOORS, PERCH_Y, TRUNKS, WATER, branchY, buildLayers, groundY } from './world.js';
 import { makeVillagers, stepVillager, villagerPose } from './villagers.js';
 import { buildFrame, drawVines } from './frame.js';
+import { makeBrachiator, stepPose, brachiatePose } from './swing.js';
 
 
 // ---------- 5×5 plate glyphs ----------
@@ -39,6 +40,10 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   let t = 0, cam = 330, seed = 11;
   const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
   const sparks = [];
+  const leaves = [];   // leaves shaken loose by a catch: { x, y, vx, vy, life, par (parallax of their layer), c }
+  const shake = (x, y, par, n) => { for (let i = 0; i < n; i++) leaves.push({ x: x + (rnd() - 0.5) * 6, y: y - rnd() * 2, vx: (rnd() - 0.5) * 8, vy: -4 - rnd() * 6, life: 1.4 + rnd() * 0.8, par, ph: rnd() * 6, c: rnd() < 0.5 ? [86, 140, 62] : [124, 170, 78] }); };
+  // a crew member's swing along the canopy branch (see swing.js)
+  const crewBrachiator = (a, sp) => { const g = AGILE[sp.canopy]; return makeBrachiator({ R: (sp.ua + sp.la) * 0.9, halfPeriod: g.T, amp: g.amp, ricochet: sp.canopy === 'brachiate-fast', branchY: x => branchY(x) + 1, x0: a.x, lo: 30, hi: WORLD - 30, dir: a.facing || 1 }); };
   const flies = Array.from({ length: 5 }, (_, i) => ({ x: 100 + i * 180, y: 90, c: [[255, 170, 40], [90, 160, 255], [255, 110, 200], [250, 230, 80], [120, 220, 160]][i], ph: i * 1.7 }));
   const ID = Object.fromEntries(CREW.map((k, i) => [k, i + 1]));
   const actors = {};
@@ -69,7 +74,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       }
       const last = a.legs[a.legs.length - 1], goingHome = last && last.home;
       if (home && !goingHome && !(a.atDoor && a.lane === d.lane)) { plan(a, d.lane, d.x); a.legs[a.legs.length - 1].home = true; }
-      if (!home && goingHome && !a.air && !a.sw && a.anim !== 'climb') a.legs = [];
+      if (!home && goingHome && !a.air && !(a.br && a.br.mode === 'flight') && a.anim !== 'climb') a.legs = [];
       if (!home && !a.legs.length && !a.air) {
         a.wait -= dt;
         if (a.wait <= 0) {
@@ -84,23 +89,24 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
         const r = a.air; r.vy += 170 * dt; r.x += r.vx * dt; r.y += r.vy * dt; a.x = r.x; setAnim(a, 'leap');
         if (r.y >= groundY(a.x)) { a.lane = 'ground'; a.air = null; a.land = 0.28; a.spd *= 0.4; a.legs.shift(); }
       } else if (leg && leg.k === 'drop') {
-        a.sw = null; a.air = { x: a.x, y: branchY(a.x) + (sp.canopy?.startsWith('brachiate') ? 14 : -2), vx: a.facing * (12 + sp.walk * 0.6), vy: sp.canopy?.startsWith('brachiate') ? 0 : -26 };
+        if (a.br) {                                        // let go of the branch: the swing's own speed carries into the fall
+          const [cx, cy] = a.br.chest(), [vx, vy] = a.br.velocity();
+          a.air = { x: cx, y: cy + sp.tl, vx: Math.max(-40, Math.min(40, vx || a.facing * 10)), vy: Math.min(20, vy) }; a.facing = Math.sign(a.air.vx) || a.facing; a.br = null;
+        } else {                                           // a branch-walker crouches, then jumps down
+          a.prepT = (a.prepT ?? 0.16) - dt; setAnim(a, 'land');
+          if (a.prepT <= 0) { a.prepT = undefined; a.air = { x: a.x, y: branchY(a.x) - 2, vx: a.facing * (12 + sp.walk * 0.6), vy: -26 }; }
+        }
       } else if (leg && leg.k === 'move') {
         a.atDoor = false;
         const dx = leg.x - a.x, dir = Math.sign(dx) || a.facing;
-        if (a.lane === 'canopy' && AGILE[sp.canopy]) {     // pendulum swing, hand over hand
-          const g = AGILE[sp.canopy], Lb = bodyLen(sp), amp = g.amp * (home ? 1.1 : 1);
-          if (!a.sw) { a.sw = { gx: a.x + dir * Lb * Math.sin(amp), u: 0, dir, hand: 0 }; a.facing = dir; }
-          const s = a.sw; s.u += dt / (g.T * (home ? 0.85 : 1));
-          const th = -amp * Math.cos(Math.PI * Math.min(1, s.u));
-          a.x = s.gx + s.dir * Lb * Math.sin(th); a.th = th;
-          setAnim(a, 'hang');
-          if (s.u >= 1) {
-            if (Math.abs(leg.x - a.x) < Lb * Math.sin(amp) * 1.2 || Math.sign(leg.x - a.x) !== s.dir) { a.legs.shift(); if (leg.home) a.atDoor = true; if (!a.legs.length || a.legs[0].k !== 'move') a.sw = { ...s, u: 1, hold: true }; else a.sw = null; }
-            else { s.gx += s.dir * 2 * Lb * Math.sin(amp); s.u -= 1; s.hand ^= 1; }
-          }
+        if (a.lane === 'canopy' && AGILE[sp.canopy]) {     // swinging along the canopy: a real pendulum (swing.js)
+          if (!a.br) a.br = crewBrachiator(a, sp);
+          if (a.br.target !== leg.x) a.br.travelTo(leg.x, home);
+          if (a.br.step(dt, rnd) === 'catch') shake(a.br.hx, branchY(a.br.hx), 1, a.br.ricochet ? 5 : 2);
+          stepPose(a.br, sp, 1, dt);
+          a.x = a.br.chest()[0]; a.facing = a.br.dir; setAnim(a, 'brach');
+          if (a.br.arrived()) { a.legs.shift(); if (leg.home) a.atDoor = true; if (!a.legs.length || a.legs[0].k !== 'move') a.br.travelTo(null); }
         } else {
-          a.sw = null;
           const run = home, target = (a.lane === 'canopy' ? (run ? sp.run * 0.9 : sp.walk * 1.1) : (run ? sp.run : sp.walk));
           const brake = Math.sqrt(2 * 50 * Math.abs(dx));
           a.spd = Math.min(brake + 2, a.spd + Math.sign(target - a.spd) * Math.min(Math.abs(target - a.spd), 55 * dt));
@@ -111,7 +117,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
           if (Math.abs(dx) <= Math.max(step, 0.3)) { a.x = leg.x; a.legs.shift(); if (!a.legs.length) a.spd = 0; if (leg.home) a.atDoor = true; } else a.x += dir * step;   // the last leg of a trip home ends at the door
         }
       } else if (leg && leg.k === 'climb') {
-        a.sw = null; a.x = leg.x; a.facing = 1; setAnim(a, 'climb');
+        a.br = null; a.x = leg.x; a.facing = 1; setAnim(a, 'climb');
         a.climbY = a.climbY ?? groundY(a.x) - 8;
         const surge = 0.3 + 0.7 * pos(Math.sin(a.phase + Math.PI)), step = (home ? 22 : 14) * surge * dt;
         a.phase += dt * (home ? 7 : 5);
@@ -120,8 +126,10 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       } else {
         // standing still: hold a hang, or idle on the ground / branch
         if (a.lane === 'canopy' && AGILE[sp.canopy]) {
-          const s = a.sw || (a.sw = { gx: a.x, u: 1, dir: a.facing, hand: 0, hold: true });
-          s.idle = (s.idle || 0) + dt; a.th = Math.sin(s.idle * 2.2) * 0.12; a.x = s.gx + s.dir * bodyLen(sp) * Math.sin(a.th); setAnim(a, 'hang');
+          if (!a.br) a.br = crewBrachiator(a, sp);                // hang and settle, swaying gently
+          if (a.br.target !== null) a.br.travelTo(null);
+          a.br.step(dt, rnd); stepPose(a.br, sp, 1, dt);
+          a.x = a.br.chest()[0]; setAnim(a, 'brach');
         } else {
           a.spd = 0;
           if (a.lane === d.lane && Math.abs(a.x - d.x) < 0.5) a.atDoor = true;
@@ -136,7 +144,8 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       // the tail follows its pose like a spring: it swings and settles on its own
       const want = a.q ? (a.q.tail ?? 0.5) : 0.5; a.tailV += ((want - a.tailA) * 60 - a.tailV * 9) * dt; a.tailA += a.tailV * dt;
     }
-    for (const v of villagers) stepVillager(v, dt, rnd);
+    for (const v of villagers) if (stepVillager(v, dt, rnd) === 'catch') shake(v.b.hx, v.b.branchY(v.b.hx), 0.55, v.fast ? 3 : 1);
+    for (let i = leaves.length - 1; i >= 0; i--) { const l = leaves[i]; l.life -= dt; l.ph += dt * 5; l.vy = Math.min(9, l.vy + 18 * dt); l.vx *= 0.97; l.x += (l.vx + Math.sin(l.ph) * 6) * dt; l.y += l.vy * dt; if (l.life <= 0 || l.y > WATER) leaves.splice(i, 1); }
     for (const f of flies) { f.ph += dt; f.x += Math.sin(f.ph * 0.7) * 10 * dt + 4 * dt; f.y = 92 + Math.sin(f.ph * 1.3) * 8 + Math.sin(f.ph * 5) * 1.5; if (f.x > WORLD) f.x = 0; }
     for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.life -= dt; s.vy += s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; if (s.life <= 0) sparks.splice(i, 1); }
   }
@@ -147,7 +156,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       case 'walk': return P.walk(sp, a.phase);
       case 'run': return P.run(sp, a.phase);
       case 'climb': return P.climb(sp, a.phase);
-      case 'hang': { const s = a.sw || {}; const q = P.hang(sp, a.th || 0, Math.min(1, s.u || 0), sp.canopy === 'brachiate-fast'); return s.hand ? { ...q, sh: [q.sh[1], q.sh[0]], el: [q.el[1], q.el[0]], grip: 1 } : q; }
+      case 'brach': return brachiatePose(sp, a.br, 1, { fast: sp.canopy === 'brachiate-fast' }).q;
       case 'leap': return P.leap(sp, a.air ? a.air.vy : 0);
       case 'land': return P.land(sp, Math.max(0, a.land / 0.28));
       default: return (P[a.anim] || P.stand)(sp, t);
@@ -209,7 +218,8 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     }
     blit(L.back, 0.55);
     fb.ox = Math.round(cam * 0.55); fb.fog = 0.26; fb.fogc = [150, 140, 130];
-    for (const v of villagers) { const { q, px, py } = villagerPose(v); drawApe(fb, v.key, q, { mode: 'pelvis', x: px, y: py }, v.dir, v.s, t); }
+    for (const v of villagers) { const { q, px, py } = villagerPose(v); drawApe(fb, v.key, q, { mode: 'pelvis', x: px, y: py }, v.b.dir, v.s, t); }
+    for (const l of leaves) if (l.par !== 1) fb.put(l.x - fb.ox, l.y, l.c);
     fb.fog = 0; fb.ox = 0;
     // low mist drifting through the trees behind the village
     for (let y = 84; y < WATER; y++) for (let x = 0; x < W; x++) { const n = noise1((x + cam * 0.7 + t * 4) / 23, 9) * 0.6 + noise1((x + cam * 0.7 - t * 2) / 9, 10) * 0.4, a = n * (1 - Math.abs(y - 104) / 20) * 0.5; if (a > 0.05) fb.add(x, y, [64, 54, 54], a * 0.45); }
@@ -237,13 +247,14 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       const sp = SPECIES[k], target = poseFor(a), q = blendPose(a.prev, target, a.blend * a.blend * (3 - 2 * a.blend)); q.tail = a.tailA; a.q = q;
       let at;
       if (a.anim === 'climb') at = { mode: 'pelvis', x: a.x - (k === 'chief' ? 13 : 7), y: a.climbY };
-      else if (a.anim === 'hang') at = { mode: 'hand', x: a.sw ? a.sw.gx : a.x, y: branchY(a.sw ? a.sw.gx : a.x) + 1 };
+      else if (a.anim === 'brach' && a.br) { const p = brachiatePose(sp, a.br, 1, { fast: sp.canopy === 'brachiate-fast' }); at = { mode: 'pelvis', x: p.px, y: p.py }; if (a.blend >= 1) { Object.assign(q, p.q); q.tail = a.tailA; } }
       else if (a.anim === 'leap') at = { mode: 'pelvis', x: a.x, y: a.air ? a.air.y - 4 : groundY(a.x) - 6 };
       else at = { mode: 'ground', x: a.x, y: surfaceY(a.lane, a.x) - (a.lane === 'canopy' ? 1.5 : 0) };
       heads[k] = drawApe(fb, k, q, at, a.facing, 1, t);
     }
     fb.pid = -1;
     glowOutline();
+    for (const l of leaves) if (l.par === 1) { fb.put(l.x - cam, l.y, l.c); if (Math.sin(l.ph) > 0) fb.put(l.x - cam + 1, l.y, l.c); }
     for (const s of sparks) { if (s.steam) { fb.add(Math.round(s.x - cam), Math.round(s.y), s.c, 0.35 * s.life); fb.add(Math.round(s.x - cam) + 1, Math.round(s.y), s.c, 0.2 * s.life); } else fb.put(s.x - cam, s.y, s.c); }
     for (const f of flies) { const x = Math.round(f.x - cam), y = Math.round(f.y), up = Math.sin(f.ph * 18) > 0; fb.put(x, y, [40, 30, 30]); fb.put(x - 1, y - (up ? 1 : 0), f.c); fb.put(x + 1, y - (up ? 1 : 0), f.c); }
     for (let i = 0; i < 14; i++) { const x = ((hash(i, 93) * WORLD + Math.sin(t * 0.3 + i) * 20) - cam), y = 70 + hash(i, 94) * 40 + Math.sin(t * 0.8 + i * 2) * 5; if (x > -2 && x < W + 2 && Math.sin(t * 2.3 + i * 1.7) > 0.3) fb.add(x, y, [200, 255, 140], 0.7); } // fireflies
