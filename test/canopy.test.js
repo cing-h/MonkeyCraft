@@ -63,3 +63,48 @@ test('every story is painted', () => {
   const colours = () => { const d = cv.ctx.last.data, set = new Set(); for (let i = 0; i < d.length; i += 4) set.add((d[i] << 16) | (d[i + 1] << 8) | d[i + 2]); return set.size; };
   for (const k of [0, 1, 2]) { st.toStory(k); for (let i = 0; i < 40; i++) st.step(0, 0.05); assert.ok(colours() > 400, `${STORIES[k].name} is fully painted`); }
 });
+
+// ---------- 2a: roaming between the stories ----------
+import { LANES, route, nextLane, pickWander } from '../ui/station/ape/lanes.js';
+import { SPECIES } from '../ui/station/ape/cast.js';
+
+test('there is a route from every lane to every other, and walks always end where climbs begin', () => {
+  for (const from of LANES) for (const to of LANES) {
+    const legs = route(from, 300, to, 700);
+    let lane = from;
+    for (let i = 0; i < legs.length; i++) {
+      const g = legs[i];
+      if (g.k === 'climb') { assert.equal(g.from, lane, `${from}→${to}: a climb starts on the lane it's on`); assert.equal(legs[i - 1].k, 'move'); assert.equal(legs[i - 1].x, g.x - g.dx, 'the walk ends at the foot of the climb'); lane = g.to; }
+      if (g.k === 'drop') { assert.equal(lane, 'canopy', 'only the low branch is low enough to drop from'); lane = 'ground'; }
+    }
+    assert.equal(lane, to, `${from}→${to} arrives`); assert.deepEqual(legs.at(-1), { k: 'move', x: 700 });
+  }
+  assert.equal(nextLane('c2', 'ground'), 'c1', 'Canopy 2 is reached only through Canopy 1');
+});
+
+test('wanderers visit every story; only climbers use the low branch', () => {
+  let s = 3; const rnd = () => (s = (Math.imul(s, 1103515245) + 12345) >>> 0) / 4294967296;
+  const seen = sp => { const n = {}; for (let i = 0; i < 2000; i++) { const g = pickWander(SPECIES[sp], 'ground', rnd); n[g.lane] = (n[g.lane] || 0) + 1; } return n; };
+  const chimp = seen('smith'), gorilla = seen('chief');
+  for (const l of ['ground', 'c1', 'c2', 'canopy']) assert.ok(chimp[l] > 50, `the chimp goes to ${l}`);
+  assert.equal(gorilla.canopy, undefined, 'a gorilla never tries the low branch');
+});
+
+test('villagers roam all stories and are never busy; a job brings every crew member home from any story', () => {
+  const modes = Object.fromEntries(CREW_IDS.map(k => [k, 'idle'])); modes.sage = 'asleep'; modes.ringer = 'asleep';
+  const cv = fakeCanvas(), st = makeStation(cv, { modeOf: id => modes[id] });
+  const lanes = new Set(), crewUp = new Set();
+  for (let i = 0; i < 4000; i++) {
+    st.step(0, 0.05);
+    for (const f of st._folk) lanes.add(f.lane);
+    for (const k of CREW_IDS) if (/^c[12]$/.test(st._actors[k].lane)) crewUp.add(k);
+  }
+  assert.ok(lanes.has('c1') && lanes.has('c2') && lanes.has('ground'), 'villagers live on every story');
+  assert.ok(crewUp.size >= 3, 'idle crew wander up into the canopy');
+  assert.ok(st._folk.every(f => f.folk && f.mode === 'idle' && f.s < 1), 'villagers are always free, and smaller than the crew');
+  for (const k of CREW_IDS) if (modes[k] === 'idle') modes[k] = 'working';
+  const far = CREW_IDS.filter(k => /^c[12]$/.test(st._actors[k].lane));
+  let done = false;
+  for (let i = 0; i < 20 * 90 && !done; i++) { st.step(0, 0.05); done = CREW_IDS.filter(k => modes[k] === 'working').every(k => st._actors[k].inside); }
+  assert.ok(done, `every working crew member got home within 90 s (from the canopy: ${far.join(', ') || 'none'})`);
+});

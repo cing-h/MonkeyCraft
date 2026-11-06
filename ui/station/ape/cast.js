@@ -163,19 +163,22 @@ export function fk(sp, q) {
  * Draw one creature. at = { x, y, mode: 'ground' (y = surface) | 'hand' (y = branch, x = grip x) | 'pelvis' (x,y = pelvis) }
  * facing = 1 right / -1 left. scale for depth.
  */
-export function drawApe(fb, key, q, at, facing, scale = 1, t = 0) {
-  const sp = SPECIES[key], k = fk(sp, q), s = scale, f = facing;
-  // place the body
-  let ox, oy;
+/** Where the pelvis goes for a placement: 'ground' (at.y = the surface its feet rest on), 'hand' (at = its grip) or 'pelvis'. */
+export function placeApe(key, q, at, facing, scale = 1, k = fk(SPECIES[key], q)) {
+  const sp = SPECIES[key], s = scale;
   if (at.mode === 'ground') {
     let low = 0;
     const pts = [k.legs[0][1], k.legs[1][1]]; if (q.plant === 'all') pts.push(k.arms[0][1], k.arms[1][1]);
     if (q.sitting) pts.push([0, sp.pr * 0.8]);
     for (const p of pts) low = Math.max(low, p[1] + sp.lr * 0.6);
-    ox = at.x; oy = at.y - (low + (q.lift || 0)) * s;
-  } else if (at.mode === 'hand') {
-    const h = k.arms[q.grip][1]; ox = at.x - h[0] * s * f; oy = at.y - (h[1] - sp.ar * 0.5) * s;
-  } else { ox = at.x; oy = at.y; }
+    return [at.x, at.y - (low + (q.lift || 0)) * s];
+  }
+  if (at.mode === 'hand') { const h = k.arms[q.grip][1]; return [at.x - h[0] * s * facing, at.y - (h[1] - sp.ar * 0.5) * s]; }
+  return [at.x, at.y];
+}
+export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false) {   // plain: a villager, without the crew's tools and finery
+  const sp = SPECIES[key], k = fk(sp, q), s = scale, f = facing;
+  const [ox, oy] = placeApe(key, q, at, facing, scale, k);   // place the body
   const X = p => ox + p[0] * s * f, Y = p => oy + p[1] * s;
   const limb = (i, far) => {
     const m = far ? sp.mf : sp.m, [el, hd] = k.arms[i];
@@ -194,7 +197,7 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0) {
   // body
   fb.cap(X([0, 0]), Y([0, 0]), X(k.ch), Y(k.ch), sp.pr * s, sp.tr * s, sp.m);
   if (key === 'chief') { const mid = [k.ch[0] * 0.45 - Math.cos(q.torso) * sp.tr * 0.35, k.ch[1] * 0.45 - Math.sin(q.torso) * sp.tr * 0.35]; fb.ell(X(mid), Y(mid), sp.tr * 0.9 * s, sp.tr * 0.55 * s, mat([150, 152, 160]), q.torso * f + Math.PI / 2); }
-  if (key === 'smith') fb.cap(X([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), Y([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), X([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), Y([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), 2 * s, 2.3 * s, mat([96, 62, 38]));
+  if (key === 'smith' && !plain) fb.cap(X([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), Y([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), X([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), Y([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), 2 * s, 2.3 * s, mat([96, 62, 38]));
   if (key === 'archivist') for (const i of [0, 1]) { const [el] = k.arms[i]; fb.cap(X(el), Y(el), X([el[0] - 0.5, el[1] + 2.5]), Y([el[0] - 0.5, el[1] + 2.5]), 1.1 * s, 0.4 * s, i ? sp.mf : sp.m); } // shaggy arm hair
   // head
   const hx = X(k.head), hy = Y(k.head), hr = sp.hr * s, fwd = [Math.cos(k.ha) * f, Math.sin(k.ha)];
@@ -213,6 +216,7 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0) {
   if (key === 'archivist') { for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) fb.put(ex + dx, ey + dy, [210, 200, 160]); fb.put(ex, ey, [24, 16, 14]); } // spectacles
   // accessories
   if (key === 'chief') for (let i = 0; i < 3; i++) fb.cap(hx - fwd[0] * hr * 0.4 + (i - 1) * 1.6 * s * f, hy - hr * 1.1, hx - fwd[0] * hr * 0.8 + (i - 1) * 2.4 * s * f, hy - hr * 2.4 - (i === 1 ? 1.5 : 0) * s, 0.9 * s, 0.5 * s, mat(i === 1 ? C.gold : C.red));
+  if (plain) { leg(0, false); limb(0, false); return { headX: hx, headY: hy - hr }; }
   if (key === 'scout') fb.cap(hx - fwd[0] * hr, hy - hr * 0.35, hx + fwd[0] * hr * 0.3, hy - hr * 0.75, 0.9 * s, 0.9 * s, mat([60, 150, 170]));  // bandana
   if (key === 'sage') { fb.cap(hx - fwd[0] * hr, hy - hr * 0.45, hx + fwd[0] * hr * 0.4, hy - hr * 0.8, 0.8 * s, 0.8 * s, mat([80, 110, 200])); for (let i = 0; i < 4; i++) fb.put(X(k.ch) + (i - 1.5) * s - fb.ox, Y(k.ch) + 1.5 * s + Math.abs(i - 1.5) * 0.5, [120, 170, 255]); }
   if (key === 'ringer') fb.cap(X(k.ch) - 2 * s * f, Y(k.ch) + 0.5 * s, X(k.ch) + 2 * s * f, Y(k.ch) + 1 * s, 1 * s, 1 * s, mat(C.gold)); // scarf

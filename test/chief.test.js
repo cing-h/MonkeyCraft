@@ -60,7 +60,7 @@ test('the Chief walks down the ladder and back, and a job sends him straight hom
   // a whole walk: down the ladder, along the ground, look round, back up
   walkNow();
   assert.ok(until(() => a.anim === 'climb', 30), 'he heads for the ladder and climbs');
-  assert.equal(a.x, LADDER_X);
+  assert.equal(a.x, LADDER_X - 4, 'on the rope ladder');
   assert.ok(until(() => a.lane === 'ground' && a.anim !== 'climb', 30), 'down on the ground');
   assert.ok(until(() => a.anim === 'look', 30), 'he stops for a look round');
   assert.ok(until(() => a.lane === 'perch' && !a.legs.length, 60), 'and climbs back up to his platform');

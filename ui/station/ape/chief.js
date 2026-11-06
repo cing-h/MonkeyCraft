@@ -3,8 +3,8 @@
 // While he's free, the Chief mostly rests on his lodge platform. Every 20–60 s he
 // shifts to a new spot and settles into a new rest pose (sitting, lying on his side,
 // lying on his back, or leaning against the great tree). Rarely, every several
-// minutes, he climbs down the rope ladder, strolls through the village, has a look
-// round and climbs back up. Far less often than the rest of the crew wander.
+// minutes, he climbs down the rope ladder (or up the great trunk to Canopy 1), strolls,
+// has a look round and climbs back. Far less often than the rest of the crew wander.
 //
 // Pure: the scene calls step(dt) only while he's free and resting on the platform,
 // and calls interrupt() when a job sends him back to his station. rnd is injected.
@@ -37,7 +37,8 @@ export function makeChiefIdle({ rnd, reduced = false }) {
       restT -= dt; walkT -= dt;
       if (walkT <= 0) {
         walkT = span(T.walk); restT = span(T.settle); pose = null;
-        return { kind: 'walk', x: Math.round(130 + rnd() * 700), linger: span(T.linger) };
+        const up = rnd() < 0.3;   // now and then his stroll takes him up the great trunk to Canopy 1
+        return { kind: 'walk', lane: up ? 'c1' : 'ground', x: Math.round(up ? 300 + rnd() * 360 : 130 + rnd() * 700), linger: span(T.linger) };
       }
       if (restT <= 0) { restT = span(T.rest); return pick(); }
       return null;

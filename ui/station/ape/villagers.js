@@ -7,19 +7,30 @@
 import { hash } from './fb.js';
 import { AGILE, SPECIES } from './cast.js';
 import { backBranchY } from './world.js';
+import { backCanopyY } from './canopy.js';
 import { makeBrachiator, stepPose, brachiatePose } from './swing.js';
 
 export const VILLAGERS = ['scout', 'smith', 'archivist', 'writer'];
+/** Free-roaming villagers in the village layer (see scene.js): their species and the story each calls home. */
+export const FOLK = [{ key: 'smith', home: 'c1' }, { key: 'writer', home: 'c2' }, { key: 'scout', home: 'c1' }, { key: 'inspector', home: 'ground' }, { key: 'archivist', home: 'c2' }];
+
+// villagers on the far branches of the two canopy stories
+export const CANOPY_VILLAGERS = [{ key: 'scout', s: 1 }, { key: 'archivist', s: 1 }, { key: 'writer', s: 2 }, { key: 'scout', s: 2 }];
 
 export function makeVillagers(bw) {
-  return VILLAGERS.map((k, i) => {
+  const up = CANOPY_VILLAGERS.map((c, i) => {
+    const sp = SPECIES[c.key], g = AGILE[sp.canopy], s = 0.7, span = 160 + hash(i, 20) * 100, x0 = 30 + hash(i, 21) * (bw - 60 - span), fast = sp.canopy === 'brachiate-fast';
+    const b = makeBrachiator({ R: (sp.ua + sp.la) * s * 0.9, halfPeriod: g.T * (1.05 + hash(i, 22) * 0.25), amp: g.amp, ricochet: fast, branchY: x => backCanopyY(c.s, x) + 0.6, x0: x0 + hash(i, 23) * span, lo: x0, hi: x0 + span, dir: hash(i, 24) < 0.5 ? 1 : -1 });
+    return { key: c.key, s, b, fast, x0, x1: x0 + span, rest: hash(i, 25) * 3, story: c.s };
+  });
+  return [...VILLAGERS.map((k, i) => {
     const sp = SPECIES[k], g = AGILE[sp.canopy], s = 0.7, span = 150 + hash(i, 10) * 90;
     const x0 = 20 + i * (bw - 40 - span) / (VILLAGERS.length - 1) + (hash(i, 11) - 0.5) * 30;
     const fast = sp.canopy === 'brachiate-fast';
     const b = makeBrachiator({ R: (sp.ua + sp.la) * s * 0.9, halfPeriod: g.T * (1.05 + hash(i, 14) * 0.25), amp: g.amp * (0.9 + hash(i, 13) * 0.2), ricochet: fast,
       branchY: x => backBranchY(x) + 0.6, x0: x0 + hash(i, 12) * span, lo: x0, hi: x0 + span, dir: hash(i, 15) < 0.5 ? 1 : -1 });
     return { key: k, s, b, fast, x0, x1: x0 + span, rest: hash(i, 16) * 3 };
-  });
+  }), ...up];
 }
 
 export function stepVillager(v, dt, rnd) {

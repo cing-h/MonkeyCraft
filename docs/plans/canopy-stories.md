@@ -20,7 +20,7 @@ Branch `feature/canopy-stories`, built on `feature/chief-roams`. The design is i
 
    Also tests for the camera bounds and the plot layout.
 2. **Roaming, culture and the council.** The user added a culture and a council on 2026-11-06 and chose a real council that meets when called by a button or once a day, in the Council Ring on Canopy 1. Built in three parts, with a check-in after each:
-   - **2a. Roaming between stories.**
+   - **2a. Roaming between stories.** DONE (2026-11-06). Lanes and routes live in `ui/station/ape/lanes.js`. Five free-roaming villagers (smaller, no glow, no tools) plus far-branch villagers on both canopy stories. The Chief's strolls sometimes go up the great trunk to Canopy 1. Fixed on the way: turns are a short flip instead of an instant mirror, and the body eases between resting placements.
      - Crew and villagers travel to all three levels: climbing trunks from the ground to Canopy 1, ladders and vines between Canopy 1 and Canopy 2, and walking the bridges. The swingers brachiate under the boughs.
      - Some villagers live up there.
      - The truthful-station rules are unchanged, and a job brings anyone home from any story.

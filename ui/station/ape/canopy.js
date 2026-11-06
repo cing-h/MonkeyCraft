@@ -45,6 +45,8 @@ export function walkY(s, x) {
 }
 /** Plots kept free for future crew members' tree houses: the bough platforms, four on each canopy story. */
 export const PLOTS = [1, 2].flatMap(s => WALK[s].filter(g => g.kind === 'bough').map((g, i) => ({ id: `c${s}-${'abcd'[i]}`, story: s, x: (g.x0 + g.x1) / 2, y: g.y, w: g.x1 - g.x0 })));
+/** The far branch through each canopy story (back-layer coordinates). */
+export const backCanopyY = (s, x) => STORY_Y[s] + 6 + Math.sin(x / 33 + s) * 3 + Math.sin(x / 11 + 2 * s);
 /** Rope ladders between Canopy 1 and Canopy 2, beside two of the trunks. */
 export const LADDERS = [232 + 13, 664 - 13].map(x => ({ x, from: 1, to: 2 }));
 
@@ -125,6 +127,12 @@ export function paintCanopyBack(back) {
       const x = i * (back.w / 25) + (hash(i, row, s, 91) - 0.5) * 20 + (row & 1) * 12, y = base - 120 + row * 42 + (hash(i, row, s, 92) - 0.5) * 18;
       foliage(back, x, y, 18 + hash(i, row, s, 93) * 14, 13 + hash(i, row, s, 94) * 8, pal, 2000 + i * 7 + row * 131 + s * 977);
     }
+  }
+  // a far branch through each canopy story, where villagers swing in the distance
+  for (const s of [1, 2]) {
+    back.fog = s === 1 ? 0.36 : 0.26; back.fogc = s === 1 ? [52, 74, 84] : [96, 104, 120];
+    for (let x = 0; x < back.w; x += 2) back.cap(x, backCanopyY(s, x), x + 2, backCanopyY(s, x + 2), 1.2, 1.2, mat([88, 70, 56]));
+    for (let i = 0; i < 14; i++) { const x = hash(i, s, 125) * back.w; foliage(back, x, backCanopyY(s, x) - 1.5, 4 + hash(i, s, 126) * 3, 2, tone(GREENS.canopy, s), 760 + i + s * 30); }
   }
   back.fogc = [150, 140, 130];
   for (let i = 0; i < 12; i++) {
