@@ -7,6 +7,12 @@
 export function makeStreamParser({ mcpServer = 'monkeycraft' } = {}) {
   const deltaMsgs = new Set();
   let currentMsg = null;
+  // live token use, so limits can stop a job mid-run: every message_start adds its
+  // input tokens; output tokens grow through message_delta (a running total per message)
+  const tot = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  let doneOut = 0;
+  const num = v => (Number.isInteger(v) && v >= 0 ? v : 0);
+  const usage = () => ({ kind: 'usage', ...tot });
 
   function feed(o) {
     if (!o || typeof o !== 'object') return [];
@@ -23,7 +29,15 @@ export function makeStreamParser({ mcpServer = 'monkeycraft' } = {}) {
       }
       case 'stream_event': {
         const ev = o.event || {};
-        if (ev.type === 'message_start') { currentMsg = ev.message?.id || null; return []; }
+        if (ev.type === 'message_start') {
+          currentMsg = ev.message?.id || null;
+          const u = ev.message?.usage || {};
+          doneOut = tot.output;
+          tot.input += num(u.input_tokens); tot.cacheRead += num(u.cache_read_input_tokens); tot.cacheWrite += num(u.cache_creation_input_tokens);
+          tot.output = doneOut + num(u.output_tokens);
+          return [usage()];
+        }
+        if (ev.type === 'message_delta' && ev.usage) { tot.output = doneOut + num(ev.usage.output_tokens); return [usage()]; }
         if (ev.type === 'content_block_delta') {
           const d = ev.delta || {};
           if (d.type === 'text_delta' && d.text) { if (currentMsg) deltaMsgs.add(currentMsg); return [{ kind: 'token', text: d.text }]; }

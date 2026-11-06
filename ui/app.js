@@ -29,7 +29,7 @@ function answerButtons(ask, container) {
   const list = [];
   const mk = (label, cls, d) => { const b = el('button', cls, label); b.type = 'button'; b.onclick = () => answer(ask.promptId, d, document.querySelectorAll(`[data-prompt="${ask.promptId}"] button`)); container.append(b); list.push(b); };
   mk('Allow once', 'allow', 'allow_once');
-  if (!ask.outsideWorkspace) mk('Allow for this session', 'allow', 'allow_session');
+  if (!ask.outsideWorkspace) { mk('Allow for this session', 'allow', 'allow_session'); mk('Always allow', 'allow', 'allow_always'); }
   mk('Deny', 'deny', 'deny');
   return list;
 }
@@ -41,7 +41,7 @@ function runBox(ev) {
     $('empty')?.remove();
     const box = el('section', 'run'); box.dataset.agent = ev.agentId;
     if (filter && filter !== ev.agentId) box.classList.add('hide');
-    r = { box, agentId: ev.agentId, say: null, tools: new Map(), asks: new Map() };
+    r = { box, agentId: ev.agentId, say: null, tools: new Map(), asks: new Map(), undos: 0, ended: false, revertBtn: null };
     if (ev.type !== 'run.start') box.append(el('div', 'foot', `EARLIER JOB · ${(names[ev.agentId] || ev.agentId).toUpperCase()}`));
     runs.set(ev.runId, r); $('log').append(box);
   }
@@ -77,21 +77,47 @@ function logRun(ev) {
       r.asks.set(ev.promptId, a); r.box.append(a); break;
     }
     case 'permission.response': {
+      if (ev.by === 'rule') { r.box.append(el('div', 'note', `ALLOWED BY YOUR REMEMBERED ANSWER (${ev.decision === 'allow_always' ? 'ALWAYS' : 'THIS SESSION'})`)); break; }
       const a = r.asks.get(ev.promptId); if (!a) break;
       a.className = 'ask done'; a.querySelector('.btns')?.remove();
-      a.append(el('div', 'ans', ev.decision === 'deny' ? (ev.by === 'user' ? 'YOU SAID NO' : 'DENIED') : ev.decision === 'allow_session' ? 'ALLOWED FOR THIS SESSION' : 'ALLOWED ONCE'));
+      a.append(el('div', 'ans', ev.decision === 'deny' ? (ev.by === 'user' ? 'YOU SAID NO' : 'DENIED') : ev.decision === 'allow_session' ? 'ALLOWED FOR THIS SESSION' : ev.decision === 'allow_always' ? 'ALWAYS ALLOWED (YOU CAN FORGET THIS UNDER REMEMBERED ANSWERS)' : 'ALLOWED ONCE'));
+      if (ev.decision === 'allow_always') loadGrants();
       break;
     }
     case 'run.error': r.box.append(el('div', 'error', ev.message)); break;
+    case 'taint.set': r.box.append(el('div', 'lock', `READ WEB CONTENT (${ev.source}). FOR SAFETY, COMMANDS AND FILE CHANGES ARE LOCKED FOR THE REST OF THIS JOB.`)); break;
+    case 'breaker.trip': r.box.append(el('div', 'warn', ev.kind === 'repeat' ? `PAUSED A REPEATED STEP: ${ev.detail}` : `STOPPING: ${ev.detail}, NO PROGRESS`)); break;
+    case 'budget.threshold': {
+      const what = { tokens: `${fmtTokens(ev.spent)} of ${fmtTokens(ev.limit)} tokens`, run: `~$${ev.spent.toFixed(2)} of the $${ev.limit} job limit`, day: `today's spend ~$${ev.spent.toFixed(2)} of the $${ev.limit} daily limit` }[ev.scope] || `${ev.spent} of ${ev.limit}`;
+      r.box.append(el('div', ev.hard ? 'error' : 'warn', ev.hard ? `SPENDING LIMIT REACHED: ${what}. THE JOB WAS STOPPED.` : `SPENDING WARNING: ${what}.`)); break;
+    }
+    case 'undo.saved': r.undos++; break;
+    case 'undo.reverted': r.box.append(el('div', 'note', `REVERTED ${ev.path}`)); if (r.revertBtn) { r.revertBtn.disabled = true; r.revertBtn.textContent = 'Reverted'; } break;
     case 'station.halt': r.box.append(el('div', 'error', 'STOP pressed: halting.')); break;
     case 'agent.cost': r.cost = ev; break;
     case 'run.end': {
       const c = r.cost, est = c && c.billing === 'subscription' ? ' (subscription: estimate, not charged)' : '';
       r.box.append(el('div', 'foot', `${REASONS[ev.reason] || ev.reason.toUpperCase()} · ${ev.turns} TURNS · ${fmtTokens(ev.tokens)} TOKENS · ~$${ev.usd.toFixed(3)}${est}`));
+      r.ended = true;
+      if (r.undos) addRevert(r, ev.runId);
       loadSpend(); break;
     }
   }
   const l = $('log'); if (l.scrollHeight - l.scrollTop - l.clientHeight < 200) l.scrollTop = l.scrollHeight;
+}
+
+// "Revert this job": undo every file change it made (newer edits are never overwritten)
+function addRevert(r, runId) {
+  const b = el('button', 'revert', `Revert this job (${r.undos} file change${r.undos > 1 ? 's' : ''})`); b.type = 'button';
+  b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Reverting…';
+    const res = await post(`/api/runs/${runId}/revert`);
+    if (!res.ok) { b.disabled = false; b.textContent = 'Revert this job'; alert(res.data.error || 'Could not revert.'); return; }
+    const skipped = res.data.results.filter(x => x.result.startsWith('skipped') && !x.result.includes('already'));
+    for (const x of skipped) r.box.append(el('div', 'warn', `NOT REVERTED ${x.path}: ${x.result.slice(9)}`));
+    b.textContent = skipped.length ? 'Reverted (some files skipped)' : 'Reverted';
+  };
+  r.revertBtn = b; r.box.append(b);
 }
 
 function logEvent(ev) {
@@ -159,8 +185,9 @@ function syncBubbles() {
 // ---------- spend, roster, controls ----------
 async function loadSpend() {
   try {
-    const { today } = await fetch('/api/spend').then(r => r.json());
-    $('spend').textContent = `TODAY · ${today.runs} JOBS · ${fmtTokens(today.tokens)} TOKENS · ~$${today.usd.toFixed(2)}`;
+    const { today, limits } = await fetch('/api/spend').then(r => r.json());
+    $('spend').textContent = `TODAY · ${today.runs} JOBS · ${fmtTokens(today.tokens)} TOKENS · ~$${today.usd.toFixed(2)} OF $${limits.dailyUsd}`;
+    $('spend').classList.toggle('near', today.usd >= 0.8 * limits.dailyUsd);
   } catch {}
 }
 
@@ -168,9 +195,10 @@ $('composer').addEventListener('submit', async e => {
   e.preventDefault();
   const prompt = $('prompt').value.trim(); if (!prompt) return;
   $('send').disabled = true;
-  const r = await post('/api/run', { agentId: 'smith', prompt });
+  let r = await post('/api/run', { agentId: 'smith', prompt });
+  if (!r.ok && r.data.code === 'daily_cap' && confirm(`${r.data.error}\n\nRun this job anyway?`)) r = await post('/api/run', { agentId: 'smith', prompt, allowOverDaily: true });
   $('send').disabled = false;
-  if (!r.ok) { alert(r.data.error || 'Could not start the job.'); return; }
+  if (!r.ok) { if (r.data.code !== 'daily_cap') alert(r.data.error || 'Could not start the job.'); return; }
   $('prompt').value = '';
 });
 $('prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('composer').requestSubmit(); } });
@@ -204,7 +232,23 @@ canvas.addEventListener('pointerup', e => {
 });
 station.scrollTo(station.positionOf('smith')); syncThumb();
 
-loadSpend();
+// remembered answers: list them, forget any
+async function loadGrants() {
+  try {
+    const { grants } = await fetch('/api/grants').then(r => r.json());
+    const ul = $('grants'); ul.replaceChildren();
+    $('grants-count').textContent = grants.length ? ` (${grants.length})` : '';
+    if (!grants.length) { ul.append(el('li', 'empty', 'None yet. When you choose "Always allow", it is listed here.')); return; }
+    for (const g of grants) {
+      const li = el('li'); li.append(el('code', '', g.summary.split('\n')[0]));
+      const b = el('button', '', 'Forget'); b.type = 'button';
+      b.onclick = async () => { b.disabled = true; await post('/api/grants/forget', { key: g.key }); loadGrants(); };
+      li.append(b); ul.append(li);
+    }
+  } catch {}
+}
+
+loadSpend(); loadGrants();
 const es = new EventSource('/api/events');
 es.onmessage = m => { try { onEvent(JSON.parse(m.data)); } catch (e) { console.error(e); } };
 

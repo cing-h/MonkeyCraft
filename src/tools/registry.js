@@ -1,16 +1,21 @@
 // Tool registry and the dispatch pipeline. Every tool call from every provider
 // goes through dispatch(), in this fixed order:
 //
-//   unknown tool → grant gate → schema validation → assess (hardline + facts)
+//   unknown tool → grant gate → schema validation → loop breaker
+//   → assess (hardline + facts) → web-read lockout (taint)
 //   → consent (for anything that isn't a plain read) → run once, with timeout + abort
+//   → mark the job tainted if the tool read untrusted content
 //
 // dispatch() never throws. It returns { ok, isError, content, summary } and
 // emits agent.tool_call / agent.tool_result, so the station shows exactly what ran.
 //
 // Tool shape:
 //   { name: 'fs.read', description, inputSchema, capability, scope: 'read'|'write'|'execute',
-//     timeoutMs?, assess?(args, ctx) -> { deny?, summary, outsideWorkspace?, cacheKey?, facts? },
+//     taints?: true (its results are untrusted, e.g. web pages),
+//     timeoutMs?, assess?(args, ctx) -> { deny?, error?, summary, outsideWorkspace?, cacheKey?, facts? },
 //     run(args, ctx, facts) -> { content, summary?, isError? } }
+// `deny` is a safety rule (can't be approved); `error` is a plain mistake in the request.
+// ctx may carry: taint (makeTaint), breaker (makeBreaker), stop(reason) to end the job.
 
 const MAX_CONTENT = 60_000;
 
@@ -47,7 +52,11 @@ export function makeRegistry(tools) {
     const toolName = tool ? tool.name : String(call.tool);
     const args = (call.args && typeof call.args === 'object' && !Array.isArray(call.args)) ? call.args : {};
     emit('agent.tool_call', { callId, tool: toolName, args });
-    const finish = (isError, content, summary) => {
+    const finish = (isError, content, summary, counts = true) => {
+      if (counts && ctx.breaker) {
+        const trip = ctx.breaker.record(isError);
+        if (trip) { emit('breaker.trip', trip); ctx.stop?.('stale'); }
+      }
       const text = String(content ?? '');
       const clipped = text.length > MAX_CONTENT ? text.slice(0, MAX_CONTENT) + `\n…[cut: ${text.length - MAX_CONTENT} more characters]` : text;
       emit('agent.tool_result', { callId, tool: toolName, ok: !isError, isError, summary: String(summary || (isError ? 'error' : 'done')).slice(0, 300) });
@@ -60,10 +69,16 @@ export function makeRegistry(tools) {
       if (call.args !== undefined && args !== call.args) return finish(true, 'Arguments must be a JSON object. Nothing ran.', 'bad arguments');
       const errs = validateArgs(tool.inputSchema, args);
       if (errs.length) return finish(true, `Invalid arguments: ${errs.join('; ')}. Nothing ran.`, 'bad arguments');
-      if (ctx.signal?.aborted) return finish(true, 'The job was stopped. Nothing ran.', 'stopped');
+      if (ctx.signal?.aborted) return finish(true, 'The job was stopped. Nothing ran.', 'stopped', false);
+      const loop = ctx.breaker?.check(tool.name, args);
+      if (loop) { emit('breaker.trip', loop); return finish(true, `Paused: you have made this exact call too many times (${loop.detail}). Nothing ran. Try a different approach, or tell the user what is blocking you.`, 'paused: repeating'); }
 
       const a = tool.assess ? await tool.assess(args, ctx) : { summary: tool.name };
       if (a.deny) return finish(true, `Blocked by a MonkeyCraft safety rule: ${a.deny}. This can't be approved; do not retry it.`, `blocked: ${a.deny}`);
+      if (a.error) return finish(true, a.error, 'not done: bad request');
+      if (ctx.taint?.tainted && tool.scope !== 'read') {
+        return finish(true, `Locked: this job has read untrusted content (${ctx.taint.source()}), so for safety it can't run commands or change files any more. Nothing ran. Finish with what you can read, and tell the user what is left to do in a new job.`, 'locked: web content was read', false);
+      }
 
       const needsConsent = tool.scope !== 'read';
       if (needsConsent) {
@@ -71,7 +86,7 @@ export function makeRegistry(tools) {
           emit, runId: ctx.runId, interactive: ctx.interactive, signal: ctx.signal, callId, tool: tool.name,
           capability: tool.capability, scope: tool.scope, summary: a.summary, outsideWorkspace: !!a.outsideWorkspace, cacheKey: a.cacheKey
         });
-        if (!allowed) return finish(true, ctx.signal?.aborted ? 'The job was stopped. Nothing ran.' : 'The user said no. Nothing ran. Do not retry the same action; ask what they would prefer.', 'denied');
+        if (!allowed) return finish(true, ctx.signal?.aborted ? 'The job was stopped. Nothing ran.' : 'The user said no. Nothing ran. Do not retry the same action; ask what they would prefer.', 'denied', false);
       }
 
       const timeoutMs = Math.min(tool.timeoutMs || 60_000, ctx.maxToolMs || 600_000);
@@ -84,6 +99,7 @@ export function makeRegistry(tools) {
           tool.run(args, { ...ctx, signal: ac.signal, callId }, a.facts),
           new Promise((_, rej) => { timer = setTimeout(() => { rej(new Error(`timed out after ${Math.round(timeoutMs / 1000)}s`)); ac.abort('timeout'); }, timeoutMs); }) // reject first, so the timeout wins the race
         ]);
+        if (tool.taints && !res.isError && ctx.taint?.set(tool.name)) emit('taint.set', { source: tool.name });
         return finish(!!res.isError, res.content, res.summary);
       } finally { clearTimeout(timer); ctx.signal?.removeEventListener('abort', onAbort); }
     } catch (e) {

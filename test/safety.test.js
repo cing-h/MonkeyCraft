@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { hardlineRules, hardlineReason, checkPath } from '../src/safety/paths.js';
 import { checkCommand } from '../src/safety/shell-guard.js';
 import { makeConsentBroker } from '../src/safety/consent.js';
+import { makeGrantStore } from '../src/safety/grants.js';
+import { memFs } from './helpers/memfs.js';
 
 const home = '/home/u', dataDir = '/home/u/monkeycraft/data', workspace = '/home/u/MonkeyCraftWorkspace';
 const rules = hardlineRules({ home, dataDir });
@@ -48,9 +50,10 @@ test('shell guard refuses catastrophic and secret-touching commands only', () =>
 
 function broker() {
   let n = 0; const events = [];
-  const b = makeConsentBroker({ newId: p => `${p}_${++n}` });
+  const fs = memFs(), grants = makeGrantStore({ fsp: fs, file: '/data/grants.json', clock: { now: () => 1 } });
+  const b = makeConsentBroker({ newId: p => `${p}_${++n}`, grants });
   const emit = (type, payload) => events.push({ type, ...payload });
-  return { b, events, emit };
+  return { b, events, emit, grants, fs };
 }
 const req = (emit, extra = {}) => ({ emit, runId: 'r1', interactive: true, callId: 'c1', tool: 'shell.exec', capability: 'shell', scope: 'execute', summary: '$ ls', outsideWorkspace: false, cacheKey: 'shell:/ws:ls', ...extra });
 
@@ -66,9 +69,10 @@ test('consent: prompt, then allow once, deny, and a session grant inside the wor
 
   p = b.request(req(emit)); b.respond(events.at(-1).promptId, 'allow_session');
   assert.equal(await p, true);
-  const before = events.length;
+  const prompts = () => events.filter(e => e.type === 'permission.prompt').length, before = prompts();
   assert.equal(await b.request(req(emit)), true, 'session grant reused');
-  assert.equal(events.length, before, 'no new prompt');
+  assert.equal(prompts(), before, 'no new prompt');
+  assert.deepEqual([events.at(-1).decision, events.at(-1).by], ['allow_session', 'rule'], 'the journal records that a remembered answer allowed it');
   assert.equal(b.respond('perm_999', 'allow_once'), false);
 });
 

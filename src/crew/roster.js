@@ -15,7 +15,7 @@ export function makeRoster({ workspace }) {
     {
       id: 'smith', name: 'The Smith', role: 'Builder: runs commands and code', awake: true,
       provider: 'claude-code', model: 'claude-sonnet-5-5',
-      grants: ['fs.read', 'shell.exec'],
+      grants: ['fs.read', 'fs.write', 'shell.exec'],
       persona: 'You are the Smith, the builder of the MonkeyCraft crew: a chimpanzee blacksmith with a leather apron and a hammer, who works in the smithy of a jungle village. You run commands and build things. Practical and steady; you check results before you say a job is done.'
     },
     { id: 'chief', name: 'The Chief', role: 'Manager: plans and hands out the work', awake: false, wakes: 'M4' },

@@ -157,7 +157,15 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
    - Original scope:
    - port the renderer, then add the event → animation mapping and the consent plate;
    - *check:* no animation fires without a matching event (tested with a scripted event feed).
-4. **M3 Safety:**
+4. **M3 Safety — DONE 2026-11-06.** 47 tests pass (15 new in `test/m3.test.js`; the lockout and revert checks were mutation-tested).
+   - Remembered answers: `src/safety/grants.js` (session plus "Always allow", saved durably to `data/grants.json`, listed and forgettable in the UI). The ladder in `consent.js`: a remembered answer inside the workspace only, else non-interactive → deny, else prompt. Auto-allows are journaled as `permission.response` by `rule`.
+   - Web-read lockout: `src/safety/taint.js`. A tool marked `taints: true` sets it after a successful read (`taint.set`); then every non-read tool is refused for the rest of the run. `runs.taintRun()` exists for M4's provider-side web search. Tested with a stub web tool, since there's no real web tool until M4.
+   - Loop breaker: `src/safety/breaker.js` (FNV-1a canonical digests). The 4th identical call is refused; 6 failed steps in a row stop the run as `stale`.
+   - Spending: `src/money/budget.js`. Live token use comes from stream-json `message_start`/`message_delta` (weighted, cache reads ×0.1; default 600k per job) and stops a job as `budget`, with a warning at 80%. The per-job $2 cap is Claude Code's `--max-budget-usd`, reported as `budget.threshold` scope `run`. The soft daily $25 limit needs an explicit go-ahead once reached. Env: `MONKEYCRAFT_MAX_RUN_TOKENS`, `MONKEYCRAFT_DAILY_USD`.
+   - Leftover processes: `src/safety/children.js` records every child PID in `data/children.json`. At startup, leftovers are killed only if `/proc/<pid>/cmdline` still matches.
+   - Undo: `src/store/undo.js` plus the new `fs.write` tool (the Smith has it). The tool refuses cut-off content via `chars`, saves an undo copy first, and writes durably. "Revert this job" (`POST /api/runs/:id/revert`) restores edits and removes new files, and skips any file changed since.
+   - Live check: the Smith created a file; "Always allow" was saved; Revert removed the file; a second job went through on the remembered answer without asking; then everything was cleaned up.
+   - Not live-tested yet: the web-read lockout with a real web page (it needs M4's Scout).
    - grants, consent, taint, caps, breaker, STOP, the hardline list, the outside-workspace prompt and the undo store;
    - *check:* unit tests for every ladder rung, a taint test (a web read, then `shell.exec`, is refused), a cap test using fake priced and unpriced runs, and STOP killing a child process;
    - *check:* a symlink-escape test (a workspace link pointing into `~/.ssh` is denied), and "Revert this job" restoring an edited outside file.

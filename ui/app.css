@@ -105,6 +105,16 @@ h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--leaf); margin: 
 .ask .ans { font: 11px var(--label); color: var(--muted); }
 .error { color: #ffc0b4; border-left: 3px solid var(--bad); padding: 4px 10px; }
 .foot { font: 10px var(--label); color: var(--muted); letter-spacing: .05em; }
+.note { font: 10px var(--label); color: var(--leaf); letter-spacing: .05em; }
+.warn { color: var(--warn); border-left: 3px solid var(--warn); padding: 4px 10px; font: 11px var(--label); letter-spacing: .04em; }
+.lock { color: #9fd0ff; border-left: 3px solid #5a9fd6; padding: 4px 10px; font: 11px var(--label); letter-spacing: .04em; background: #101c26; }
+.revert { justify-self: start; border-color: var(--sun); }
+.spend.near { color: var(--warn); }
+.grants { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; max-height: 220px; overflow: auto; }
+.grants li { display: flex; align-items: center; gap: 8px; justify-content: space-between; border-left: 3px solid var(--fern); padding: 2px 8px; }
+.grants li.empty { border: 0; color: var(--muted); font-size: 12px; }
+.grants code { font: 12px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.grants button { padding: 2px 8px; font-size: 10px; flex: none; }
 .composer { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 16px; border-top: 2px solid var(--bark); background: var(--moss); box-shadow: inset 0 2px 0 var(--moss-hi); }
 .composer::before { content: ""; position: absolute; left: -2px; top: -14px; width: 45px; height: 32px; background: var(--sprig) no-repeat 0 0 / 45px 32px; image-rendering: pixelated; pointer-events: none; }
 textarea { resize: vertical; min-height: 44px; font: 15px var(--body); color: var(--fg); background: #0a120c; border: 2px solid var(--bark); padding: 8px 10px; }

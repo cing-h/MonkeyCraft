@@ -37,7 +37,7 @@ export function makeClaudeCodeProvider({ spawn, claudePath, baseEnv, killProcess
      * Run one job. The prompt goes in on stdin. Events go out through `emit`.
      * Resolves { reason, usd, priced, tokens, turns, billing, text } and never rejects.
      */
-    run({ agent, prompt, mcpConfig, signal, emit, maxBudgetUsd = 2 }) {
+    run({ agent, prompt, mcpConfig, signal, emit, maxBudgetUsd = 2, onUsage = () => {} }) {
       return new Promise(resolve => {
         const parser = makeStreamParser();
         let buf = '', stderr = '', result = null, billing = 'unknown', settled = false, killTimer = null, initSeen = false;
@@ -53,6 +53,7 @@ export function makeClaudeCodeProvider({ spawn, claudePath, baseEnv, killProcess
           for (const a of parser.feed(o)) {
             if (a.kind === 'token') emit('agent.token', { text: a.text });
             else if (a.kind === 'reasoning') emit('agent.reasoning', { text: a.text });
+            else if (a.kind === 'usage') onUsage(a);
             else if (a.kind === 'retry') emit('provider.retry', { attempt: a.attempt, reason: a.reason });
             else if (a.kind === 'init') {
               initSeen = true;
@@ -77,7 +78,7 @@ export function makeClaudeCodeProvider({ spawn, claudePath, baseEnv, killProcess
           clearTimeout(killTimer); signal?.removeEventListener('abort', stop);
           if (spawnErr) emit('run.error', { message: `Couldn't start Claude Code (${claudePath}): ${spawnErr.message}`, code: 'spawn_failed' });
           let reason = result ? result.reason : 'error';
-          if (signal?.aborted) reason = signal.reason === 'halt' ? 'halted' : 'cancelled';
+          if (signal?.aborted) reason = signal.reason === 'halt' ? 'halted' : signal.reason === 'budget' || signal.reason === 'stale' ? signal.reason : 'cancelled';
           else if (!result && !spawnErr) emit('run.error', { message: `Claude Code exited (code ${code}) without a result.${stderr ? ' ' + stderr.trim().split('\n').slice(-3).join(' ') : ''}`, code: initSeen ? 'no_result' : 'cli_failed' });
           else if (result && result.reason !== 'done' && result.text) emit('run.error', { message: result.text.slice(0, 500), code: result.subtype || 'error' });
           const r = result || { usd: 0, priced: false, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, turns: 0, text: '' };

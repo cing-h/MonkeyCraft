@@ -2,13 +2,13 @@
 
 import { send } from '../http/server.js';
 
-export function apiRoutes({ bus, runs, consent, roster, journal, ledger, clock }) {
+export function apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits }) {
   return [
     { method: 'GET', path: '/api/roster', handle: ({ res }) => send(res, 200, { crew: roster.public() }) },
 
     { method: 'POST', path: '/api/run', handle: ({ res, body }) => {
-      const r = runs.start({ agentId: body.agentId, prompt: body.prompt });
-      if (r.error) return send(res, 400, { error: r.error });
+      const r = runs.start({ agentId: body.agentId, prompt: body.prompt, allowOverDaily: body.allowOverDaily === true });
+      if (r.error) return send(res, r.code === 'daily_cap' ? 409 : 400, { error: r.error, code: r.code || null });
       send(res, 202, { runId: r.runId });
     } },
 
@@ -19,6 +19,15 @@ export function apiRoutes({ bus, runs, consent, roster, journal, ledger, clock }
 
     { method: 'POST', path: '/api/halt', handle: ({ res }) => send(res, 200, { stopped: runs.halt('user') }) },
 
+    { method: 'POST', path: /^\/api\/runs\/([A-Za-z0-9_-]+)\/revert$/, handle: async ({ res, params }) => {
+      const r = await runs.revert(params[0]);
+      send(res, r.error ? 409 : 200, r);
+    } },
+
+    // remembered answers ("Always allow"), listed and forgettable
+    { method: 'GET', path: '/api/grants', handle: ({ res }) => send(res, 200, { grants: grants.list() }) },
+    { method: 'POST', path: '/api/grants/forget', handle: async ({ res, body }) => send(res, 200, { forgotten: await grants.forget(String(body.key || '')) }) },
+
     { method: 'POST', path: /^\/api\/runs\/([A-Za-z0-9_-]+)\/cancel$/, handle: ({ res, params }) => send(res, runs.cancel(params[0]) ? 200 : 404, {}) },
 
     { method: 'GET', path: '/api/runs', handle: async ({ res }) => send(res, 200, { active: runs.active(), all: await journal.list() }) },
@@ -27,7 +36,7 @@ export function apiRoutes({ bus, runs, consent, roster, journal, ledger, clock }
 
     { method: 'GET', path: '/api/spend', handle: async ({ res }) => {
       const d = new Date(clock.now()); d.setHours(0, 0, 0, 0);
-      send(res, 200, { today: await ledger.totals(d.getTime()) });
+      send(res, 200, { today: await ledger.totals(d.getTime()), limits: { dailyUsd: limits.dailyUsd, perRunUsd: limits.perRunUsd, perRunTokens: limits.perRunTokens } });
     } },
 
     // Live events (Server-Sent Events). On connect, replays this session's recent events.
