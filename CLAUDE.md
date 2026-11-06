@@ -1,5 +1,6 @@
 # AutoCraft — notes for Claude
 
+General rules first: the owner's standing instructions for every project (plan first, one feature per session, permission to create sessions, a branch per feature, saving tokens, helper agents) live in cing-h/claude-standards and are installed as ~/.claude/CLAUDE.md. If they aren't loaded in this session, read https://github.com/cing-h/claude-standards/blob/main/CLAUDE.md before doing anything else.
 The user directs and never writes code; Claude writes all of it. Explain changes in plain language.
 
 - **Plan:** `PLAN.md` (Edition 1, milestones M0–M5, decisions). Read it before starting work, and keep its milestone status current.
