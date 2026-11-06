@@ -1,8 +1,9 @@
 # Edition 1: final changes (waiting list)
 
-Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 → 1, one branch each, checking in after each.
+Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 → 5 → 1, one branch each, checking in after each.
 - Item 2: DONE on `feature/swing-reanimation` (pushed).
-- Item 3: DONE on `feature/village-chatter`.
+- Item 3: DONE on `feature/village-chatter` (pushed).
+- Item 4: IN PROGRESS on `feature/claude-link`.
 
 Each item records what the user asked for, the decisions already made, and an outline of how to build it.
 
@@ -155,3 +156,26 @@ Added 2026-11-06. The user accepted all of the recommendations below.
 - **Checks:**
   - Tests: a job given from outside runs through the normal pipeline; outside sessions can't answer permission questions; the mailbox survives a restart; requests from web-reading jobs are labelled; the Chief's waiting has a time limit.
   - Live round trip: this session gives the Chief a job, and the Chief sends a request back through the mailbox.
+
+---
+
+## 5. Second and third stories of the village: branch platforms and tree houses, scrolled to vertically
+
+Added 2026-11-06.
+
+**What the user wants:** two more "stories" of the village up in the canopy, made of branch platforms and tree houses, that the view can scroll up to. They are room for future crew members. When the Clerk (item 1) is built, she lives on the first canopy level. The higher levels need plenty of foliage, realistic branch formations, flowers and vines.
+
+**Decided:**
+- **Three stories in total:** the ground village as it is now, then canopy level 1 (the Clerk's home), then canopy level 2.
+- **Purpose:** empty plots on both canopy levels are reserved for future agents. Each new crew member gets a tree house on a plot.
+- **Look:** lush, in the same Kingdom-Two-Crowns-style pixel aesthetic as the ground village. Thick leaf masses in several layers of green, branches that fork and taper realistically out of the existing trunks (not floating planks), hanging vines and lianas, flowers (orchids, bromeliads, hibiscus) on the branches, and a little light and haze changing with height.
+
+**Planned design (outline):**
+- **World:** the scene is currently 320×180 pixels per view inside a 960-pixel-wide world, scrolling sideways only. Make the world about three views tall, with a camera that scrolls vertically as well as horizontally: mouse wheel, arrow keys (up/down), dragging, and up/down buttons next to the current left/right ones, plus a small "story" indicator (Ground · Canopy 1 · Canopy 2).
+- **Structure:** the big trunks continue up through all three stories. Each canopy level has branch platforms where boughs fork from the trunks, with rope bridges and ladders or vines connecting platforms and stories.
+- **Movement:** crew and villagers use the swing engine from item 2 to climb vines and brachiate between levels, so travel between stories looks natural and stays truthful (the UI still only animates from events).
+- **Plots:** each canopy level gets a few marked empty tree-house plots. The roster can say which story and plot a crew member's house sits on, and the Clerk's goes on canopy level 1.
+- **Chatter and villagers:** villagers can live and chat on the higher levels too, and chatter bubbles follow the camera properly.
+- **Performance:** draw only what is on screen, so the extra height doesn't slow the village down.
+- **Checks:** tests for the camera bounds and the plot layout. Screenshots of each story to judge the foliage, branches, flowers and vines. Then the user looks at it live.
+- **Order:** build it before item 1, so the Clerk has a home to move into.
