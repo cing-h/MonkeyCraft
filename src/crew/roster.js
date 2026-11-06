@@ -52,11 +52,16 @@ export function makeRoster({ workspace }) {
     { id: 'sage', name: 'The Sage', role: 'Memory keeper: remembers and teaches skills', awake: false, wakes: 'Edition 2' },
     { id: 'ringer', name: 'The Bell-ringer', role: 'Timekeeper: runs scheduled jobs', awake: false, wakes: 'Edition 2' }
   ];
-  for (const c of crew) if (c.awake) { c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}`; c.grantSet = new Set(c.grants); }
+  for (const c of crew) if (c.awake) { c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}`; c.grantSet = new Set(c.grants); c.defaults = { provider: c.provider, model: c.model }; }
   const byId = new Map(crew.map(c => [c.id, c]));
   return {
     get: id => byId.get(id),
+    /** Apply saved per-member settings ({ id: { provider?, model? } }); anything not set goes back to the default. */
+    configure(crewSettings = {}) {
+      for (const c of crew) if (c.awake) { const o = crewSettings[c.id] || {}; c.provider = o.provider || c.defaults.provider; c.model = o.model || c.defaults.model; }
+    },
+    ids: () => crew.map(c => c.id),
     /** What the UI may show: no prompts, no internals. */
-    public: () => crew.map(({ id, name, role, awake, wakes, model, grants, builtinTools }) => ({ id, name, role, awake, wakes: wakes || null, model: model || null, grants: [...(grants || []), ...(builtinTools || []).map(b => `builtin:${b}`)] }))
+    public: () => crew.map(({ id, name, role, awake, wakes, model, provider, grants, builtinTools }) => ({ id, name, role, awake, wakes: wakes || null, model: model || null, provider: provider || null, grants: [...(grants || []), ...(builtinTools || []).map(b => `builtin:${b}`)] }))
   };
 }

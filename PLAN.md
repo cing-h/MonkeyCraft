@@ -1,6 +1,6 @@
 # MonkeyCraft — Edition 1 plan
 
-Status: draft, 2026-11-06. Owner: the user directs; Claude writes all code.
+Status: Edition 1 complete, 2026-11-06 (M0–M5 done). Owner: the user directs; Claude writes all code.
 Before changing this plan, also load: memory `monkeycraft-decisions`, and the vault notes "Building my own StarNet" (hub) and "StarNet build reference".
 
 ---
@@ -180,7 +180,19 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
    - Live check: the Chief sent the Scout (two real WebSearches and a Wikipedia `web.fetch`, tainting the Scout only), then the Writer. The Writer's first write was refused for a wrong `chars` count; it retried, the user allowed it, and `tallest-trees.txt` was written with sources. The run then hit the user's Claude 5-hour usage limit, which was reported in the log. After the reset, a second job had the Chief send the Archivist to read the file, and the Chief answered correctly (`done`, ~11k tokens in total).
    - the roster, `crew.dispatch` and `crew.spawn` with the shared pool, liveness and concurrency;
    - *check:* the Chief splits "research X and write a summary file" into the Scout plus the Writer; worker spend rolls up into the lead's pool; the lead receives only the workers' final messages.
-6. **M5 Finish:**
+6. **M5 Finish — DONE 2026-11-06.** 66 tests pass (7 new in `test/m5.test.js`; the cut-off tool request and settings range checks were mutation-tested).
+   - API-key provider: `src/providers/anthropic.js` on the official SDK, `@anthropic-ai/sdk` pinned to 1.1.0 (published 2026-10-21). It runs a manual streaming agent loop. Every tool call goes through the same `localTools(run)` doorway into `registry.dispatch` as Claude Code's MCP calls, so permissions, lockout, breaker and undo are identical. Details:
+     - top-level prompt caching;
+     - on Sonnet and Opus, the server-side refusal fallback (`fallbacks: "default"`, beta `server-side-fallback-2026-07-01`);
+     - eager input streaming, with registry validation before anything runs;
+     - refusal, max_tokens and pause_turn handling, a 40-turn cap, and a dollar cap from a price table;
+     - the Scout's search uses the server tool `web_search_20260209`, reported as `web.search` and tainting.
+     The key comes from `ANTHROPIC_API_KEY` or `MONKEYCRAFT_ANTHROPIC_API_KEY`; there's no keychain yet.
+   - Settings: `src/settings.js`, saved durably in `data/settings.json`, with routes in `src/routes/settings.js`. Per member: provider (`claude-code` | `anthropic-api`) and model (sonnet, opus or haiku 5.5). Plus the five limits, range-checked. Env vars are the defaults; changes apply to new jobs. Choosing the API without a key is refused. UI: the Settings dialog (also opened by `#settings`).
+   - Crash recovery: unfinished runs are closed (already in M1), and leftover processes reaped (M3). New: the Job log survives restarts, because `journal.history(30)` is merged into the bus replay without duplicates and in time order. Revert works after a restart (undo is on disk), and question cards for jobs that ended show "no longer waiting".
+   - *Check:* the same job runs on both providers through the same pipeline (a fake Anthropic client vs a fake Claude Code), with identical event sequences, including the permission prompt. Live: settings and the replayed log after a restart were screenshot; a Smith job on Claude Code still works after the refactor. The API was not run live: there is no API key on this machine.
+
+**Edition 1 is complete (M0–M5).**
    - the API-key provider (key in an env var for now, keychain later), a settings panel, and crash recovery;
    - *check:* the same job runs on both providers through the same pipeline.
 

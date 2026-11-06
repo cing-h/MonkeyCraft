@@ -17,6 +17,7 @@
       <button id="scroll-r" type="button" aria-label="Scroll the village right">▶</button>
     </div>
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
+    <button id="open-settings" type="button">Settings</button>
     <button id="stop" class="stop" type="button" title="Stop every job right now">STOP</button>
   </header>
 
@@ -56,6 +57,30 @@
     </form>
   </aside>
 </div>
+<dialog id="settings" class="settings" aria-labelledby="settings-title">
+  <form method="dialog" id="settings-form">
+    <h2 id="settings-title">Settings</h2>
+    <p class="hint">Changes apply to jobs you start after saving.</p>
+    <fieldset>
+      <legend>Who thinks with what</legend>
+      <p class="hint" id="api-status"></p>
+      <table class="crew-table"><thead><tr><th scope="col">Crew member</th><th scope="col">Thinks with</th><th scope="col">Model</th></tr></thead><tbody id="crew-rows"></tbody></table>
+    </fieldset>
+    <fieldset>
+      <legend>Spending limits</legend>
+      <div class="limits">
+        <label for="lim-perRunUsd">Per job ($)</label><input id="lim-perRunUsd" type="number" step="0.05">
+        <label for="lim-perRunTokens">Per job (tokens)</label><input id="lim-perRunTokens" type="number" step="10000">
+        <label for="lim-familyUsd">A job and its crew together ($)</label><input id="lim-familyUsd" type="number" step="0.5">
+        <label for="lim-familyTokens">A job and its crew together (tokens)</label><input id="lim-familyTokens" type="number" step="100000">
+        <label for="lim-dailyUsd">Per day, soft limit ($)</label><input id="lim-dailyUsd" type="number" step="1">
+      </div>
+      <p class="hint">Token limits count cache reads at one tenth. Subscription jobs show an estimate in dollars, so their token limit is the one that really caps them.</p>
+    </fieldset>
+    <p class="error" id="settings-error" hidden></p>
+    <div class="settings-btns"><button type="button" id="settings-cancel">Cancel</button><button type="submit" id="settings-save" class="primary">Save</button></div>
+  </form>
+</dialog>
 <script type="module" src="/ui/app.js"></script>
 </body>
 </html>

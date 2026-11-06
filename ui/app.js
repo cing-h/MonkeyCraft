@@ -111,6 +111,7 @@ function logRun(ev) {
       if (r.parent) r.parent.say = null;
       r.box.append(el('div', 'foot', `${REASONS[ev.reason] || ev.reason.toUpperCase()} · ${ev.turns} TURNS · ${fmtTokens(ev.tokens)} TOKENS · ~$${ev.usd.toFixed(3)}${est}`));
       r.ended = true;
+      for (const q of r.asks.values()) if (!q.classList.contains('done')) { q.className = 'ask done'; q.querySelector('.btns')?.remove(); q.append(el('div', 'ans', 'NO LONGER WAITING: THE JOB ENDED')); }
       if (r.undos) addRevert(r, ev.runId);
       loadSpend(); break;
     }
@@ -268,7 +269,40 @@ async function loadGrants() {
   } catch {}
 }
 
+// ---------- settings ----------
+let settingsView = null;
+const LIMIT_KEYS = ['perRunUsd', 'perRunTokens', 'familyUsd', 'familyTokens', 'dailyUsd'];
+async function openSettings() {
+  settingsView = await fetch('/api/settings').then(r => r.json());
+  const { effective, options } = settingsView, api = options.providers.find(p => p.id === 'anthropic-api');
+  $('api-status').textContent = api.available ? 'An Anthropic API key was found, so crew members can use the API.' : 'Everyone uses Claude Code on your subscription. ' + api.why;
+  const rows = $('crew-rows'); rows.replaceChildren();
+  for (const c of effective.crew) {
+    const tr = el('tr'); tr.append(el('th', '', c.name));
+    const sel = (id, opts, val) => { const s2 = el('select'); s2.id = id; for (const o of opts) s2.append(Object.assign(el('option', '', o.label), { value: o.id, disabled: !!o.disabled })); s2.value = val; return s2; };
+    const p = sel(`prov-${c.id}`, options.providers.map(o => ({ id: o.id, label: o.label, disabled: !o.available })), c.provider);
+    const m = sel(`model-${c.id}`, options.models.map(x => ({ id: x, label: x.replace('claude-', '').replace(/-(\d)-(\d)$/, ' $1.$2') })), c.model);
+    p.setAttribute('aria-label', `${c.name} thinks with`); m.setAttribute('aria-label', `${c.name}'s model`);
+    const td1 = el('td'), td2 = el('td'); td1.append(p); td2.append(m); tr.append(td1, td2); rows.append(tr);
+  }
+  for (const k of LIMIT_KEYS) { const i = $(`lim-${k}`), r = options.ranges[k]; i.min = r[0]; i.max = r[1]; i.value = effective.limits[k]; }
+  $('settings-error').hidden = true;
+  $('settings').showModal();
+}
+$('open-settings').onclick = () => openSettings().catch(e => alert('Could not load settings: ' + e.message));
+$('settings-cancel').onclick = () => $('settings').close();
+$('settings-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const crewS = {}, limits = {};
+  for (const c of settingsView.effective.crew) crewS[c.id] = { provider: $(`prov-${c.id}`).value, model: $(`model-${c.id}`).value };
+  for (const k of LIMIT_KEYS) limits[k] = Number($(`lim-${k}`).value);
+  const res = await post('/api/settings', { crew: crewS, limits });
+  if (!res.ok) { const er = $('settings-error'); er.textContent = res.data.error || 'Could not save.'; er.hidden = false; return; }
+  $('settings').close(); loadSpend();
+});
+
 loadSpend(); loadGrants();
+if (location.hash === '#settings') openSettings().catch(() => {});
 const es = new EventSource('/api/events');
 es.onmessage = m => { try { onEvent(JSON.parse(m.data)); } catch (e) { console.error(e); } };
 

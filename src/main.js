@@ -27,6 +27,9 @@ import { makeRegistry } from './tools/registry.js';
 import { makeFsRead } from './tools/fs-read.js';
 import { makeShellExec } from './tools/shell-exec.js';
 import { makeClaudeCodeProvider } from './providers/claude-code.js';
+import { makeAnthropicProvider } from './providers/anthropic.js';
+import { makeSettingsStore, LIMIT_RANGES } from './settings.js';
+import { settingsRoutes } from './routes/settings.js';
 import { makeRoster } from './crew/roster.js';
 import { makeRunHost } from './runs.js';
 import { makeServer } from './http/server.js';
@@ -107,7 +110,15 @@ async function main() {
     ...makeCrewTools({ roster })
   ]);
   const claudePath = await findClaude();
-  const providers = { 'claude-code': makeClaudeCodeProvider({ spawn: trackedSpawn('claude'), claudePath, baseEnv: process.env, killProcessGroup, cwd: realWorkspace }) };
+  // settings: env vars are the defaults, saved choices override them
+  const ENV_LIMITS = { ...LIMITS };
+  const settings = makeSettingsStore({ fsp, file: path.join(dataDir, 'settings.json'), crewIds: roster.ids() });
+  const sl = await settings.load();
+  if (!sl.ok) console.warn(`Settings couldn't be read (${sl.error}); using the defaults.`);
+  const applySettings = s => { roster.configure(s.crew); for (const k of Object.keys(LIMIT_RANGES)) LIMITS[k] = s.limits[k] ?? ENV_LIMITS[k]; };
+  applySettings(settings.get());
+  const apiKey = process.env.MONKEYCRAFT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
+  const providers = { 'anthropic-api': makeAnthropicProvider({ apiKey }), 'claude-code': makeClaudeCodeProvider({ spawn: trackedSpawn('claude'), claudePath, baseEnv: process.env, killProcessGroup, cwd: realWorkspace }) };
   const runs = makeRunHost({
     bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken,
     mcpUrl: runId => `http://127.0.0.1:${PORT}/mcp/${runId}`,
@@ -119,14 +130,17 @@ async function main() {
   const recovered = await runs.recover();
   await journal.flush();
   if (recovered.length) console.log(`Closed ${recovered.length} job(s) interrupted by the last shutdown.`);
+  // the Job log survives restarts: the newest jobs are replayed from the journal to every new screen
+  const history = await journal.history(30);
+  bus.seed(history);
 
   const server = makeServer({
     port: PORT,
-    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...mcpRoutes({ runs })]
+    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs })]
   });
   await server.listen();
   console.log(`MonkeyCraft is running: http://127.0.0.1:${PORT}/`);
-  console.log(`Workspace: ${realWorkspace}  ·  Claude Code: ${claudePath}`);
+  console.log(`Workspace: ${realWorkspace}  ·  Claude Code: ${claudePath}  ·  Anthropic API: ${apiKey ? 'key found' : 'no key'}`);
 
   let stopping = false;
   const shutdown = async sig => {

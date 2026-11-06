@@ -65,6 +65,15 @@ export function makeJournal({ fsp, dir, flushMs = 200, setTimer = setTimeout }) 
       try { names = await fsp.readdir(dir); } catch (e) { if (e.code !== 'ENOENT') throw e; }
       return names.filter(n => n.endsWith('.ndjson')).map(n => n.slice(0, -7));
     },
+    /** The events of the newest `limit` runs (by file time), oldest first, with a worker kept beside its lead. */
+    async history(limit = 30) {
+      const ids = await this.list(), stamped = [];
+      for (const id of ids) { try { stamped.push([id, (await fsp.stat(fileOf(id))).mtimeMs]); } catch {} }
+      stamped.sort((a, b) => b[1] - a[1]);
+      const evs = [];
+      for (const [id] of stamped.slice(0, limit)) evs.push(...await this.read(id));
+      return evs.sort((a, b) => (a.ts - b.ts) || (a.seq - b.seq));
+    },
     /** Runs that started but never ended (the process died). Returns [{ runId, agentId, lastSeq, provider }]. */
     async unfinished() {
       const out = [];

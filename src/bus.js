@@ -26,6 +26,13 @@ export function makeBus({ clock, journal, log = () => {}, keep = 3000 }) {
   return {
     emitFor,
     subscribe(fn) { subs.add(fn); return () => subs.delete(fn); },
+    /** Put earlier events (from the journal, after a restart) in front of this session's, for replay to new screens. */
+    seed(events) {
+      const seen = new Set(), all = [];
+      for (const e of [...events, ...recent]) { const k = `${e.runId}:${e.seq}`; if (!seen.has(k)) { seen.add(k); all.push(e); } }
+      all.sort((a, b) => (a.ts - b.ts) || (a.seq - b.seq));
+      recent.length = 0; recent.push(...all.slice(-keep));
+    },
     recent: () => recent.slice()
   };
 }

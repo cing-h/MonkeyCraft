@@ -67,7 +67,8 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
         maxBudgetUsd: Math.max(0.05, Math.min(limits.perRunUsd, left)),
         onUsage: u => { run.budget.usage(u); run.family.usage(runId, weighTokens(u)); },
         onTaint: source => { if (run.taint.set(source)) emit('taint.set', { source }); },
-        mcpConfig: { mcpServers: { monkeycraft: { type: 'http', url: mcpUrl(runId), headers: { Authorization: `Bearer ${run.token}` } } } }
+        mcpConfig: { mcpServers: { monkeycraft: { type: 'http', url: mcpUrl(runId), headers: { Authorization: `Bearer ${run.token}` } } } },
+        tools: localTools(run)   // the API provider calls the same pipeline directly
       });
     } catch (e) {
       emit('run.error', { message: `Provider failed: ${e.message}`, code: 'provider_threw' });
@@ -128,6 +129,17 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     return { runId, run, done: execute(run, agent, prompt.trim()) };
   }
 
+  // The one doorway into the dispatch pipeline for a run, used over MCP by Claude Code and directly by the API provider.
+  function localTools(run) {
+    return {
+      listTools: () => registry.list(run.grants).map(t => ({ name: t.name.replace(/\./g, '_'), description: t.description, inputSchema: t.inputSchema })),
+      callTool: (name, args) => registry.dispatch({ tool: name, args }, {
+        emit: run.emit, newId, grants: run.grants, consent, interactive: run.interactive, signal: run.controller.signal, runId: run.runId, agentId: run.agentId,
+        taint: run.taint, breaker: run.breaker, stop: run.stop, crew: crewApi(run), maxToolMs: 1_800_000
+      })
+    };
+  }
+
   // ---------- the Chief's view of its crew (ctx.crew for delegation tools) ----------
   function crewApi(lead) {
     return {
@@ -176,13 +188,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     mcpContext(runId, token) {
       const run = active.get(runId);
       if (!run || !token || token.length !== run.token.length || !timingSafeEq(token, run.token)) return null;
-      return {
-        listTools: () => registry.list(run.grants).map(t => ({ name: t.name.replace(/\./g, '_'), description: t.description, inputSchema: t.inputSchema })),
-        callTool: (name, args) => registry.dispatch({ tool: name, args }, {
-          emit: run.emit, newId, grants: run.grants, consent, interactive: run.interactive, signal: run.controller.signal, runId, agentId: run.agentId,
-          taint: run.taint, breaker: run.breaker, stop: run.stop, crew: crewApi(run), maxToolMs: 1_800_000
-        })
-      };
+      return localTools(run);
     },
 
     /** Stop workers that have made no progress for too long. Call every few seconds. */
