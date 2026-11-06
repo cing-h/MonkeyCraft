@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, reduce, modeOf, HOLD_MS, TALK_MS, ERROR_MS } from '../ui/station/state.js';
-import { makeStation, CREW_IDS } from '../ui/station/scene.js';
+import { makeStation, CREW_IDS } from '../ui/station/ape/scene.js';
 
-const crew = [{ id: 'smith', name: 'Cinder Smith', awake: true }, { id: 'seer', name: 'Tide Seer', awake: false }];
+const crew = [{ id: 'smith', name: 'The Smith', awake: true }, { id: 'sage', name: 'The Sage', awake: false }];
 let seq = 0;
 const ev = (type, ts, extra = {}) => ({ v: 1, type, ts, seq: seq++, runId: extra.runId || 'r1', agentId: extra.agentId || 'smith', ...extra });
 
@@ -48,12 +48,12 @@ test('nothing animates without a matching event', () => {
   reduce(s, ev('agent.tool_call', 10, { callId: 'x', tool: 't', args: {} }));
   reduce(s, ev('agent.token', 10, { text: 'hi' }));
   reduce(s, ev('permission.prompt', 10, { promptId: 'p', callId: 'x', tool: 't', capability: 'c', scope: 'execute', summary: 's', outsideWorkspace: false }));
-  reduce(s, ev('run.start', 10, { agentId: 'seer' }));
+  reduce(s, ev('run.start', 10, { agentId: 'sage' }));
   reduce(s, ev('run.start', 10, { agentId: 'ghost' }));
   reduce(s, ev('made.up', 10));
   reduce(s, null);
   assert.equal(modeOf(c, 10), 'idle');
-  assert.equal(modeOf(s.creatures.seer, 10), 'asleep');
+  assert.equal(modeOf(s.creatures.sage, 10), 'asleep');
   assert.deepEqual([c.tools, c.asks], [[], []]);
   // a stale run.end for another run doesn't end the current one
   reduce(s, ev('run.start', 20, { runId: 'r5' }));
@@ -70,36 +70,36 @@ test('replayed history (old timestamps) does not animate now', () => {
   assert.equal(modeOf(c, 1_000_000), 'idle');
 });
 
-// ---------- the scene draws from modes (headless canvas) ----------
+// ---------- the ape village draws from modes (headless canvas) ----------
 function fakeCanvas() {
-  const ops = [];
-  const ctx = { createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData(img) { this.last = img; }, fillRect: (...a) => ops.push(a), set fillStyle(v) { ops.push(['style', v]); } };
-  return { width: 0, height: 0, getContext: () => ctx, getBoundingClientRect: () => ({ left: 0, top: 0, width: 1080, height: 720 }), ctx, ops };
+  const ctx = { createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData(img) { this.last = img; } };
+  return { width: 0, height: 0, getContext: () => ctx, getBoundingClientRect: () => ({ left: 0, top: 0, width: 1280, height: 720 }), ctx };
 }
+const countColour = (cv, rgb) => { const d = cv.ctx.last.data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] === rgb[0] && d[i + 1] === rgb[1] && d[i + 2] === rgb[2]) n++; return n; };
 
-test('scene: glow appears only while the mode says working, and plates match modes', () => {
+test('ape village: the Smith goes inside only while working, and plates match modes', () => {
   const modes = Object.fromEntries(CREW_IDS.map(k => [k, 'asleep'])); modes.smith = 'idle';
   const cv = fakeCanvas();
   const st = makeStation(cv, { modeOf: id => modes[id] });
-  const litPixels = () => st._view.em.reduce((n, v) => n + v, 0); // pixels lit by a WORKING creature's lights
-  const home = st.anchor('smith');
-  for (let i = 0; i < 100; i++) st.step(0); // idle: it wanders off
-  assert.notDeepEqual(st.anchor('smith'), home, 'idle smith wandered away');
-  assert.equal(litPixels(), 0, 'no working lights while everyone is idle or asleep');
+  const home = st.positionOf('smith');
+  for (let i = 0; i < 200; i++) st.step(0, 0.05); // idle: it wanders off
+  assert.notEqual(st.positionOf('smith'), home, 'idle smith wandered away');
+  assert.equal(st._actors.smith.inside, false, 'not inside while idle');
   modes.smith = 'working';
-  st.step(0);
-  assert.equal(litPixels(), 0, 'not lit while still walking to the forge');
-  for (let i = 0; i < 60; i++) st.step(0); // walk to the forge, then hammer
-  assert.ok(litPixels() > 10, `working at the forge lights up (${litPixels()} px)`);
-  modes.smith = 'ready'; st.step(0);
+  st.step(0, 0.05);
+  assert.equal(st._actors.smith.inside, false, 'not inside while still on its way home');
+  for (let i = 0; i < 1200 && !st._actors.smith.inside; i++) st.step(0, 0.05); // hurry home through the village
+  assert.equal(st._actors.smith.inside, true, 'working: the smith goes into the smithy');
+  st.scrollTo(st.positionOf('smith')); st.step(0, 0.05);
+  assert.ok(countColour(cv, [255, 146, 56]) > 10, 'the smithy windows glow orange');
+  modes.smith = 'ready'; st.step(0, 0.05);
   assert.equal(st._actors.smith.inside, false, 'the smith comes out as soon as the mode leaves working');
-  for (let i = 0; i < 20; i++) st.step(0); // the last embers from the chimney fade out
-  assert.equal(litPixels(), 0, 'no working lights once the job step is over');
-  // asking draws a yellow "?" plate; asleep crew draw "Z" plates
-  cv.ops.length = 0; modes.smith = 'asking'; st.step(0);
-  const styles = cv.ops.filter(o => o[0] === 'style').map(o => o[1]);
-  assert.ok(styles.includes('#f2c531'), 'yellow ? plate'); assert.ok(styles.includes('#8fb4ff'), 'Z plates for sleepers');
-  // the smith is at its station and can be picked there
-  const [x, y] = st.anchor('smith');
-  assert.ok(x > 0 && y > 0);
+  assert.equal(countColour(cv, [255, 146, 56]), 0, 'no orange window glow once the job step is over');
+  // asking draws a yellow "?" plate over the smith; sleepers draw blue "Z" plates
+  modes.smith = 'asking'; st.step(0, 0.05);
+  assert.ok(countColour(cv, [242, 197, 49]) > 10, 'yellow ? plate');
+  st.scrollTo(st.positionOf('archivist')); st.step(0, 0.05);
+  assert.ok(countColour(cv, [143, 180, 255]) > 3, 'Z plates for sleepers');
+  // the background monkeys are scenery: never part of the crew
+  assert.ok(st._villagers.length > 0 && st._villagers.every(v => !('mode' in v)));
 });

@@ -66,7 +66,7 @@ test('MCP context refuses a wrong token or unknown run', async () => {
 test('start refuses sleeping crew, empty jobs, and too many at once', async () => {
   const provider = { run: () => new Promise(() => {}) };
   const w = await world(provider);
-  assert.match(w.runs.start({ agentId: 'seer', prompt: 'x' }).error, /asleep/);
+  assert.match(w.runs.start({ agentId: 'sage', prompt: 'x' }).error, /asleep/);
   assert.match(w.runs.start({ agentId: 'ghost', prompt: 'x' }).error, /No crew member/);
   assert.match(w.runs.start({ agentId: 'smith', prompt: '  ' }).error, /Empty/);
   w.runs.start({ agentId: 'smith', prompt: 'a' }); w.runs.start({ agentId: 'smith', prompt: 'b' });

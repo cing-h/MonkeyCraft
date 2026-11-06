@@ -1,9 +1,9 @@
 // MonkeyCraft UI. Everything shown here comes from the live event stream: the
-// job log, the crew strip and the station floor all read the same events.
+// job log, the crew strip and the ape village all read the same events.
 // If an event didn't arrive, nothing on the page pretends it happened.
 
 import { initialState, reduce, modeOf, MODE_TEXT } from './station/state.js';
-import { makeStation, CREW_IDS } from './station/scene.js';
+import { makeStation, CREW_IDS, SCENE_W } from './station/ape/scene.js';
 
 const $ = id => document.getElementById(id);
 const H = { 'content-type': 'application/json', 'x-monkeycraft': '1' };
@@ -148,6 +148,7 @@ function syncBubbles() {
       const btns = el('div', 'btns'); answerButtons(ask, btns); b.append(btns);
       $('overlay').append(b); bubbles.set(ask.promptId, b);
     }
+    if (!b.dataset.shown) { b.dataset.shown = '1'; station.scrollTo(station.positionOf(id)); station.redraw(Date.now()); syncThumb(); } // bring the asker into view
     const [x, y] = station.anchor(id);
     b.style.left = Math.max(170, Math.min(x, $('stage').clientWidth - 170)) + 'px';
     b.style.top = Math.max(b.offsetHeight + 14, y) + 'px';
@@ -182,18 +183,31 @@ state = initialState(crew);
 
 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), reduced });
-$('scene').addEventListener('click', e => {
-  const r = $('scene').getBoundingClientRect(), id = station.pick(e.clientX - r.left, e.clientY - r.top);
-  if (id) setFilter(id);
+// scrolling the village: buttons, arrow keys and drag; a click without a drag picks a crew member
+const WORLD_W = 960;
+function syncThumb() { const t = $('thumb'); t.style.width = (SCENE_W / WORLD_W * 100) + '%'; t.style.left = (station.camera() / WORLD_W * 100) + '%'; }
+const scrollBy = dx => { station.scrollBy(dx); station.redraw(Date.now()); syncThumb(); syncBubbles(); };
+$('scroll-l').onclick = () => scrollBy(-120);
+$('scroll-r').onclick = () => scrollBy(120);
+const canvas = $('scene');
+canvas.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') { e.preventDefault(); scrollBy(-24); } if (e.key === 'ArrowRight') { e.preventDefault(); scrollBy(24); } });
+let drag = null;
+canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, moved: 0 }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const r = canvas.getBoundingClientRect(), dx = (e.clientX - drag.x) / r.width * SCENE_W;
+  if (Math.abs(e.clientX - drag.x) > 3 || drag.moved) { drag.moved += Math.abs(dx); canvas.classList.add('dragging'); drag.x = e.clientX; scrollBy(-dx); }
 });
-const rotate = d => { $('cam-label').textContent = `CAMERA ${station.rotate(d)}°`; station.redraw(Date.now()); };
-$('rot-l').onclick = () => rotate(-1);
-$('rot-r').onclick = () => rotate(1);
+canvas.addEventListener('pointerup', e => {
+  const was = drag; drag = null; canvas.classList.remove('dragging');
+  if (was && was.moved < 2) { const r = canvas.getBoundingClientRect(), id = station.pick(e.clientX - r.left, e.clientY - r.top); if (id) setFilter(id); }
+});
+station.scrollTo(station.positionOf('smith')); syncThumb();
 
 loadSpend();
 const es = new EventSource('/api/events');
 es.onmessage = m => { try { onEvent(JSON.parse(m.data)); } catch (e) { console.error(e); } };
 
-// draw at once (don't wait for the first tick), then ~10 steps a second for the pixel-art cadence
-station.step(Date.now()); syncStrip(Date.now());
-setInterval(() => { const now = Date.now(); station.step(now); syncStrip(now); syncBubbles(); }, 100);
+// draw at once (don't wait for the first tick), then 20 steps a second so moves flow smoothly
+station.step(Date.now(), 0.05); syncStrip(Date.now());
+setInterval(() => { const now = Date.now(); station.step(now, 0.05); syncStrip(now); syncBubbles(); }, 50);

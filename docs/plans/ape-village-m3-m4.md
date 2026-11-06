@@ -1,6 +1,6 @@
 # Plan: ape village in the app, then M3 Safety, then M4 Crew
 
-Status: proposed 2026-11-06, waiting for the user's OK. Order chosen by the user: port the ape look first, then M3, then M4.
+Status: APPROVED by the user 2026-11-06. Q-web answered: (a) Claude Code's own web search. Order chosen by the user: port the ape look first, then M3, then M4.
 Each phase has its own branch, and I check in with you when each phase is done before starting the next.
 
 ## In plain words (for you)

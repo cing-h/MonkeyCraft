@@ -7,7 +7,7 @@ Before changing this plan, also load: memory `monkeycraft-decisions`, and the va
 
 ## Part 1 — In plain words (for you)
 
-**What Edition 1 does.** You open MonkeyCraft in a window and see the station floor. You type a job to the Voidwyrm, for example "find out why my script fails and fix it". The Voidwyrm makes a plan and hands pieces to the crew: Hollow Plate researches the web, Cinder Smith runs commands, the Bone Scribe reads and files documents, the Silkscript Spider writes text and the Prism Gargoyle checks the result. You watch them walk to their stations and work. Every animation comes from something the AI is really doing.
+**What Edition 1 does.** You open MonkeyCraft in a window and see the ape village. You type a job to the Chief, for example "find out why my script fails and fix it". The Chief makes a plan and hands pieces to the crew: Scout researches the web, Smith runs commands, the Archivist reads and files documents, the Writer writes text and the Inspector checks the result. You watch them hurry home through the jungle village and work inside. Every animation comes from something the AI is really doing.
 
 **How it stays safe and cheap.**
 - The crew can work anywhere on your computer (your choice). Its home base is a MonkeyCraft workspace folder.
@@ -21,17 +21,17 @@ Before changing this plan, also load: memory `monkeycraft-decisions`, and the va
 **What it runs on.** Your own signed-in Claude Code does the thinking (your subscription, personal use). An API-key option is built too, for anyone else who uses it later.
 
 **Not in Edition 1** (planned for Edition 2+):
-- Remembering you across jobs and learning skills (Tide Seer)
-- Scheduled jobs (Clockwork Bat)
+- Remembering you across jobs and learning skills (Sage)
+- Scheduled jobs (Bell-ringer)
 - Chat-app access, plug-in connectors and a proper desktop installer
 
-The Seer and Bat appear on the floor, asleep, so nothing pretends to work when it doesn't.
+The Sage and Bell-ringer appear on the floor, asleep, so nothing pretends to work when it doesn't.
 
 **Milestones you'll be able to see:**
-1. A chat box where one creature (Cinder Smith) answers and can run a safe command, with its events listed live.
-2. The station floor replaces the list. The Smith walks, works and asks permission on screen.
+1. A chat box where one creature (Smith) answers and can run a safe command, with its events listed live.
+2. The village screen replaces the list. The Smith walks, works and asks permission on screen.
 3. The safety layer works: permission prompts, the web-read lockout, spending limits and STOP.
-4. The Voidwyrm delegates to the five working crew members, who can run side by side.
+4. The Chief delegates to the five working crew members, who can run side by side.
 5. The API-key option, settings, and recovery after a crash or restart.
 
 ---
@@ -83,13 +83,13 @@ It never throws. It returns `{ok, isError, content, summary}`. Write tools refus
 
 | Crew | Tools | Scope |
 |---|---|---|
-| Voidwyrm | `crew.dispatch`, `crew.spawn`, `crew.status`, read-only fs | delegate; no shell |
-| Hollow Plate | `web.search`, `web.fetch` | read, network, taint source |
-| Cinder Smith | `shell.exec` (default cwd = workspace), fs read/write | execute, consent |
-| Bone Scribe | fs list/read/write/move (anywhere not hardlined) | write, consent |
-| Silkscript Spider | `doc.write` / `doc.edit` (text files) | write, consent |
-| Prism Gargoyle | `verify.run` (test commands from an allowlist), fs read | execute, consent |
-| Tide Seer, Clockwork Bat | none (asleep until Edition 2) | — |
+| Chief | `crew.dispatch`, `crew.spawn`, `crew.status`, read-only fs | delegate; no shell |
+| Scout | `web.search`, `web.fetch` | read, network, taint source |
+| Smith | `shell.exec` (default cwd = workspace), fs read/write | execute, consent |
+| Archivist | fs list/read/write/move (anywhere not hardlined) | write, consent |
+| Writer | `doc.write` / `doc.edit` (text files) | write, consent |
+| Inspector | `verify.run` (test commands from an allowlist), fs read | execute, consent |
+| Sage, Bell-ringer | none (asleep until Edition 2) | — |
 
 - **Reach is the whole computer (user decision Q1).**
   - `~/MonkeyCraftWorkspace/` is the default cwd and the "home" scope.
@@ -153,6 +153,7 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
      - Each crew member has a medieval building: smithy, archive, lookout tower, weaver's cottage, chapel, shrine and clock tower. The Voidwyrm is perched on a magic tower at the back.
      - Working = the creature walks the road graph to its door and goes INSIDE, and the building's light layer glows in its colour. Asking, ready, talking and error = waits at the door with a plate. Asleep = dozes on its doorstep.
      - The canvas is 640×424 at 2 px per voxel, about 5 ms a frame. Dev render: `node scripts/render-station.js out.png [steps] [k=mode,…] [yawSteps]`.
+   - **Ape village (2026-11-06, the user's choice after a 2D trial):** the voxel village is replaced by a side-scrolling jungle village of apes, in `ui/station/ape/` (fb, cast, scenery, world, villagers, frame, scene). The interface (`makeStation`, `modeOf`, `pick`, `anchor`) is unchanged. Crew IDs are now `chief scout smith archivist writer inspector sage ringer`. It renders 320×180 at 20 steps a second; the village scrolls (drag, ◀ ▶, arrow keys) and jumps to whoever asks for permission. Dev render: `node scripts/render-station.js out.png [steps] [k=mode,…] [cameraX]`. Verified: 32 tests pass, plus a live run in which the Smith asked from its smithy door, ran `ls -la` once allowed, and finished (`done`, ~4k tokens). Plan: `docs/plans/ape-village-m3-m4.md`.
    - Original scope:
    - port the renderer, then add the event → animation mapping and the consent plate;
    - *check:* no animation fires without a matching event (tested with a scripted event feed).
@@ -162,7 +163,7 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
    - *check:* a symlink-escape test (a workspace link pointing into `~/.ssh` is denied), and "Revert this job" restoring an edited outside file.
 5. **M4 Crew:**
    - the roster, `crew.dispatch` and `crew.spawn` with the shared pool, liveness and concurrency;
-   - *check:* the Voidwyrm splits "research X and write a summary file" into the Plate plus the Spider; worker spend rolls up into the lead's pool; the lead receives only the workers' final messages.
+   - *check:* the Chief splits "research X and write a summary file" into the Scout plus the Writer; worker spend rolls up into the lead's pool; the lead receives only the workers' final messages.
 6. **M5 Finish:**
    - the API-key provider (key in an env var for now, keychain later), a settings panel, and crash recovery;
    - *check:* the same job runs on both providers through the same pipeline.
@@ -171,4 +172,4 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
 - Q1 Reach: **the whole computer**, with the hardline list, a prompt for every change outside the workspace, and the undo store.
 - Q2 Shell: **a browser tab on localhost** for Edition 1. The desktop app comes later.
 - Q3 Code origin: **fresh code** that borrows StarNet's designs. No StarNet code is copied.
-- Q4 Crew: **five working**. The Tide Seer and Clockwork Bat are asleep until Edition 2.
+- Q4 Crew: **five working**. The Sage and Bell-ringer are asleep until Edition 2.

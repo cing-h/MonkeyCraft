@@ -2,7 +2,7 @@
   "name": "monkeycraft",
   "version": "0.0.1",
   "private": true,
-  "description": "A local AI crew harness with a voxel station floor.",
+  "description": "A local AI crew harness: a jungle village of apes who do your jobs.",
   "type": "module",
   "engines": { "node": ">=22" },
   "scripts": {
