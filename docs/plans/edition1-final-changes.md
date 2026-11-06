@@ -107,3 +107,29 @@ Added 2026-11-06.
   - Tests: no chatter from a busy crew member; work-related lines only after the matching real event.
   - Bubbles never overlap the question bubble.
   - A screenshot and a frame strip to judge readability.
+
+## 4. Two-way link between a Claude Code session and the Chief
+
+Added 2026-11-06. The user accepted all of the recommendations below.
+
+**What the user wants:** the Claude Code session running in WSL (the one building MonkeyCraft) can give the Chief jobs, and the Chief can give that session jobs.
+
+**Planned design:**
+- **Session → MonkeyCraft (straightforward):**
+  - MonkeyCraft offers outside Claude Code sessions a small, local-only toolset: *give a job* (to the Chief by default, or any awake crew member), *check a job / get its final report*, and *stop a job*. It would be an MCP server, or a tiny CLI over the existing local API, with its own access token stored in `data/`.
+  - These jobs appear in the village and the Job log like the user's own, marked "from Claude Code".
+  - Every change or command still asks **the user** on the MonkeyCraft screen. The outside session can never approve MonkeyCraft's permission questions.
+- **Chief → session (the mailbox):**
+  - The Chief gets a new tool, *ask Claude Code*, which drops a request into a MonkeyCraft mailbox (durable, in `data/`).
+  - In the village, a **messenger toucan** flies off from the Chief's lodge with the note, and flies back when the answer arrives.
+  - The session picks requests up when the user says "check the Chief's mailbox", or with a watcher that wakes the session when a note arrives (only while that session is open). The session does the work under Claude Code's own permission prompts in its terminal, then replies.
+  - The Chief can wait for the answer (with a time limit) or carry on and collect it later, like crew.spawn plus crew.wait.
+- **Not built:** MonkeyCraft starting full Claude Code sessions with all built-in tools by itself. That would bypass the village, MonkeyCraft's permission questions, undo and the spending limits.
+- **Safety:**
+  - Requests from the Chief are untrusted input. Requests that trace back to web content (the Scout) are labelled so. The session treats every request as information and confirms consequential actions with the user.
+  - Neither side approves the other's actions: MonkeyCraft's questions stay on its screen, and Claude Code's stay in its terminal.
+  - Every message in both directions is recorded in the Job log and the journal.
+  - Only this computer can reach it: the toolset listens on 127.0.0.1 only, needs its token, and is refused from the crew's own tools, so crew members can't use it to give themselves extra jobs.
+- **Checks:**
+  - Tests: a job given from outside runs through the normal pipeline; outside sessions can't answer permission questions; the mailbox survives a restart; requests from web-reading jobs are labelled; the Chief's waiting has a time limit.
+  - Live round trip: this session gives the Chief a job, and the Chief sends a request back through the mailbox.
