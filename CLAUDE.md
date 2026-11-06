@@ -19,6 +19,8 @@ The user directs and never writes code; Claude writes all of it. Explain changes
 - No runtime dependencies without a reason. Pin exact versions when one is added.
 - Remove the Claude Co-author line after any changes or additions to the Repo.
 
+- Exception to the owner's general standards for THIS project: ignore "one feature per session". Keep building MonkeyCraft features in the same session; don't hand off to a new session just because a feature is done. (Owner's decision, 2026-11-06.)
+
 ## Seeing the UI
 You can't see a browser, so take a screenshot with the user's Windows Chrome in headless mode, using a throwaway profile under `%LOCALAPPDATA%\Temp\acshot`. Then Read the PNG.
 ```
