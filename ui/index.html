@@ -11,16 +11,6 @@
 <div class="app">
   <header class="top">
     <div class="brand"><span class="logo" aria-hidden="true"></span><h1>MonkeyCraft</h1></div>
-    <div class="cam">
-      <button id="scroll-l" type="button" aria-label="Scroll the village left">◀</button>
-      <span>VILLAGE</span>
-      <button id="scroll-r" type="button" aria-label="Scroll the village right">▶</button>
-      <button id="scroll-u" type="button" aria-label="Up a story">▲</button>
-      <button id="scroll-d" type="button" aria-label="Down a story">▼</button>
-      <div class="stories" id="stories" role="group" aria-label="Which story of the village to show">
-        <button type="button" data-story="0" aria-pressed="true">GROUND</button><span aria-hidden="true">·</span><button type="button" data-story="1" aria-pressed="false">CANOPY 1</button><span aria-hidden="true">·</span><button type="button" data-story="2" aria-pressed="false">CANOPY 2</button>
-      </div>
-    </div>
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
     <button id="council-report" class="council-note" type="button" hidden title="A council report: the Chief thinks you should know something. Click to read it." aria-label="Read the council report">★ REPORT</button>
     <button id="call-council" type="button" title="Call the crew to the Ring to review recent work. You choose how long the meeting lasts.">Council</button>
@@ -33,6 +23,18 @@
       <canvas id="scene" tabindex="0" aria-describedby="crew-status" aria-label="The ape village, three stories tall. Drag, use the mouse wheel or the arrow keys to scroll. Click a crew member or its home to see only its jobs."></canvas>
       <div class="overlay" id="overlay"></div>
       <div class="scrollbar" aria-hidden="true"><span id="thumb"></span></div>
+      <div class="cam viewbar" role="toolbar" aria-label="Move and zoom the village view">
+        <button id="scroll-l" type="button" aria-label="Scroll the village left">◀</button>
+        <button id="scroll-r" type="button" aria-label="Scroll the village right">▶</button>
+        <button id="scroll-u" type="button" aria-label="Up a story">▲</button>
+        <button id="scroll-d" type="button" aria-label="Down a story">▼</button>
+        <button id="zoom-out" type="button" aria-label="Zoom out (see more of the village)" title="Zoom out: see more of the village, up to all of it (or press −)">−</button>
+        <span id="zoom-level" aria-live="polite" title="Zoom">1×</span>
+        <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in (or press +)">+</button>
+        <div class="stories" id="stories" role="group" aria-label="Which story of the village to show">
+          <button type="button" data-story="0" aria-pressed="true">GROUND</button><span aria-hidden="true">·</span><button type="button" data-story="1" aria-pressed="false">CANOPY 1</button><span aria-hidden="true">·</span><button type="button" data-story="2" aria-pressed="false">CANOPY 2</button>
+        </div>
+      </div>
       <span class="tie l" aria-hidden="true"></span><span class="tie r" aria-hidden="true"></span>
     </div>
     <ul class="crew" id="crew-status" aria-label="What each crew member is doing" aria-live="polite"></ul>

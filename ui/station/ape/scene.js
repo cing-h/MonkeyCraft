@@ -39,10 +39,14 @@ export const PLATE = { asking: ['?', [242, 197, 49]], error: ['!', [255, 90, 90]
  */
 export const CREW_IDS = CREW;
 export const SCENE_W = W, SCENE_H = H;
+export const ZOOMS = [1, 1.5, 2, 3];   // 3: the whole village (960×540) in one view
 
 export function makeStation(canvas, { modeOf, councilOf = () => false, reduced = false }) {   // councilOf(id, now): is it at a council (a real council job)?
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d'), img = ctx.createImageData(W, H), fb = new FB(W, H);
+  // zoom: the view can show more of the world (1× = 320×180 … 3× = the whole village, 960×540)
+  const ctx = canvas.getContext('2d');
+  let zoom = 1, VW = W, VH = H, img, fb, glowW, glowWho;
+  const sizeView = () => { VW = Math.round(W * zoom); VH = Math.round(H * zoom); canvas.width = VW; canvas.height = VH; img = ctx.createImageData(VW, VH); fb = new FB(VW, VH); glowW = new Float32Array(VW * VH); glowWho = new Uint8Array(VW * VH); };
+  sizeView();
   const L = buildLayers(), frame = buildFrame(), villagers = makeVillagers(L.back.w);
   let t = 0, cam = 330, camY = 0, goalY = null, seed = 11;   // camY: the world y at the top of the screen (0 = the ground village)
   const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
@@ -263,16 +267,16 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
   const GLOW_RING = [[1, 0, 0.62], [-1, 0, 0.62], [0, 1, 0.62], [0, -1, 0.62], [1, 1, 0.42], [-1, 1, 0.42], [1, -1, 0.42], [-1, -1, 0.42],
     [2, 0, 0.24], [-2, 0, 0.24], [0, 2, 0.24], [0, -2, 0.24], [2, 1, 0.15], [-2, 1, 0.15], [2, -1, 0.15], [-2, -1, 0.15], [1, 2, 0.15], [-1, 2, 0.15], [1, -2, 0.15], [-1, -2, 0.15]];
   const GLOW_C = CREW.map(k => mixc([255, 238, 200], LIGHT[k], 0.35));
-  const glowW = new Float32Array(W * H), glowWho = new Uint8Array(W * H), glowHit = [];
+  const glowHit = [];
   function glowOutline() {
     const id = fb.id, d = fb.d;
     // stamp the ring round every crew pixel, keeping the strongest weight each neighbour gets
     for (let i = 0; i < id.length; i++) {
       const n = id[i]; if (n <= 0) continue;
-      const x = i % W, y = (i / W) | 0;
+      const x = i % VW, y = (i / VW) | 0;
       for (const [dx, dy, k] of GLOW_RING) {
-        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= W || yy >= H) continue;
-        const j = yy * W + xx; if (id[j] > 0 || k <= glowW[j]) continue;
+        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= VW || yy >= VH) continue;
+        const j = yy * VW + xx; if (id[j] > 0 || k <= glowW[j]) continue;
         if (!glowW[j]) glowHit.push(j);
         glowW[j] = k; glowWho[j] = n;
       }
@@ -285,46 +289,51 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     glowHit.length = 0;
   }
 
+  // Where a parallax layer sits in the view: layer x = off + screen x * k. At 1× this is the usual
+  // parallax (off = cam × f, k = 1). Zoomed out, a far layer narrower than the view stretches to fill it.
+  const layerMap = src => { const k = Math.min(1, src.w / VW), span = WORLD - VW; return { k, off: span > 0 ? cam / span * (src.w - VW * k) : 0 }; };
   // copy the on-screen part of a pre-painted layer; `fixed` layers stay put on the screen (the foliage frame)
   const blit = (src, f, fixed = false) => {
-    const off = Math.round(cam * f), top = fixed ? 0 : fb.oy;
-    for (let y = 0; y < H; y++) {
+    const { k, off } = fixed ? { k: 1, off: 0 } : layerMap(src), top = fixed ? 0 : fb.oy;
+    for (let y = 0; y < VH; y++) {
       const sy = y + top - src.oy; if (sy < 0 || sy >= src.h) continue;
-      for (let x = 0; x < W; x++) {
-        const sx = x + off; if (sx < 0 || sx >= src.w) continue;
+      for (let x = 0; x < VW; x++) {
+        const sx = Math.floor(off + x * k); if (sx < 0 || sx >= src.w) continue;
         const so = (sy * src.w + sx) * 4; if (!src.d[so + 3]) continue;
-        const o = (y * W + x) * 4; fb.d[o] = src.d[so]; fb.d[o + 1] = src.d[so + 1]; fb.d[o + 2] = src.d[so + 2]; fb.d[o + 3] = 255;
-        fb.id[y * W + x] = src.id[sy * src.w + sx];
+        const o = (y * VW + x) * 4; fb.d[o] = src.d[so]; fb.d[o + 1] = src.d[so + 1]; fb.d[o + 2] = src.d[so + 2]; fb.d[o + 3] = 255;
+        fb.id[y * VW + x] = src.id[sy * src.w + sx];
       }
     }
   };
-  const onScreen = (y0, y1) => y1 > fb.oy && y0 < fb.oy + H;   // is any of world rows y0..y1 on screen?
+  const onScreen = (y0, y1) => y1 > fb.oy && y0 < fb.oy + VH;   // is any of world rows y0..y1 on screen?
   function draw(now) {
     fb.id.fill(-1); fb.pid = -1; fb.oy = Math.round(camY);
     const cy = fb.oy;
     blit(L.sky, 0.05);
     // clouds drift slowly on their own as well as with the camera
     const cl = L.clouds, coff = Math.round(cam * 0.1 + t * 0.6);
-    for (let y = Math.max(0, cy); y < Math.min(70, cy + H); y++) for (let x = 0; x < W; x++) { const sx = ((x + coff) % cl.w + cl.w) % cl.w, so = (y * cl.w + sx) * 4; if (cl.d[so + 3]) { const o = ((y - cy) * W + x) * 4; fb.d[o] = cl.d[so]; fb.d[o + 1] = cl.d[so + 1]; fb.d[o + 2] = cl.d[so + 2]; } }
+    for (let y = Math.max(0, cy); y < Math.min(70, cy + VH); y++) for (let x = 0; x < VW; x++) { const sx = ((x + coff) % cl.w + cl.w) % cl.w, so = (y * cl.w + sx) * 4; if (cl.d[so + 3]) { const o = ((y - cy) * VW + x) * 4; fb.d[o] = cl.d[so]; fb.d[o + 1] = cl.d[so + 1]; fb.d[o + 2] = cl.d[so + 2]; } }
     blit(L.far, 0.15);
     blit(L.jungle, 0.3);
     // the distant waterfall falls
     if (onScreen(62, WATER)) { // streaks that flow downward, hazed like the rest of the far jungle, with spray at the foot
-      const ox = Math.round(cam * 0.3), haze = [176, 150, 140];
-      for (let x = 405; x < 417; x++) { const col = hash(x, 3), sp = 26 + col * 18;
-        for (let y = 66; y < WATER; y++) { const b = hash(x, Math.floor((y - t * sp) / 3), 4); const c = b > 0.55 ? [226, 232, 234] : b > 0.2 ? [178, 198, 206] : [132, 150, 160]; fb.put(x - ox, y, mixc(c, haze, 0.4)); } }
-      for (let i = 0; i < 18; i++) { const x = 403 + hash(i, 5) * 16, y = WATER - 2 - pos(Math.sin(t * 3 + i)) * 5; fb.add(x - ox, y, [200, 210, 214], 0.35); }
+      const m = layerMap(L.jungle), haze = [176, 150, 140];   // (in the far jungle's coordinates)
+      for (let sx = Math.floor((405 - m.off) / m.k); sx < Math.ceil((417 - m.off) / m.k); sx++) { const x = Math.floor(m.off + sx * m.k), col = hash(x, 3), sp = 26 + col * 18;
+        for (let y = 66; y < WATER; y++) { const b = hash(x, Math.floor((y - t * sp) / 3), 4); const c = b > 0.55 ? [226, 232, 234] : b > 0.2 ? [178, 198, 206] : [132, 150, 160]; fb.put(sx, y, mixc(c, haze, 0.4)); } }
+      for (let i = 0; i < 18; i++) { const x = 403 + hash(i, 5) * 16, y = WATER - 2 - pos(Math.sin(t * 3 + i)) * 5; fb.add((x - m.off) / m.k, y, [200, 210, 214], 0.35); }
     }
     blit(L.back, 0.55);
-    fb.ox = Math.round(cam * 0.55); fb.fog = 0.26; fb.fogc = [150, 140, 130];
-    villagers.forEach((v, i) => { const { q, px, py } = villagerPose(v), h = drawApe(fb, v.key, q, { mode: 'pelvis', x: px, y: py }, v.b.dir, v.s, t); vheads[i] = { x: h.headX - fb.ox, y: h.headY }; });
-    for (const l of leaves) if (l.par !== 1) fb.put(l.x - fb.ox, l.y, l.c);
-    fb.fog = 0; fb.ox = 0;
+    { // the far villagers, in the back layer's coordinates mapped onto the screen
+      const m = layerMap(L.back), toS = x => (x - m.off) / m.k; fb.fog = 0.26; fb.fogc = [150, 140, 130];
+      villagers.forEach((v, i) => { const { q, px, py } = villagerPose(v), h = drawApe(fb, v.key, q, { mode: 'pelvis', x: toS(px), y: py }, v.b.dir, v.s, t); vheads[i] = { x: h.headX, y: h.headY }; });
+      for (const l of leaves) if (l.par !== 1) fb.put(toS(l.x), l.y, l.c);
+      fb.fog = 0; fb.ox = 0;
+    }
     // low mist drifting through the trees behind the village
-    if (onScreen(84, WATER)) for (let y = 84; y < WATER; y++) for (let x = 0; x < W; x++) { const n = noise1((x + cam * 0.7 + t * 4) / 23, 9) * 0.6 + noise1((x + cam * 0.7 - t * 2) / 9, 10) * 0.4, a = n * (1 - Math.abs(y - 104) / 20) * 0.5; if (a > 0.05) fb.add(x, y, [64, 54, 54], a * 0.45); }
+    if (onScreen(84, WATER)) for (let y = 84; y < WATER; y++) for (let x = 0; x < VW; x++) { const n = noise1((x + cam * 0.7 + t * 4) / 23, 9) * 0.6 + noise1((x + cam * 0.7 - t * 2) / 9, 10) * 0.4, a = n * (1 - Math.abs(y - 104) / 20) * 0.5; if (a > 0.05) fb.add(x, y, [64, 54, 54], a * 0.45); }
     // light shafts from the low sun on the left
     // (they reach up through the canopy too, brighter the higher you go)
-    for (let y = cy; y < Math.min(WATER, cy + H); y++) for (let x = 0; x < W; x++) {
+    for (let y = cy; y < Math.min(WATER, cy + VH); y++) for (let x = 0; x < VW; x++) {
       const u = (x + cam * 0.3) - y * 1.1, band = Math.sin(u / 43) * 0.6 + Math.sin(u / 17 + 1.3) * 0.25 + Math.sin(t * 0.2 + u / 90) * 0.15;
       if (band < 0.58) continue;
       const a = Math.min(1, (band - 0.58) * 2.2) * Math.min(1.15, 1 - y / WATER * 0.6);
@@ -394,22 +403,22 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     for (let i = 0; i < 14; i++) { const x = ((hash(i, 93) * WORLD + Math.sin(t * 0.3 + i) * 20) - cam), y = 70 + hash(i, 94) * 40 + Math.sin(t * 0.8 + i * 2) * 5; if (x > -2 && x < W + 2 && Math.sin(t * 2.3 + i * 1.7) > 0.3) fb.add(x, y, [200, 255, 140], 0.7); } // fireflies
     fb.ox = 0;
     // the lagoon: everything above mirrored, darkened, rippling, with bright ripple dashes
-    for (let y = Math.max(WATER, cy); y < Math.min(H, cy + H); y++) {   // world rows of the lagoon that are on screen
+    for (let y = Math.max(WATER, cy); y < Math.min(H, cy + VH); y++) {   // world rows of the lagoon that are on screen (H: the bottom of the world)
       const depth = (y - WATER) / (H - WATER), wob = Math.round(Math.sin(y * 0.9 + t * 2.2) * (0.5 + depth * 1.6));
       const sy = 2 * WATER - y - 1 - Math.round(Math.sin(t * 1.3 + y * 0.35) * 0.6) - cy, ry = y - cy;   // source and target rows on screen
-      for (let x = 0; x < W; x++) {
-        const sx = Math.max(0, Math.min(W - 1, x + wob)), so = (Math.max(0, sy) * W + sx) * 4, o = (ry * W + x) * 4;
+      for (let x = 0; x < VW; x++) {
+        const sx = Math.max(0, Math.min(VW - 1, x + wob)), so = (Math.max(0, sy) * VW + sx) * 4, o = (ry * VW + x) * 4;
         const k = 0.55 - depth * 0.15;
-        fb.d[o] = fb.d[so] * k + 18 * (1 - k); fb.d[o + 1] = fb.d[so + 1] * k + 34 * (1 - k); fb.d[o + 2] = fb.d[so + 2] * k + 44 * (1 - k); fb.d[o + 3] = 255; fb.id[ry * W + x] = -1;
+        fb.d[o] = fb.d[so] * k + 18 * (1 - k); fb.d[o + 1] = fb.d[so + 1] * k + 34 * (1 - k); fb.d[o + 2] = fb.d[so + 2] * k + 44 * (1 - k); fb.d[o + 3] = 255; fb.id[ry * VW + x] = -1;
       }
       for (let i = 0; i < 3; i++) {                          // ripple dashes
-        const r = hash(y, i, 21), x0 = ((r * 1200 - cam * 1.0 + Math.sin(t * 0.5 + r * 6) * 8) % W + W) % W, len = 2 + Math.floor(hash(y, i, 22) * 5);
+        const r = hash(y, i, 21), x0 = ((r * 1200 - cam * 1.0 + Math.sin(t * 0.5 + r * 6) * 8) % VW + VW) % VW, len = 2 + Math.floor(hash(y, i, 22) * 5);
         if (Math.sin(t * 1.6 + r * 20) < 0.2) continue;
         for (let x = 0; x < len; x++) fb.add(x0 + x, y, [190, 200, 190], 0.32);   // (add takes world rows)
       }
     }
     blit(L.fore, 1.3);
-    fb.oy = 0; blit(frame, 0, true); drawVines(fb, t); fb.oy = cy;   // the foliage frame is fixed to the screen
+    if (zoom === 1) { fb.oy = 0; blit(frame, 0, true); drawVines(fb, t); fb.oy = cy; }   // the foliage frame is fixed to the screen (left out when zoomed out, so it hides nothing)
     // plates over heads
     for (const k of CREW) { const a = actors[k], h = heads[k]; if (!h) continue; const p = PLATE[a.mode]; if (!p) continue;
       let x = Math.round(h.headX - cam) - 4, y = Math.round(h.headY) - 11;
@@ -421,7 +430,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     img.data.set(fb.d); ctx.putImageData(img, 0, 0);
   }
 
-  const clampCam = x => Math.max(0, Math.min(WORLD - W, x)), clampY = y => Math.max(TOP, Math.min(0, y));
+  const clampCam = x => Math.max(0, Math.min(WORLD - VW, x)), clampY = y => Math.max(TOP, Math.min(H - VH, y));   // H: the bottom of the world
   const storyOf = y => STORIES.reduce((b, s, i) => Math.abs(s.camY - y) < Math.abs(STORIES[b].camY - y) ? i : b, 0);
   const worldYOf = a => a.anim === 'climb' && a.climbY !== undefined ? a.climbY : a.air ? a.air.y : surfaceY(a.lane, a.x);
   return {
@@ -429,28 +438,43 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     step(now, dt = 0.05) {
       t += dt;
       if (goalY !== null) { camY += (goalY - camY) * Math.min(1, reduced ? 1 : dt * 6); if (Math.abs(goalY - camY) < 0.5) { camY = goalY; goalY = null; } }
-      update(dt, now); draw(now);
+      update(dt, now);
+      draw(now);
     },
+    /** Zoom: 1 (normal) … 3 (the whole village). Keeps the middle of the view where it was. */
+    ZOOMS,
+    zoom: () => zoom,
+    setZoom(z) {
+      z = ZOOMS.reduce((b, c) => Math.abs(c - z) < Math.abs(b - z) ? c : b, 1);
+      if (z === zoom) return zoom;
+      const mx = cam + VW / 2, my = camY + VH / 2;
+      zoom = z; sizeView(); goalY = null;
+      cam = clampCam(mx - VW / 2); camY = clampY(my - VH / 2);
+      draw(0); return zoom;
+    },
+    zoomBy(step) { const i = ZOOMS.indexOf(zoom); return this.setZoom(ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + step))]); },
+    /** The size of the view in scene pixels, for turning mouse moves into scrolling. */
+    view: () => [VW, VH],
     redraw(now) { draw(now); },
     camera: () => cam,
     cameraY: () => camY,
     /** Centre the view on world x; with y, also bring that world height into view. */
-    scrollTo(x, y) { cam = clampCam(x - W / 2); if (y !== undefined) { camY = clampY(y - H * 0.62); goalY = null; } },
+    scrollTo(x, y) { cam = clampCam(x - VW / 2); if (y !== undefined) { camY = clampY(y - VH * 0.62); goalY = null; } },
     scrollBy(dx, dy = 0) { cam = clampCam(cam + dx); if (dy) { camY = clampY(camY + dy); goalY = null; } },
     /** Which story is in view (0 Ground, 1 Canopy 1, 2 Canopy 2), and glide to one. */
     story: () => storyOf(goalY ?? camY),
-    toStory(i) { goalY = STORIES[Math.max(0, Math.min(STORIES.length - 1, i))].camY; },
+    toStory(i) { if (zoom === ZOOMS.at(-1)) this.setZoom(1); goalY = clampY(STORIES[Math.max(0, Math.min(STORIES.length - 1, i))].camY); },   // from the whole-village view, a story button zooms back in
     /** Bring a crew member into view, whichever story it is on. */
-    focus(k) { const a = actors[k]; cam = clampCam(a.x - W / 2); goalY = clampY(worldYOf(a) - H * 0.62); if (reduced) { camY = goalY; goalY = null; } },
+    focus(k) { const a = actors[k]; cam = clampCam(a.x - VW / 2); goalY = clampY(worldYOf(a) - VH * 0.62); if (reduced) { camY = goalY; goalY = null; } },
     pick(cssX, cssY) {
-      const r = canvas.getBoundingClientRect(), x = Math.floor(cssX / r.width * W), y = Math.floor(cssY / r.height * H);
-      if (x < 0 || y < 0 || x >= W || y >= H) return null;
-      const id = fb.id[y * W + x]; if (id > 0) return CREW[id - 1];
+      const r = canvas.getBoundingClientRect(), x = Math.floor(cssX / r.width * VW), y = Math.floor(cssY / r.height * VH);
+      if (x < 0 || y < 0 || x >= VW || y >= VH) return null;
+      const id = fb.id[y * VW + x]; if (id > 0) return CREW[id - 1];
       const wx = x + cam, wy = y + Math.round(camY); let best = null, bd = 30;
       for (const k of CREW) { const dd = Math.abs(DOORS[k].x - wx) + Math.abs(surfaceY(DOORS[k].lane, DOORS[k].x) - wy) * 0.5; if (dd < bd) { bd = dd; best = k; } }
       return best;
     },
-    anchor(k) { const r = canvas.getBoundingClientRect(), h = heads[k] || { headX: DOORS[k].x, headY: surfaceY(DOORS[k].lane, DOORS[k].x) - 20 }; return [(h.headX - cam) / W * r.width, (h.headY - Math.round(camY)) / H * r.height]; },
+    anchor(k) { const r = canvas.getBoundingClientRect(), h = heads[k] || { headX: DOORS[k].x, headY: surfaceY(DOORS[k].lane, DOORS[k].x) - 20 }; return [(h.headX - cam) / VW * r.width, (h.headY - Math.round(camY)) / VH * r.height]; },
     positionOf: k => actors[k].x,
     /** A real event the villagers may remark on (see chatter.js). */
     notify(fact) {
@@ -472,7 +496,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       for (const k of CREW) if (heads[k]) pos.set(`crew:${k}`, [heads[k].headX - cam, heads[k].headY - cy]);
       vheads.forEach((h, i) => h && pos.set(`v:${i}`, [h.x, h.y - cy]));
       fheads.forEach((h, i) => h && pos.set(`f:${i}`, [h.headX - cam, h.headY - cy]));
-      return chat.filter(b => pos.has(b.ref) && pos.get(b.ref)[1] > 4 && pos.get(b.ref)[1] < H).map(b => { const [x, y] = pos.get(b.ref); return { ...b, x: x / W * r.width, y: y / H * r.height }; });
+      return chat.filter(b => pos.has(b.ref) && pos.get(b.ref)[1] > 4 && pos.get(b.ref)[1] < VH && zoom < 2).map(b => { const [x, y] = pos.get(b.ref); return { ...b, x: x / VW * r.width, y: y / VH * r.height }; });   // (no chatter bubbles when zoomed far out: too small to read)
     }
   };
 }

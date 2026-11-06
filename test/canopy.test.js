@@ -108,3 +108,20 @@ test('villagers roam all stories and are never busy; a job brings every crew mem
   for (let i = 0; i < 20 * 90 && !done; i++) { st.step(0, 0.05); done = CREW_IDS.filter(k => modes[k] === 'working').every(k => st._actors[k].inside); }
   assert.ok(done, `every working crew member got home within 90 s (from the canopy: ${far.join(', ') || 'none'})`);
 });
+
+test('zoom: from the normal view out to the whole village, keeping the middle of the view where it was', () => {
+  const { cv, st } = station();
+  st.scrollTo(480, -64);
+  assert.deepEqual(st.view(), [320, 180]); assert.equal(st.zoom(), 1);
+  const mid = () => [st.camera() + st.view()[0] / 2, st.cameraY() + st.view()[1] / 2];
+  const before = mid();
+  st.zoomBy(1); assert.equal(st.zoom(), 1.5); assert.deepEqual(st.view(), [480, 270]);
+  assert.ok(Math.abs(mid()[0] - before[0]) < 1 && Math.abs(mid()[1] - before[1]) < 1, 'zooming keeps the middle in place');
+  st.zoomBy(1); st.zoomBy(1); st.zoomBy(1);
+  assert.equal(st.zoom(), 3); assert.deepEqual(st.view(), [960, 540], 'the whole village fits');
+  assert.deepEqual([st.camera(), st.cameraY()], [0, TOP], 'and nothing is left out');
+  st.scrollBy(500, 500); assert.deepEqual([st.camera(), st.cameraY()], [0, TOP], 'no scrolling past the edges');
+  st.step(0, 0.05); assert.equal(cv.ctx.last.data.length, 960 * 540 * 4, 'the canvas grows to the bigger view');
+  st.toStory(0); assert.equal(st.zoom(), 1, 'a story button zooms back in'); for (let i = 0; i < 60; i++) st.step(0, 0.05); assert.equal(st.cameraY(), 0);
+  st.setZoom(2); st.zoomBy(-5); assert.equal(st.zoom(), 1, 'never closer than normal'); st.setZoom(7); assert.equal(st.zoom(), 3);
+});

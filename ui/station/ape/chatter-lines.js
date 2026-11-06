@@ -69,7 +69,7 @@ export const CONVERSATIONS = [
   ['That cloud looks like a banana.', 'Every cloud looks like a banana to you.'],
   ['Let\'s sing!', 'You start.', 'Hooo…', 'Lovely. Stop now.'],
   ['The breeze is perfect.', 'Not too warm, not too cold.'],
-  ['I found the sunny branch.', 'Make room for me.']
+  ['I found the sunny branch.', 'Make room for me.'],
   // the culture: the way of the Leaf-Ledger (see docs/culture.md)
   ['Share the fruit you find.', 'And say where the tree is.'],
   ['A branch that hides its rot breaks.', 'So we tell each other when something\'s wrong.', 'Kindly.', 'Kindly, but we tell.'],

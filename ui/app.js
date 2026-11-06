@@ -3,7 +3,7 @@
 // If an event didn't arrive, nothing on the page pretends it happened.
 
 import { initialState, reduce, modeOf, inCouncil, MODE_TEXT } from './station/state.js';
-import { makeStation, CREW_IDS, SCENE_W, SCENE_H } from './station/ape/scene.js';
+import { makeStation, CREW_IDS } from './station/ape/scene.js';
 
 const $ = id => document.getElementById(id);
 const H = { 'content-type': 'application/json', 'x-monkeycraft': '1' };
@@ -330,12 +330,17 @@ syncCouncil();
 if (mailOpen.size) station.mail(true, false);   // requests opened before the village was built
 // scrolling the village: buttons, arrow keys and drag; a click without a drag picks a crew member
 const WORLD_W = 960;
-function syncThumb() { const t = $('thumb'); t.style.width = (SCENE_W / WORLD_W * 100) + '%'; t.style.left = (station.camera() / WORLD_W * 100) + '%'; }
+function syncThumb() { const t = $('thumb'), [vw] = station.view(); t.style.width = (vw / WORLD_W * 100) + '%'; t.style.left = (station.camera() / WORLD_W * 100) + '%'; }
 const scrollBy = (dx, dy = 0) => { station.scrollBy(dx, dy); station.redraw(Date.now()); syncThumb(); syncStories(); syncBubbles(); };
 // the three stories: Ground, Canopy 1, Canopy 2 (▲ goes up a story, ▼ down)
 let shownStory = -1;
 function syncStories() { const k = station.story(); if (k === shownStory) return; shownStory = k; for (const b of $('stories').querySelectorAll('button')) b.setAttribute('aria-pressed', String(+b.dataset.story === k)); }
-const toStory = k => { station.toStory(k); syncStories(); };
+const toStory = k => { station.toStory(k); syncZoom(); syncThumb(); syncStories(); };
+// zoom: − shows more of the village (up to all of it at 3×), + goes back in
+function syncZoom() { const z = station.zoom(); $('zoom-level').textContent = z === station.ZOOMS.at(-1) ? 'ALL' : `${z}×`; $('zoom-out').disabled = z === station.ZOOMS.at(-1); $('zoom-in').disabled = z === 1; }
+const zoomBy = step => { station.zoomBy(step); syncZoom(); syncThumb(); syncStories(); syncBubbles(); };
+$('zoom-out').onclick = () => zoomBy(1);
+$('zoom-in').onclick = () => zoomBy(-1);
 $('scroll-l').onclick = () => scrollBy(-120);
 $('scroll-r').onclick = () => scrollBy(120);
 $('scroll-u').onclick = () => toStory(station.story() + 1);
@@ -345,11 +350,14 @@ const canvas = $('scene');
 canvas.addEventListener('keydown', e => {
   const k = { ArrowLeft: [-24, 0], ArrowRight: [24, 0], ArrowUp: [0, -24], ArrowDown: [0, 24] }[e.key];
   if (k) { e.preventDefault(); scrollBy(...k); }
+  if (e.key === '-' || e.key === '_') { e.preventDefault(); zoomBy(1); }
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); zoomBy(-1); }
   if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); toStory(station.story() + (e.key === 'PageUp' ? 1 : -1)); }
 });
 // the mouse wheel scrolls up and down the stories (sideways with Shift or a sideways swipe); at the top or bottom the page scrolls as usual
 canvas.addEventListener('wheel', e => {
-  const r = canvas.getBoundingClientRect(), k = SCENE_W / r.width, side = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+  if (e.ctrlKey) { e.preventDefault(); zoomBy(e.deltaY > 0 ? 1 : -1); return; }   // Ctrl + wheel zooms
+  const r = canvas.getBoundingClientRect(), k = station.view()[0] / r.width, side = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
   const before = [station.camera(), station.cameraY()];
   if (side) scrollBy((e.deltaX || e.deltaY) * k * 0.5); else scrollBy(0, e.deltaY * k * 0.35);
   if (station.camera() !== before[0] || station.cameraY() !== before[1]) e.preventDefault();
@@ -358,7 +366,7 @@ let drag = null;
 canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', e => {
   if (!drag) return;
-  const r = canvas.getBoundingClientRect(), dx = (e.clientX - drag.x) / r.width * SCENE_W, dy = (e.clientY - drag.y) / r.height * SCENE_H;
+  const r = canvas.getBoundingClientRect(), [vw, vh] = station.view(), dx = (e.clientX - drag.x) / r.width * vw, dy = (e.clientY - drag.y) / r.height * vh;
   if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 3 || drag.moved) { drag.moved += Math.abs(dx) + Math.abs(dy); canvas.classList.add('dragging'); drag.x = e.clientX; drag.y = e.clientY; scrollBy(-dx, -dy); }
 });
 canvas.addEventListener('pointerup', e => {

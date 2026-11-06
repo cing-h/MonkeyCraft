@@ -77,3 +77,9 @@ test('the village produces chatter bubbles placed over the speakers\' heads', ()
   for (let i = 0; i < 600; i++) quiet.step(0, 0.05);
   assert.deepEqual(quiet.chatter(), [], 'no chatter when reduced motion is asked for');
 });
+
+test('every written conversation and mutter is well-formed (a missing comma in the list would silently break one)', async () => {
+  const { CONVERSATIONS, MUTTERS } = await import('../ui/station/ape/chatter-lines.js');
+  for (const c of CONVERSATIONS) { assert.ok(Array.isArray(c) && c.length >= 2 && c.length <= 4, JSON.stringify(c)); for (const l of c) assert.equal(typeof l, 'string'); }
+  for (const m of MUTTERS) assert.equal(typeof m, 'string');
+});

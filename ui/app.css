@@ -37,6 +37,9 @@ h1 { font: 700 22px var(--display); margin: 0; text-shadow: 2px 2px 0 var(--bark
 h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--leaf); margin: 0; text-transform: uppercase; }
 .cam { display: flex; align-items: center; gap: 6px; font: 11px var(--label); color: var(--muted); }
 .cam button { padding: 4px 9px; font-size: 12px; }
+.viewbar { position: absolute; left: 50%; transform: translateX(-50%); bottom: 26px; z-index: 2; flex-wrap: wrap; justify-content: center; gap: 4px; padding: 4px 8px; background: rgba(10, 16, 11, .8); border: 2px solid var(--bark-lo); max-width: calc(100% - 24px); }
+.viewbar #zoom-level { min-width: 30px; text-align: center; }
+.viewbar #zoom-out { margin-left: 10px; }
 .council-note { color: #2a1c13; background: #e8c25a; border-color: #8a6a1e; animation: council-glow 2.4s ease-in-out infinite; }
 @keyframes council-glow { 50% { background: #f3d77e; } }
 @media (prefers-reduced-motion: reduce) { .council-note { animation: none; } }
