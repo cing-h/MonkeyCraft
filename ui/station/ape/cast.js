@@ -133,6 +133,12 @@ export const P = {
     return { torso: -1.5 + br, plant: 'all', head: -0.15 + Math.sin(t * 0.35) * 0.12, sh: [1.15, 0.95], el: [-2.0, -1.8], hip: [2.75, 1.6], kn: [-2.55, -0.15], tail: 1.2, sitting: true, lying: true, lift: 0 }; },
   lean(sp, t) { const br = Math.sin(t * 1.4) * 0.02;      // sitting back against the trunk, legs out, hands in his lap
     return { torso: -0.32 + br, plant: 'feet', head: 0.2 + Math.sin(t * 0.5) * 0.2, sh: [0.55, 0.35], el: [-1.15, -0.95], hip: [1.45, 1.6], kn: [-0.45, -0.2], tail: 1.2, sitting: true, lift: 0 }; },
+  // the villagers' trades and the drum circle (scenery, see culture.js)
+  paint(sp, t) { const w = Math.sin(t * 3); return { torso: sp.posture === 'biped' ? 0.08 : 0.32, plant: 'feet', head: -0.15, sh: [1.9 + 0.25 * w, 0.8], el: [-0.4 + 0.3 * Math.sin(t * 3 + 1), -1.2], hip: [0.1, -0.08], kn: [-0.1, -0.05], tail: 0.5, lift: 0 }; },
+  carve(sp, t) { const ph = (t * 1.6) % 1, up = ph < 0.75 ? lerp(0.7, 2.5, ph / 0.75) : lerp(2.5, 0.7, (ph - 0.75) / 0.25);   // raise the mallet slowly, bring it down fast
+    return { torso: 0.55, plant: 'feet', head: 0.1, sh: [up, 1.25], el: [-0.5, -0.7], hip: [0.95, 0.75], kn: [-1.4, -1.2], tail: 0.6, lift: 0 }; },
+  weave(sp, t) { const b = P.sit(sp, t), w = Math.sin(t * 5); return { ...b, head: 0.2, sh: [1.3 + 0.15 * w, 1.2 - 0.15 * w], el: [-0.6, -0.6] }; },
+  drum(sp, t) { const b = P.sit(sp, t), d = k => 0.35 * pos(Math.sin(t * 8 + k)); return { ...b, head: 0.1 + Math.sin(t * 8) * 0.05, sh: [1.0 + d(0), 1.0 + d(Math.PI)], el: [-1.2, -1.2] }; },
   chestbeat(sp, t) {
     const f = Math.sin(t * 16);
     return { torso: 0.02, plant: 'feet', head: -0.4, sh: [1.25 + 0.3 * f, 1.25 - 0.3 * f], el: [-2.25, -2.25], hip: [0.12, -0.1], kn: [-0.1, -0.05], lift: 0, tail: 0 };

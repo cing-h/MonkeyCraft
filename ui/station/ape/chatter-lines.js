@@ -70,6 +70,19 @@ export const CONVERSATIONS = [
   ['Let\'s sing!', 'You start.', 'Hooo…', 'Lovely. Stop now.'],
   ['The breeze is perfect.', 'Not too warm, not too cold.'],
   ['I found the sunny branch.', 'Make room for me.']
+  // the culture: the way of the Leaf-Ledger (see docs/culture.md)
+  ['Share the fruit you find.', 'And say where the tree is.'],
+  ['A branch that hides its rot breaks.', 'So we tell each other when something\'s wrong.', 'Kindly.', 'Kindly, but we tell.'],
+  ['Did you add your mark to the Ledger today?', 'Three leaves and a spiral.', 'A good day, then.'],
+  ['The carver gave the new totem a face.', 'Whose?', 'Still deciding. It keeps changing its mind.'],
+  ['I traded two mangoes for a scroll.', 'What was in it?', 'A better way to find mangoes.'],
+  ['Is the drum calling a gathering?', 'Just practice.', 'It sounded important.', 'All drumming sounds important.'],
+  ['What\'s the painter painting?', 'The sunset again.', 'It is a very good sunset.'],
+  ['The weaver put an eye in the new rug.', 'For seeing clearly.', 'Or for watching who sits on it.'],
+  ['Count the lanterns at the Ring tonight.', 'Each one a job well done.', 'The crew have been busy.'],
+  ['Ask before you take, and leave the branch as you found it.', 'Grandmother\'s rule.', 'Everyone\'s grandmother\'s rule.'],
+  ['The courier brought fresh fruit up to the Ring.', 'Up all those ladders?', 'Up all those ladders.'],
+  ['What did you learn today?', 'That the bridge creaks on the third plank.', 'Write it down for the next one.'],
 ];
 
 /** Things a lone villager mutters to itself. */
@@ -80,7 +93,13 @@ export const MUTTERS = [
   'Was it left at the palm, or right?', 'Shiny pebble! Mine now.', 'The lanterns look cosy.', 'I love the smell of hibiscus.',
   'Is it nap time yet?', 'So many leaves.', 'Who hums like that?', 'The lagoon is calm today.', 'Time for a stretch.',
   'I\'ll just sit here a moment.', 'Mmm, warm sunshine.', 'Fruit, fruit, fruit…', 'Perfect swinging weather.',
-  'Funny-looking frog.', 'Hope it doesn\'t rain.', 'Where\'s everyone going?', 'What a view.'
+  'Funny-looking frog.', 'Hope it doesn\'t rain.', 'Where\'s everyone going?', 'What a view.',
+  'Seeing, growing, learning, sharing, keeping.',
+  'Leave the branch as you found it.',
+  'One more knot and the rug is done.',
+  'A good trade: everyone goes home with more.',
+  'Share the fruit you find.',
+  'The Ledger remembers what we forget.',
 ];
 
 /** Sleep-talk, for crew members who are asleep (they really are: this edition doesn't wake them). */

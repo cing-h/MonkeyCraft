@@ -24,7 +24,7 @@ Branch `feature/canopy-stories`, built on `feature/chief-roams`. The design is i
      - Crew and villagers travel to all three levels: climbing trunks from the ground to Canopy 1, ladders and vines between Canopy 1 and Canopy 2, and walking the bridges. The swingers brachiate under the boughs.
      - Some villagers live up there.
      - The truthful-station rules are unchanged, and a job brings anyone home from any story.
-   - **2b. A culture, decorations and the Council Ring.** The villagers are a *Civilization of Knowledge*.
+   - **2b. A culture, decorations and the Council Ring.** DONE (2026-11-06). In `ui/station/ape/culture.js`, lore in `docs/culture.md`. The user added commerce and art: the villagers have trades (fruit stall, painter, carver, weaver, courier). Also fixed: the hanging fronds in the foreground keep to the top of the screen on every story, redrawn as broad drooping leaves. The villagers are a *Civilization of Knowledge*.
      - **Lore** (written in `docs/culture.md`):
        - The way of the Leaf-Ledger: be curious, keep careful records, share the fruit you find, and give honest feedback ("a branch that hides its rot breaks").
        - Sayings, and a glyph alphabet (eye, leaf, scroll-spiral, open hand).

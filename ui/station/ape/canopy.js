@@ -18,8 +18,8 @@ const PLOT_W = 42;
 function buildWalk(s) {
   const base = STORY_Y[s], plats = [];
   TRUNKS.forEach((tx, i) => {
-    const half = tx === BIG_TRUNK ? 40 : 24;
-    plats.push({ kind: 'trunk', x0: Math.max(22, tx - half), x1: Math.min(WORLD - 22, tx + half), y: base + Math.round((hash(i, s, 301) - 0.5) * 6), tx });
+    const half = tx === BIG_TRUNK ? 40 : 24, ring = s === 1 && tx === BIG_TRUNK;   // the great tree's Canopy 1 platform is the wider Council Ring
+    plats.push({ kind: 'trunk', x0: Math.max(22, tx - (ring ? 60 : half)), x1: Math.min(WORLD - 22, tx + (ring ? 44 : half)), y: base + Math.round((hash(i, s, 301) - 0.5) * 6), tx });
     if (i < TRUNKS.length - 1) {
       const nx = TRUNKS[i + 1], mx = Math.round((tx + nx) / 2 + (hash(i, s, 302) - 0.5) * 16);
       plats.push({ kind: 'bough', x0: mx - PLOT_W / 2, x1: mx + PLOT_W / 2, y: base - 3 + Math.round((hash(i, s, 303) - 0.5) * 8), tx: Math.abs(mx - tx) < Math.abs(mx - nx) ? tx : nx });

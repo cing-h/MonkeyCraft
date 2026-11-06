@@ -253,6 +253,7 @@ async function loadSpend() {
     const { today, limits } = await fetch('/api/spend').then(r => r.json());
     $('spend').textContent = `TODAY · ${today.runs} JOBS · ${fmtTokens(today.tokens)} TOKENS · ~$${today.usd.toFixed(2)} OF $${limits.dailyUsd}`;
     $('spend').classList.toggle('near', today.usd >= 0.8 * limits.dailyUsd);
+    station?.lanterns(today.runs);   // one lantern at the Council Ring for each job today
   } catch {}
 }
 

@@ -4,6 +4,7 @@ import { FB, GROUND, H, TOP, W, WORLD, bayer, hash, mat, mixc } from './fb.js';
 import { C } from './cast.js';
 import { GREENS, banana, bush, canopy, fern, flower, foliage, palm, trunk } from './scenery.js';
 import { TRUNKS, paintCanopy, paintCanopyBack, paintHighSky } from './canopy.js';
+import { paintCulture } from './culture.js';
 export { TRUNKS };
 
 // ---------- the world ----------
@@ -171,16 +172,13 @@ export function buildLayers() {
   for (const x of [8, 96, 236, 344, 528, 566, 668, 790, 900, 950]) fern(mid, x, GROUND, x);
   for (let i = 0; i < 70; i++) { const x = hash(i, 91) * WORLD, kinds = ['hibiscus', 'plumeria', 'orchid', 'heliconia', 'bird']; flower(mid, x, groundY(x) - 1 - hash(i, 92) * 3, kinds[i % 5]); }
   for (const x of [120, 226, 362, 582, 700, 818]) lamp(x, GROUND - 12);
-  // foreground (parallax 1.3): reeds and lily pads in the water, fronds hanging from the top
+  for (const g of paintCulture(mid)) lamps.push(g);   // the villagers' culture: totems, bunting, glyphs, the market, art and the Council Ring
+  // foreground (parallax 1.3): reeds and lily pads in the water (the fronds hanging from the top of the view are in frame.js)
   const fore = layer(1.3);
   for (let i = 0; i < 60; i++) {
     const x = hash(i, 40) * fore.w, y = H - 1 - hash(i, 41) * 30, n = 3 + Math.floor(hash(i, 42) * 4);
     if (y < 150) { fore.ell(x, y, 4 + hash(i, 43) * 4, 1.2, mat([40, 86, 44], { rim: 0.6 })); if (hash(i, 44) < 0.3) flower(fore, x + 1, y - 1, 'plumeria'); continue; }  // lily pads
     for (let k = 0; k < n; k++) { const len = 14 + hash(i, k, 2) * 20; fore.cap(x + k * 1.5, H + 2, x + k * 1.5 + (hash(i, k) - 0.5) * 6, H - len, 0.9, 0.5, mat([20, 34, 24], { rim: 0.35 })); }
-  }
-  for (const x of [fore.w * 0.12, fore.w * 0.47, fore.w * 0.8]) for (let k = 0; k < 6; k++) {
-    let a = Math.PI / 2 + (k - 2.5) * 0.35, fx = x, fy = -2; const len = 22 + hash(k, x | 0) * 14;
-    for (let s = 0; s < len; s++) { a += (k < 3 ? 1 : -1) * 0.02; fx += Math.cos(a); fy += Math.sin(a); for (let w = -2; w <= 2; w++) fore.put(fx + w * Math.sin(a) * 0.8 - fore.ox, fy - w * Math.cos(a) * 0.3 + Math.abs(w) * 0.6, Math.abs(w) > 1 ? [20, 30, 22] : [28, 44, 28]); }
   }
   return { sky, clouds, far, jungle, back, mid, fore, lights, lamps };
 }

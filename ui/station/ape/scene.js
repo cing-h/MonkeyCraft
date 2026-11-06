@@ -14,17 +14,19 @@
 // The background monkeys on the far branch are villagers: scenery, never crew.
 
 import { makeToucan, drawToucan } from './toucan.js';
-import { FB, GROUND, H, STORIES, SUN, TOP, W, WORLD, hash, mixc } from './fb.js';
+import { FB, GROUND, H, STORIES, SUN, TOP, W, WORLD, hash, mat, mixc } from './fb.js';
 import { AGILE, CREW, LIGHT, P, SPECIES, TAU, blendPose, bodyLen, drawApe, placeApe, pos } from './cast.js';
 import { noise1 } from './scenery.js';
 import { DOORS, PERCH_Y, TRUNKS, WATER, branchY, buildLayers, groundY } from './world.js';
 import { makeVillagers, stepVillager, villagerPose } from './villagers.js';
-import { buildFrame, drawVines } from './frame.js';
+import { buildFrame, drawFronds, drawVines } from './frame.js';
 import { makeBrachiator, stepPose, brachiatePose } from './swing.js';
 import { makeChatter } from './chatter.js';
 import { LADDER_X, makeChiefIdle } from './chief.js';
 import { climbLevel, hangs, holdY, pickWander, route, surfaceY } from './lanes.js';
 import { FOLK } from './villagers.js';
+import { DELIVERIES, RING, TRADES, gourd, makeGatherings } from './culture.js';
+import { walkY } from './canopy.js';
 
 
 // ---------- 5×5 plate glyphs ----------
@@ -59,19 +61,25 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   for (const k of CREW) actors[k] = newActor(k, DOORS[k].lane, DOORS[k].x);
   // free-roaming villagers: scenery that lives in the village layer and travels all three stories like the crew.
   // Smaller, with no glow, no tools and no plates, so they're never mistaken for the crew.
-  const folk = FOLK.map((f, i) => { const x = 60 + hash(i, 17) * 840; return newActor(f.key, f.home, x, { folk: true, s: 0.8, home: { lane: f.home, x }, wait: 2 + i * 1.5 }); });
+  const folk = FOLK.map((f, i) => { const x = 60 + hash(i, 17) * 840; return newActor(f.key, f.home, x, { folk: true, s: 0.8, home: { lane: f.home, x }, trade: f.trade, wait: 2 + i * 1.5 }); });
   const everyone = [...Object.values(actors), ...folk];
   const strideOf = sp => (sp.posture === 'biped' ? 2.6 : 2.2) * (sp.ul + sp.ll);
   // Plan a trip as legs: walk/swing along a lane, climb a trunk or the lodge ladder, or drop from the canopy.
-  function plan(a, lane, x) {
+  // top: a swinger climbs up onto the walkway at the end (to sit at the Ring, say), instead of hanging under it
+  const topY = (lane, x) => walkY(lane === 'c1' ? 1 : 2, x) - 5;
+  const mount = (a, lane, x, up) => { const sp = SPECIES[a.key], hang = climbLevel(lane, x, sp), top = topY(lane, x); return { k: 'climb', x, dx: 0, from: lane, to: lane, y0: up ? hang : top, y1: up ? top : hang, top: up }; };
+  function plan(a, lane, x, { top = false } = {}) {
     const cl = a.climbY !== undefined && a.legs[0] && a.legs[0].k === 'climb' ? a.legs[0] : null;
-    const legs = [];
+    const legs = [], sp = SPECIES[a.key];
     let from = a.lane, at = a.x;
-    if (cl) {   // caught mid-climb: carry on, or turn round if the new trip goes back where the climb started
+    if (cl && cl.y0 !== undefined) legs.push({ ...cl, y0: cl.y1, y1: cl.y0, top: !cl.top });   // caught climbing onto or off a walkway: undo it
+    else if (cl) {   // caught mid-climb: carry on, or turn round if the new trip goes back where the climb started
       const back = lane === cl.from;
       legs.push(back ? { ...cl, from: cl.to, to: cl.from } : cl); from = back ? cl.from : cl.to; at = cl.x - (cl.dx || 0);
-    }
-    a.legs = [...legs, ...route(from, at, lane, x)];
+    } else if (a.top) legs.push(mount(a, a.lane, a.x, false));   // up on a walkway: climb back down under it first
+    const trip = route(from, at, lane, x);
+    if (top && hangs(lane, sp)) trip.push(mount(a, lane, x, true));
+    a.legs = [...legs, ...trip];
   }
   function setAnim(a, anim, blendT = 0.22) { if (a.anim !== anim) { a.prev = a.q; a.blend = 0; a.anim = anim; a.blendT = blendT; } }
 
@@ -87,24 +95,55 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     else { a.rest = null; a.linger = act.linger; plan(a, act.lane || 'ground', act.x); }
   }
 
+  // ---------- the villagers' trades and the gatherings at the Ring (scenery, see culture.js) ----------
+  // A task: go to (lane, x), then hold a pose there for t seconds. `top`: sit on the walkway, not under it.
+  function tradeTasks(a) {
+    const tr = TRADES[a.trade];
+    if (a.trade === 'courier') { const to = DELIVERIES[Math.floor(rnd() * DELIVERIES.length)]; return [{ lane: tr.lane, x: tr.x, anim: 'look', facing: tr.facing, t: 2.5, carry: true }, { lane: to.lane, x: to.x, anim: 'look', facing: 1, t: 2, carry: false, top: true }]; }
+    return [{ lane: tr.lane, x: tr.x, anim: tr.anim, facing: tr.facing, t: 20 + rnd() * 25, top: true }];
+  }
+  function doTask(a, dt) {
+    const k = a.tasks[0];
+    if (!k.arrived) {
+      const there = a.lane === k.lane && Math.abs(a.x - k.x) < 1 && (!k.top || a.top || !hangs(k.lane, SPECIES[a.key]));
+      if (there) k.arrived = true; else { plan(a, k.lane, k.x, { top: k.top }); return; }
+    }
+    if ((k.t -= dt) > 0) return;
+    if ('carry' in k) a.carry = k.carry;
+    a.tasks.shift(); if (!a.tasks.length) { a.tasks = null; a.wait = 2 + rnd() * 3; if (a.key === 'chief') a.linger = 0; }
+  }
+  const gatherings = makeGatherings({ rnd: () => rnd(), reduced });
+  let gathering = false;
+  function startGathering() {
+    const seats = [...RING.seats].sort(() => rnd() - 0.5), drum = seats.find(s => s.drum), rest = seats.filter(s => !s.drum);
+    const crew = CREW.map(k => actors[k]).filter(a => a.mode === 'idle' && rnd() < (a.key === 'chief' ? 0.5 : 0.45)).slice(0, 3);   // free crew may join; busy crew never do
+    const sit = (a, seat, anim) => { a.tasks = [{ gather: true, lane: 'c1', x: seat.x, anim, facing: seat.facing, t: Infinity, top: true }]; a.rest = null; };
+    crew.forEach(a => sit(a, rest.shift(), 'sit'));
+    folk.forEach((a, i) => { const seat = i === 0 ? drum : rest.shift(); if (seat) sit(a, seat, seat.drum ? 'drum' : 'sit'); a.carry = false; });
+  }
+  function endGathering() { for (const a of everyone) if (a.tasks?.[0]?.gather) { a.tasks = null; a.wait = 1 + rnd() * 4; if (a.key === 'chief') a.linger = 0; } }
+  let lanternsLit = 0; const flares = [];
+
   function update(dt, now) {
+    const g = gatherings.step(dt); if (g && !gathering) startGathering(); if (!g && gathering) endGathering(); gathering = g;
     for (const a of everyone) {
       const sp = SPECIES[a.key], mode = a.folk ? 'idle' : modeOf(a.key, now), d = a.folk ? a.home : DOORS[a.key];
       a.mode = mode; a.blend = Math.min(1, a.blend + dt / (a.blendT || 0.22));
       if (mode !== 'working') a.inside = false;
-      if (mode === 'asleep') { Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true, climbY: undefined, rest: null }); setAnim(a, 'sleep'); continue; }
+      if (mode === 'asleep') { Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true, climbY: undefined, rest: null, top: false, tasks: null }); setAnim(a, 'sleep'); continue; }
       const home = mode !== 'idle';
       if (a.key === 'chief' && home && !a.called) { a.called = true; a.rest = null; chiefIdle.interrupt(); }   // a job sends him straight back to his station
-      if (!home) a.called = false;
+      if (!home) a.called = false; else if (a.tasks) a.tasks = null;   // a job comes before any gathering
       const last = a.legs[a.legs.length - 1], goingHome = last && last.home;
       if (home && !goingHome && !(a.atDoor && a.lane === d.lane)) { plan(a, d.lane, d.x); a.legs[a.legs.length - 1].home = true; }
       if (!home && goingHome && !a.air && !(a.br && a.br.mode === 'flight') && a.anim !== 'climb') a.legs = [];
-      if (!home && !a.legs.length && !a.air && a.key === 'chief' && !a.folk) chiefFree(a, dt);
+      if (!home && !a.legs.length && !a.air && a.tasks?.length) doTask(a, dt);
+      else if (!home && !a.legs.length && !a.air && a.key === 'chief' && !a.folk) chiefFree(a, dt);
       else if (!home && !a.legs.length && !a.air) {
         a.wait -= dt;
         if (a.wait <= 0) {
-          const go = pickWander(sp, a.lane, rnd, a.folk ? a.home.lane : null);
-          plan(a, go.lane, go.x);
+          if (a.folk && rnd() < 0.5) a.tasks = tradeTasks(a);   // villagers ply their trades
+          else { const go = pickWander(sp, a.lane, rnd, a.folk ? a.home.lane : null); plan(a, go.lane, go.x); }
           a.wait = (a.folk ? 4 : 2) + rnd() * 4;
         }
       }
@@ -124,7 +163,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       } else if (leg && leg.k === 'move') {
         a.atDoor = false;
         const dx = leg.x - a.x, dir = Math.sign(dx) || a.facing;
-        if (hangs(a.lane, sp)) {                           // swinging along a branch or under a walkway: a real pendulum (swing.js)
+        if (hangs(a.lane, sp) && !a.top) {                           // swinging along a branch or under a walkway: a real pendulum (swing.js)
           if (!a.br) a.br = crewBrachiator(a, sp);
           if (a.br.target !== leg.x) a.br.travelTo(leg.x, home);
           if (a.br.step(dt, rnd) === 'catch') shake(a.br.hx, holdY(a.lane, a.br.hx), 1, a.br.ricochet ? 5 : 2);
@@ -143,14 +182,14 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
         }
       } else if (leg && leg.k === 'climb') {
         a.br = null; a.x = leg.x - (leg.dx || 0); a.facing = 1; setAnim(a, 'climb');
-        const y0 = climbLevel(leg.from || 'ground', leg.x, sp), y1 = climbLevel(leg.to || 'canopy', leg.x, sp), dir = Math.sign(y1 - y0) || -1;
+        const y0 = leg.y0 ?? climbLevel(leg.from || 'ground', leg.x, sp), y1 = leg.y1 ?? climbLevel(leg.to || 'canopy', leg.x, sp), dir = Math.sign(y1 - y0) || -1;
         a.climbY = a.climbY ?? y0;
         const surge = 0.3 + 0.7 * pos(Math.sin(a.phase + Math.PI)), step = (home ? 30 : 14) * (dir > 0 ? 1.25 : 1) * surge * dt;   // a little quicker going down, and hurrying home
         a.phase += dt * (home ? 7 : 5);
-        if ((y1 - a.climbY) * dir <= step) { a.lane = leg.to || 'canopy'; a.climbY = undefined; a.legs.shift(); a.spd = 0; } else a.climbY += dir * step;
+        if ((y1 - a.climbY) * dir <= step) { a.lane = leg.to || 'canopy'; a.top = !!leg.top; a.climbY = undefined; a.legs.shift(); a.spd = 0; } else a.climbY += dir * step;
       } else {
         // standing still: hold a hang, or idle on the ground / branch
-        if (hangs(a.lane, sp)) {
+        if (hangs(a.lane, sp) && !a.top) {
           if (!a.br) a.br = crewBrachiator(a, sp);                // hang and settle, swaying gently
           if (a.br.target !== null) a.br.travelTo(null);
           a.br.step(dt, rnd); stepPose(a.br, sp, a.s, dt);
@@ -159,7 +198,9 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
           a.spd = 0;
           if (a.lane === d.lane && Math.abs(a.x - d.x) < 0.5) a.atDoor = true;
           if (home && a.atDoor) a.facing = a.key === 'chief' ? 1 : -1;
-          if (a.key === 'chief' && !a.folk) {             // on his platform or out on a stroll; he keeps his dignity when asking
+          const job = a.tasks?.[0];
+          if (job?.arrived && !home) { a.facing = job.facing; setAnim(a, job.anim, 0.35); }
+          else if (a.key === 'chief' && !a.folk) {        // on his platform or out on a stroll; he keeps his dignity when asking
             if (!home && a.rest && a.lane === 'perch') { a.facing = a.rest.facing; setAnim(a, a.rest.pose, chiefIdle.timing.blend); }
             else setAnim(a, home ? (mode === 'talking' ? 'talk' : 'stand') : a.lane === 'ground' ? 'look' : 'stand');
           } else {
@@ -184,6 +225,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     for (let i = leaves.length - 1; i >= 0; i--) { const l = leaves[i]; l.life -= dt; l.ph += dt * 5; l.vy = Math.min(9, l.vy + 18 * dt); l.vx *= 0.97; l.x += (l.vx + Math.sin(l.ph) * 6) * dt; l.y += l.vy * dt; if (l.life <= 0 || l.y > WATER) leaves.splice(i, 1); }
     toucan.update(dt);
     for (const f of flies) { f.ph += dt; f.x += Math.sin(f.ph * 0.7) * 10 * dt + 4 * dt; f.y = 92 + Math.sin(f.ph * 1.3) * 8 + Math.sin(f.ph * 5) * 1.5; if (f.x > WORLD) f.x = 0; }
+    for (let i = flares.length - 1; i >= 0; i--) if ((flares[i].life -= dt) <= 0) flares.splice(i, 1);
     for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.life -= dt; s.vy += s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; if (s.life <= 0) sparks.splice(i, 1); }
   }
 
@@ -277,6 +319,17 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     blit(L.mid, 1);
     fb.ox = cam;
     for (const [lx, ly] of L.lamps) for (let y = ly - 4; y <= ly + 4; y++) for (let x = lx - 4; x <= lx + 4; x++) { const dd = Math.hypot(x - lx, y - ly); if (dd > 0.5 && dd < 4.5) fb.add(x - cam, y, [255, 190, 110], 0.1 / dd * (0.85 + 0.15 * Math.sin(t * 7 + lx))); }
+    // the Council Ring: the fire in its bowl (higher during a gathering), and one lantern lit for each job finished today
+    if (onScreen(RING.y - 60, RING.y + 4)) {
+      const fx = RING.fire.x, fy = RING.fire.y, big = gathering ? 1.6 : 1;
+      for (let i = 0; i < 14 * big; i++) { const h = hash(i, Math.floor(t * 10), 41), x = fx - 3 + hash(i, 42) * 6, y = fy - 2 - h * 6 * big * (1 - Math.abs(x - fx) / 4); fb.put(x - cam, y, h > 0.7 ? [255, 236, 150] : h > 0.35 ? [255, 170, 60] : [220, 80, 40]); }
+      for (let y = fy - 12; y <= fy + 2; y++) for (let x = fx - 9; x <= fx + 9; x++) { const dd = Math.hypot(x - fx, (y - fy + 3) * 1.4); if (dd > 1 && dd < 10) fb.add(x - cam, y, [255, 150, 70], (0.12 * big) / dd * (0.85 + 0.15 * Math.sin(t * 9))); }
+      RING.lanterns.forEach((l, i) => {
+        const lit = i < lanternsLit; fb.put(l.x - cam, l.y - 3, [96, 76, 56]); fb.ell(l.x, l.y, 1.6, 2, lit ? { s: [220, 120, 50], b: [255, 190, 90], l: [255, 230, 160], r: [255, 240, 190] } : { s: [60, 44, 30], b: [96, 70, 44], l: [120, 90, 56], r: [140, 110, 70] });
+        if (lit) for (let y = l.y - 5; y <= l.y + 5; y++) for (let x = l.x - 5; x <= l.x + 5; x++) { const dd = Math.hypot(x - l.x, y - l.y); if (dd > 1 && dd < 5.5) fb.add(x - cam, y, [255, 180, 90], 0.09 / dd); }
+      });
+      for (const f of flares) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + t * 3, r = (1 - f.life) * 7; fb.add(f.x + Math.cos(a) * r - cam, f.y + Math.sin(a) * r, [255, 220, 140], f.life * 0.8); }
+    }
     for (const l of L.lights) {
       const a = actors[l.key], lit = a && a.inside;
       if (l.chimney) { if (lit) fb.rect(l.x0, l.y0, l.x1, l.y1, [255, 170, 80]); continue; }
@@ -303,7 +356,12 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       // turning round is a quick flip over a few frames, not an instant mirror (the head sits well forward of the hips)
       a.face = a.face ?? a.facing; if (a.face !== a.facing) { const st = dt / (reduced ? 0.08 : 0.16) * 2; a.face = Math.abs(a.facing - a.face) <= st ? a.facing : a.face + Math.sign(a.facing - a.face) * st; }
       const f = Math.abs(a.face) < 0.25 ? Math.sign(a.face || a.facing) * 0.25 : a.face;
-      return drawApe(fb, a.key, q, { mode: 'pelvis', x: a.drawn[0], y: a.drawn[1] }, f, a.s, t, a.folk);
+      const h = drawApe(fb, a.key, q, { mode: 'pelvis', x: a.drawn[0], y: a.drawn[1] }, f, a.s, t, a.folk);
+      if (a.carry) {   // the courier's basket of fruit: on its head, or slung from its hips while it swings
+        const [bx, by] = a.anim === 'brach' || a.anim === 'climb' ? [a.drawn[0], a.drawn[1] + 3] : [h.headX, h.headY - 1.5];
+        fb.ell(bx, by, 2.6, 1.4, mat([150, 110, 60])); fb.ell(bx - 1, by - 1.4, 1, 1, mat([236, 200, 60])); fb.ell(bx + 1, by - 1.2, 1, 1, mat([236, 120, 40]));
+      }
+      return h;
     };
     fb.pid = -1; folk.forEach((a, i) => { fheads[i] = onScreen(a.climbY ?? surfaceY(a.lane, a.x), (a.climbY ?? surfaceY(a.lane, a.x)) + 40) ? drawActor(a) : null; });   // villagers first, behind the crew
     for (const k of CREW) { const a = actors[k]; if (a.inside) { heads[k] = null; continue; } fb.pid = ID[k]; heads[k] = drawActor(a); }
@@ -331,7 +389,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       }
     }
     blit(L.fore, 1.3);
-    fb.oy = 0; blit(frame, 0, true); drawVines(fb, t); fb.oy = cy;   // the foliage frame is fixed to the screen
+    fb.oy = 0; drawFronds(fb, t, cam); blit(frame, 0, true); drawVines(fb, t); fb.oy = cy;   // the foliage frame and the hanging fronds keep to the screen
     // plates over heads
     for (const k of CREW) { const a = actors[k], h = heads[k]; if (!h) continue; const p = PLATE[a.mode]; if (!p) continue;
       let x = Math.round(h.headX - cam) - 4, y = Math.round(h.headY) - 11;
@@ -347,7 +405,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   const storyOf = y => STORIES.reduce((b, s, i) => Math.abs(s.camY - y) < Math.abs(STORIES[b].camY - y) ? i : b, 0);
   const worldYOf = a => a.anim === 'climb' && a.climbY !== undefined ? a.climbY : a.air ? a.air.y : surfaceY(a.lane, a.x);
   return {
-    _actors: actors, _villagers: villagers, _folk: folk, _heads: () => ({ ...heads, ...Object.fromEntries(fheads.map((h, i) => [`f:${i}`, h])) }), _chiefIdle: chiefIdle,
+    _actors: actors, _villagers: villagers, _folk: folk, _gatherings: gatherings, _lanterns: () => lanternsLit, _heads: () => ({ ...heads, ...Object.fromEntries(fheads.map((h, i) => [`f:${i}`, h])) }), _chiefIdle: chiefIdle,
     step(now, dt = 0.05) {
       t += dt;
       if (goalY !== null) { camY += (goalY - camY) * Math.min(1, reduced ? 1 : dt * 6); if (Math.abs(goalY - camY) < 0.5) { camY = goalY; goalY = null; } }
@@ -375,7 +433,14 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     anchor(k) { const r = canvas.getBoundingClientRect(), h = heads[k] || { headX: DOORS[k].x, headY: surfaceY(DOORS[k].lane, DOORS[k].x) - 20 }; return [(h.headX - cam) / W * r.width, (h.headY - Math.round(camY)) / H * r.height]; },
     positionOf: k => actors[k].x,
     /** A real event the villagers may remark on (see chatter.js). */
-    notify: fact => chatter.notify(fact),
+    notify(fact) {
+      chatter.notify(fact);
+      if (fact.type === 'job_done' && lanternsLit < RING.lanterns.length) { const l = RING.lanterns[lanternsLit++]; flares.push({ x: l.x, y: l.y, life: 1 }); }   // the lantern ritual
+    },
+    /** How many jobs finished today (from the server): that many lanterns are lit at the Council Ring. */
+    lanterns(n) { lanternsLit = Math.max(0, Math.min(RING.lanterns.length, n | 0)); },
+    /** Is a gathering under way at the Ring? (scenery) */
+    gathering: () => gathering,
     /** Is a request to Claude Code open? The toucan is away exactly while one is. `animate` false snaps (replayed history). */
     mail: (open, animate = true) => toucan.setAway(open, animate && !reduced),
     /** Chatter bubbles to show now, each with where its speaker's head is, in CSS px relative to the canvas. */

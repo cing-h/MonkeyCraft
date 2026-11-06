@@ -11,8 +11,8 @@ import { backCanopyY } from './canopy.js';
 import { makeBrachiator, stepPose, brachiatePose } from './swing.js';
 
 export const VILLAGERS = ['scout', 'smith', 'archivist', 'writer'];
-/** Free-roaming villagers in the village layer (see scene.js): their species and the story each calls home. */
-export const FOLK = [{ key: 'smith', home: 'c1' }, { key: 'writer', home: 'c2' }, { key: 'scout', home: 'c1' }, { key: 'inspector', home: 'ground' }, { key: 'archivist', home: 'c2' }];
+/** Free-roaming villagers in the village layer (see scene.js): their species, the story each calls home, and its trade (culture.js). */
+export const FOLK = [{ key: 'writer', home: 'ground', trade: 'vendor' }, { key: 'smith', home: 'ground', trade: 'carver' }, { key: 'scout', home: 'c1', trade: 'courier' }, { key: 'inspector', home: 'c2', trade: 'weaver' }, { key: 'archivist', home: 'c1', trade: 'painter' }];
 
 // villagers on the far branches of the two canopy stories
 export const CANOPY_VILLAGERS = [{ key: 'scout', s: 1 }, { key: 'archivist', s: 1 }, { key: 'writer', s: 2 }, { key: 'scout', s: 2 }];
