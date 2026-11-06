@@ -149,6 +149,10 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
    - `ui/station/scene.js` renders the floor: plates (? ! … Z), sparks and lights only in working mode, and a question bubble anchored over the asking creature.
    - Clicking a creature or its strip chip filters the job log.
    - Verified in real headless Chrome screenshots: idle floor, and the live permission bubble over the Smith.
+   - **Redesign (2026-11-06, the user's request):** the floor is now a VILLAGE (`ui/station/village.js`). It's a grass island 300×184 voxels with cobbled roads, a square and dirt lanes, trees, lamps, a well and a pond.
+     - Each crew member has a medieval building: smithy, archive, lookout tower, weaver's cottage, chapel, shrine and clock tower. The Voidwyrm is perched on a magic tower at the back.
+     - Working = the creature walks the road graph to its door and goes INSIDE, and the building's light layer glows in its colour. Asking, ready, talking and error = waits at the door with a plate. Asleep = dozes on its doorstep.
+     - The canvas is 640×424 at 2 px per voxel, about 5 ms a frame. Dev render: `node scripts/render-station.js out.png [steps] [k=mode,…] [yawSteps]`.
    - Original scope:
    - port the renderer, then add the event → animation mapping and the consent plate;
    - *check:* no animation fires without a matching event (tested with a scripted event feed).

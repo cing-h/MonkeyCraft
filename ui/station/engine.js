@@ -45,7 +45,18 @@ const MAT = {
   copper:   { r: ['#2a120a', '#552414', '#8a3e22', '#bf6236', '#e8925c'], n: 0.05 },
   ghost:    { r: ['#123d26', '#1f6b41', '#3fcf7a', '#9bf5bd', '#e8fff0'], e: 1 },
   rose:     { r: ['#4a0f33', '#8a1f5e', '#e0459b', '#ff9ad0', '#ffe6f4'], e: 1 },
-  tide:     { r: ['#0f1f4a', '#1c3a8f', '#3f7bff', '#9ab9ff', '#e8efff'], e: 1 }
+  tide:     { r: ['#0f1f4a', '#1c3a8f', '#3f7bff', '#9ab9ff', '#e8efff'], e: 1 },
+  // village
+  grass:    { r: ['#0f2a12', '#17401b', '#235a26', '#2f7430', '#3f8f3c'], n: 0.3 },
+  dirt:     { r: ['#2a1a10', '#3d2717', '#57391f', '#71502c', '#8c6a3c'], n: 0.3 },
+  cobble:   { r: ['#1c1b22', '#2c2b34', '#403e4a', '#575462', '#716d7e'], n: 0.35 },
+  plaster:  { r: ['#4a4438', '#6e6553', '#988c72', '#c0b394', '#e2d6b5'], n: 0.12 },
+  thatch:   { r: ['#3a2a0e', '#5c4316', '#82621f', '#a8842c', '#cdaa45'], n: 0.35 },
+  tile:     { r: ['#2e0f0c', '#4f1a14', '#76281d', '#9c3a27', '#bf5534'], n: 0.3 },
+  slate:    { r: ['#14161d', '#21252f', '#323846', '#475064', '#5f6a82'], n: 0.3 },
+  leaf:     { r: ['#0a1f10', '#12331a', '#1b4a24', '#276330', '#367e3c'], n: 0.4 },
+  tower:    { r: ['#120e1a', '#201a2e', '#2f2742', '#423859', '#5b4e76'], n: 0.3 },
+  lamp:     { r: ['#4a3a0a', '#8f7414', '#f2c531', '#ffe683', '#fffbe0'], e: 1 }
 };
 const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 for (const m of Object.values(MAT)) m.rgb = m.r.map(hexRGB);
@@ -86,11 +97,12 @@ class Vox {
     return this;
   }
   recolor(fn) { for (const v of this.m.values()) { const m = fn(v[0], v[1], v[2], v[3]); if (m) v[3] = m; } return this; }
-  faces(skipTop) {
+  // `solid`: another Vox whose voxels also hide faces (for light decals laid into a building)
+  faces(skipTop, solid) {
     const out = [], D = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]]; // -Y is never visible from above
     for (const [x, y, z, mat] of this.m.values()) for (const d of D) {
       if (skipTop && d[1] === 1) continue;
-      if (this.has(x + d[0], y + d[1], z + d[2])) continue;
+      if (this.has(x + d[0], y + d[1], z + d[2]) || (solid && solid.has(x + d[0], y + d[1], z + d[2]))) continue;
       const a = d[0] ? 0 : d[1] ? 1 : 2, s = d[a], b = (a + 1) % 3, c = (a + 2) % 3, base = [x, y, z];
       const pl = base[a] + (s > 0 ? 1 : 0), cs = [];
       for (const [u, v] of [[0, 0], [1, 0], [1, 1], [0, 1]]) { const p = [0, 0, 0]; p[a] = pl; p[b] = base[b] + u; p[c] = base[c] + v; cs.push(p[0], p[1], p[2]); }
@@ -126,7 +138,8 @@ class View {
   /** World point → canvas pixel [x, y] under the current camera. */
   project(w) { const [x, y] = this.toScreen(mv(this.C, w)); return [x, y]; }
   // obj: { model, pos, facing, pose(name) }, on: true (working) | false (idle) | null (static prop)
-  draw(obj, id, on, t) {
+  // bias: added to depth so a decal (lit windows) wins over the coplanar surface it sits in
+  draw(obj, id, on, t, bias = 0, litTone = 3) {
     const F = rY(obj.facing || 0);
     for (const p of obj.model.parts) {
       const ps = (obj.pose && obj.pose(p.name)) || NO_POSE;
@@ -135,17 +148,17 @@ class View {
       const tw = mv(F, [pv[0] + (ps.dx || 0) - rpv[0], pv[1] + (ps.dy || 0) - rpv[1], pv[2] + (ps.dz || 0) - rpv[2]]);
       const T = [tw[0] + obj.pos[0], tw[1] + obj.pos[1], tw[2] + obj.pos[2]];
       const A = mm(this.C, M), b = mv(this.C, T);
-      this.faces(p.faces, M, A, b, id, on, t);
+      this.faces(p.faces, M, A, b, id, on, t, bias, litTone);
     }
   }
-  faces(list, M, A, b, id, on, t) {
+  faces(list, M, A, b, id, on, t, bias = 0, litTone = 3) {
     const q = new Float64Array(8);
     for (const f of list) {
       const nw = mv(M, f.n), nc = mv(this.C, nw);
       if (nc[1] * SP + nc[2] * CP <= 0.02) continue; // faces turned away from the camera
       const mat = f.m; let tone;
       if (mat.e) {
-        if (on === true) tone = 3 + ((hash3(f.h * 1e6 | 0, (t * 9) | 0, 3) > 0.5) ? 1 : 0);
+        if (on === true) tone = litTone + ((hash3(f.h * 1e6 | 0, (t * 9) | 0, 3) > 0.5) ? 1 : 0);
         else tone = on === null ? 2 : (f.h < 0.5 ? 1 : 2);
       } else {
         const lit = 0.32 + 0.68 * Math.max(0, nw[0] * Lw[0] + nw[1] * Lw[1] + nw[2] * Lw[2]);
@@ -160,7 +173,7 @@ class View {
         const cx = A[0] * x + A[1] * y + A[2] * z + b[0], cy = A[3] * x + A[4] * y + A[5] * z + b[1], cz = A[6] * x + A[7] * y + A[8] * z + b[2];
         q[k * 2] = this.cx0 + this.S * cx; q[k * 2 + 1] = this.cy0 + this.S * (cz * SP - cy * CP); dsum += cz * CP + cy * SP;
       }
-      this.quad(q, dsum / 4, rgb, id, (mat.e && on === true) ? 1 : 0);
+      this.quad(q, dsum / 4 + bias, rgb, id, (mat.e && on === true) ? 1 : 0);
     }
   }
   quad(q, d, rgb, id, em) {
@@ -574,86 +587,5 @@ function buildBat() {
 }
 
 // ---------- the station: floor, props, stations ----------
-const FX = 76, FZ = 52;
-function buildProps() {
-  const v = new Vox();
-  v.box(-64, 0, -3, -52, 6, 5, 'stone').box(-64, 7, -3, -52, 7, 5, 'stone').box(-62, 7, -1, -54, 7, 3, 'lava').box(-63, 8, -3, -60, 18, 0, 'stone');
-  v.box(-43, 0, 16, -37, 1, 20, 'metal').box(-42, 2, 17, -38, 4, 19, 'metal').box(-45, 5, 16, -35, 6, 20, 'metal').box(-34, 5, 17, -32, 5, 19, 'metal').set(-31, 5, 18, 'metal').box(-41, 7, 17, -38, 7, 18, 'lava');
-  v.box(37, 6, 5, 51, 7, 14, 'wood');
-  for (const [x, z] of [[38, 6], [50, 6], [38, 13], [50, 13]]) v.box(x, 0, z, x, 5, z, 'wood');
-  v.box(39, 8, 7, 49, 8, 12, 'paper').ell(47, 10, 9, 1.6, 1.6, 1.6, 'gold').box(41, 9, 8, 43, 9, 8, 'leather');
-  v.box(-4, 0, 28, 3, 5, 35, 'stone').box(-5, 6, 27, 4, 6, 36, 'stone').line([[0, 7, 31.5], [0, 15, 32]], 1.6, 0.5, 'crystal').set(0, 9, 30, 'core').set(-1, 9, 31, 'core');
-  for (const [x, z] of [[-70, -46], [70, -46], [-70, 46], [70, 46]]) {
-    v.box(x - 3, 0, z - 3, x + 2, 16, z + 2, 'stone').box(x - 4, 17, z - 4, x + 3, 18, z + 3, 'stone').line([[x, 19, z], [x, 23, z]], 1.1, 0.4, 'violet');
-  }
-  for (const [x, z] of [[-20, -14], [54, -30], [40, 44], [-66, -12]]) {
-    v.line([[x, 0, z], [x + 0.5, 4, z]], 1, 0.3, 'violet').line([[x + 2, 0, z + 1], [x + 3, 2.5, z + 1.5]], 0.8, 0.3, 'violet');
-  }
-  // Bone Scribe: a tall shelf of ledgers, a scroll pile and a lectern
-  v.box(-58, 0, -40, -42, 0, -36, 'wood').box(-58, 1, -40, -58, 21, -36, 'wood').box(-42, 1, -40, -42, 21, -36, 'wood').box(-58, 22, -40, -42, 22, -36, 'wood').box(-57, 1, -40, -43, 21, -40, 'wood');
-  for (const y0 of [1, 8, 15]) {
-    v.box(-57, y0 + 6, -39, -43, y0 + 6, -36, 'wood');
-    for (let x = -57; x <= -43; x++) {
-      const h = hash3(x, y0, 4); if (h < 0.12) continue;
-      v.box(x, y0, -39, x, y0 + 3 + Math.floor(h * 3), -37, ['leather', 'plume', 'ink', 'moss', 'paper'][Math.floor(hash3(x, y0, 9) * 5)]);
-    }
-  }
-  v.line([[-52, 0.6, -31], [-47, 0.6, -30]], 1, 1, 'paper').line([[-51, 2, -29], [-46, 2, -31]], 0.9, 0.9, 'paper');
-  v.box(-36, 0, -20, -32, 1, -17, 'wood').box(-35, 2, -19, -33, 9, -18, 'wood').box(-37, 10, -21, -31, 10, -17, 'wood').box(-36, 11, -21, -32, 11, -18, 'paper').box(-35, 11, -20, -33, 11, -20, 'ink');
-  v.box(-31, 11, -21, -31, 12, -21, 'paper').set(-31, 13, -21, 'ghost');
-  // Silkscript Spider: a web loom with written silk
-  v.box(21, 0, -39, 22, 22, -37, 'wood').box(41, 0, -39, 42, 22, -37, 'wood').box(21, 23, -39, 42, 24, -37, 'wood');
-  for (let k = 0; k < 10; k++) { const a = k * Math.PI / 5; v.line([[31.5, 12, -37.5], [31.5 + Math.cos(a) * 9.6, 12 + Math.sin(a) * 10.6, -37.5]], 0.6, 0.6, 'silk'); }
-  for (const r of [3.5, 6.5, 9]) for (let k = 0; k < Math.round(r * 7); k++) {
-    const a = k / Math.round(r * 7) * Math.PI * 2;
-    v.set(31.5 + Math.cos(a) * r, 12 + Math.sin(a) * r * 1.1, -38, hash3(k, r * 10, 3) < 0.3 ? 'rose' : 'silk');
-  }
-  v.ell(25, 1.5, -31, 1.6, 1.6, 1.6, 'silk').ell(37, 1.2, -32, 1.3, 1.3, 1.3, 'silk');
-  // Tide Seer: a tide pool ringed with stone and coral
-  for (let x = -35; x <= -17; x++) for (let z = 33; z <= 51; z++) {
-    const d = Math.hypot(x + 0.5 + 26, z + 0.5 - 42); if (d > 8) continue;
-    if (d > 6.2) v.box(x, 0, z, x, 1 + (hash3(x, 3, z) < 0.3 ? 1 : 0), z, 'stone');
-    else v.set(x, 0, z, hash3(x, 4, z) < 0.05 ? 'tide' : 'water');
-  }
-  for (const [x, z] of [[-33, 38], [-19, 46], [-31, 48]]) v.line([[x, 2, z], [x + 0.5, 6, z - 0.5]], 0.8, 0.4, 'coral');
-  // Clockwork Bat: a clock tower with a bell and a perch
-  v.box(59, 0, 15, 65, 25, 21, 'stone').box(58, 26, 14, 66, 27, 22, 'metal').box(60, 28, 16, 64, 29, 20, 'metal').box(61, 30, 17, 63, 31, 19, 'gold');
-  for (let x = 59; x <= 65; x++) for (let y = 14; y <= 24; y++) { const d = (x - 62) ** 2 + (y - 19) ** 2; if (d <= 7) v.set(x, y, 22, 'paper'); else if (d <= 11) v.set(x, y, 22, 'gold'); }
-  v.box(62, 19, 23, 62, 22, 23, 'ink').box(62, 19, 23, 64, 19, 23, 'ink');
-  v.box(53, 22, 17, 58, 22, 18, 'metal').box(58, 20, 17, 58, 21, 18, 'metal');
-  v.box(-62, 0, 28, -57, 5, 33, 'wood').box(-55, 0, 33, -51, 4, 37, 'wood').box(56, 0, -10, 61, 5, -5, 'wood');
-  const rim = new Vox();
-  for (let x = -FX; x < FX; x++) for (let y = -6; y <= -1; y++) { rim.set(x, y, -FZ, 'stone'); rim.set(x, y, FZ - 1, 'stone'); }
-  for (let z = -FZ; z < FZ; z++) for (let y = -6; y <= -1; y++) { rim.set(-FX, y, z, 'stone'); rim.set(FX - 1, y, z, 'stone'); }
-  return [{ model: { parts: [part('props', v, [0, 0, 0])] }, pos: [0, 0, 0] }, { model: { parts: [part('rim', rim, [0, 0, 0], true)] }, pos: [0, 0, 0] }];
-}
-function floorRGB(x, z) {
-  const vx = Math.floor(x), vz = Math.floor(z), gx = ((vx % 8) + 8) % 8, gz = ((vz % 8) + 8) % 8;
-  const bx = Math.floor(vx / 8), bz = Math.floor(vz / 8), bh = hash3(bx, 7, bz);
-  const mat = bh < 0.1 ? MAT.moss : MAT.floor;
-  if (gx === 0 || gz === 0) return mat.rgb[1];
-  const h = hash3(vx, 0, vz); let tone = 3;
-  if (h < 0.22) tone = 2; else if (h > 0.92) tone = 4;
-  if (bh > 0.85) tone--;
-  return mat.rgb[Math.max(0, tone)];
-}
-function buildBase(view, props) {
-  const { W, H, S, cx0, cy0 } = view, c = Math.cos(view.yaw), s = Math.sin(view.yaw);
-  view.clear();
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const i = y * W + x, o = i * 4, c0 = (x + 0.5 - cx0) / S, c2 = ((y + 0.5 - cy0) / S) / SP;
-    const wx = c0 * c + c2 * s, wz = -c0 * s + c2 * c;
-    if (wx >= -FX && wx < FX && wz >= -FZ && wz < FZ) {
-      view.col.set([...floorRGB(wx, wz), 255], o); view.dep[i] = c2 * CP; view.id[i] = 0;
-    } else {
-      const st = hash3(x, y, 11), g = 9 + (y / H) * 6;
-      view.col.set(st > 0.995 ? [120, 105, 150, 255] : [g, g * 0.8, g * 1.5, 255], o);
-    }
-  }
-  props.forEach((p, k) => view.draw(p, 10 + k, null, 0));
-  view.snapshot();
-}
-
-
-export { DEG, PHI, SP, CP, MAT, hash3, Vox, part, rX, rY, rZ, mm, mv, View, FX, FZ,
-  buildWyrm, buildArmor, buildSmith, buildGargoyle, buildScribe, buildSpider, buildSeer, buildBat, buildProps, buildBase };
+export { DEG, PHI, SP, CP, MAT, hash3, Vox, part, rX, rY, rZ, mm, mv, View,
+  buildWyrm, buildArmor, buildSmith, buildGargoyle, buildScribe, buildSpider, buildSeer, buildBat };

@@ -29,8 +29,8 @@ h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--muted); margin:
 .stop:hover { border-color: var(--bad); }
 
 .floor { grid-area: floor; overflow: auto; padding: 14px; display: grid; align-content: start; gap: 12px; }
-.stage { position: relative; border: 2px solid var(--edge); background: #07060b; max-width: 1080px; }
-.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 360 / 240; image-rendering: pixelated; cursor: pointer; }
+.stage { position: relative; border: 2px solid var(--edge); background: #07060b; max-width: 1280px; }
+.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 640 / 424; image-rendering: pixelated; cursor: pointer; }
 .overlay { position: absolute; inset: 0; pointer-events: none; }
 .bubble { position: absolute; transform: translate(-50%, calc(-100% - 10px)); pointer-events: auto; width: min(320px, 80%); background: #241f0c; border: 2px solid var(--warn); box-shadow: 0 0 0 2px #0a080e, 0 8px 20px #000a; padding: 8px 10px; display: grid; gap: 6px; }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -10px; margin-left: -6px; border: 6px solid transparent; border-top-color: var(--warn); }
@@ -38,7 +38,7 @@ h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--muted); margin:
 .bubble code { font: 12px var(--mono); white-space: pre-wrap; word-break: break-word; background: #120f06; padding: 4px 6px; max-height: 6.5em; overflow: auto; }
 .bubble .btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .bubble button { padding: 4px 8px; font-size: 10px; }
-.crew { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; max-width: 1080px; }
+.crew { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px; max-width: 1280px; }
 .crew li { border: 2px solid var(--edge); background: var(--panel); padding: 5px 8px; cursor: pointer; }
 .crew li:hover { border-color: var(--accent); }
 .crew li.asleep { opacity: .5; }
@@ -49,7 +49,7 @@ h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--muted); margin:
 .crew .n { font: 10px var(--label); display: block; }
 .crew .st { font-size: 12px; color: var(--muted); }
 .crew li.working .st { color: var(--ok); } .crew li.asking .st { color: var(--warn); } .crew li.error .st { color: #ffb4b4; }
-.events { max-width: 1080px; }
+.events { max-width: 1280px; }
 .events summary { font: 11px var(--label); letter-spacing: .08em; color: var(--muted); cursor: pointer; }
 .events .hint { color: var(--muted); font-size: 12px; margin: 6px 0; }
 .events ol { list-style: none; margin: 0; padding: 0; font: 12px var(--mono); display: grid; gap: 2px; max-height: 220px; overflow: auto; }

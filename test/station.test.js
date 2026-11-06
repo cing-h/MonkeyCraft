@@ -92,7 +92,9 @@ test('scene: glow appears only while the mode says working, and plates match mod
   for (let i = 0; i < 60; i++) st.step(0); // walk to the forge, then hammer
   assert.ok(litPixels() > 10, `working at the forge lights up (${litPixels()} px)`);
   modes.smith = 'ready'; st.step(0);
-  assert.equal(litPixels(), 0, 'lights go out as soon as the mode leaves working');
+  assert.equal(st._actors.smith.inside, false, 'the smith comes out as soon as the mode leaves working');
+  for (let i = 0; i < 20; i++) st.step(0); // the last embers from the chimney fade out
+  assert.equal(litPixels(), 0, 'no working lights once the job step is over');
   // asking draws a yellow "?" plate; asleep crew draw "Z" plates
   cv.ops.length = 0; modes.smith = 'asking'; st.step(0);
   const styles = cv.ops.filter(o => o[0] === 'style').map(o => o[1]);
