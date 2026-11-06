@@ -10,7 +10,9 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "check": "node scripts/check.js",
-    "start": "node src/main.js"
+    "start": "node src/main.js",
+    "link": "node scripts/link-setup.js",
+    "mailbox": "node scripts/mailbox-watch.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "1.1.0"

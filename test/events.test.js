@@ -109,3 +109,10 @@ test('every event type has at least one field and valid kind specs', () => {
     }
   }
 });
+
+test('the Claude Code link events (item 4) are valid, and run.start may say a job came from Claude Code', () => {
+  assert.ok(makeEvent('run.start', { trigger: 'user', provider: 'claude-code', model: 'm', source: 'claude-code' }, ctx).ok);
+  assert.ok(makeEvent('link.request', { requestId: 'ask_1', request: 'Please check the README.', untrusted: false }, ctx).ok);
+  assert.ok(makeEvent('link.reply', { requestId: 'ask_1' }, ctx).ok);
+  assert.equal(makeEvent('link.request', { requestId: 'ask_1', request: 'x' }, ctx).ok, false, 'untrusted is required');
+});

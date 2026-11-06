@@ -22,6 +22,10 @@ import { makeFsMove } from './tools/fs-move.js';
 import { makeVerifyRun } from './tools/verify-run.js';
 import { makeWebFetch } from './tools/web-fetch.js';
 import { makeCrewTools } from './crew/orchestrate.js';
+import { makeAskClaudeTools } from './crew/ask-claude.js';
+import { makeMailbox } from './link/mailbox.js';
+import { makeLinkSession } from './link/session.js';
+import { linkRoutes } from './routes/link.js';
 import dns from 'node:dns/promises';
 import { makeRegistry } from './tools/registry.js';
 import { makeFsRead } from './tools/fs-read.js';
@@ -89,6 +93,14 @@ async function main() {
   const grants = makeGrantStore({ fsp, file: path.join(dataDir, 'grants.json'), clock });
   const g = await grants.load();
   if (!g.ok) console.warn(`Remembered answers couldn't be read (${g.error}); starting with none.`);
+  // the link with an outside Claude Code session: its token (made once, owner-only) and the Chief's mailbox
+  const linkTokenFile = path.join(dataDir, 'link-token');
+  let linkToken = '';
+  try { linkToken = (await fsp.readFile(linkTokenFile, 'utf8')).trim(); } catch {}
+  if (!/^[0-9a-f]{64}$/.test(linkToken)) { linkToken = newToken(); await fsp.writeFile(linkTokenFile, linkToken + '\n', { mode: 0o600 }); }
+  const mailbox = makeMailbox({ fsp, file: path.join(dataDir, 'mailbox.json'), clock, newId, log: m => console.warn(m) });
+  const mb = await mailbox.load();
+  if (!mb.ok) console.warn(`The Chief's mailbox couldn't be read (${mb.error}); starting empty.`);
   const undo = makeUndoStore({ fsp, dir: path.join(dataDir, 'undo'), newId, clock });
   const guardPath = async p => { const c = await checkPath(p, pathEnv); return c.error || c.hardline || null; };
 
@@ -107,7 +119,8 @@ async function main() {
     shell,
     makeVerifyRun({ shell }),
     makeWebFetch({ fetchImpl: fetch, lookup: host => dns.lookup(host, { all: true }) }),
-    ...makeCrewTools({ roster })
+    ...makeCrewTools({ roster }),
+    ...makeAskClaudeTools({ mailbox })
   ]);
   const claudePath = await findClaude();
   // settings: env vars are the defaults, saved choices override them
@@ -122,10 +135,14 @@ async function main() {
   const runs = makeRunHost({
     bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken,
     mcpUrl: runId => `http://127.0.0.1:${PORT}/mcp/${runId}`,
-    limits: LIMITS, undo, guardPath
+    limits: LIMITS, undo, guardPath,
+    onRunEnd: runId => mailbox.askerEnded(runId)
   });
   await runs.init();
   setInterval(() => runs.checkLiveness(), 15_000).unref();
+
+  const link = makeLinkSession({ fsp, file: path.join(dataDir, 'link-jobs.json'), runs, roster, mailbox, clock, log: m => console.warn(m) });
+  await link.load();
 
   const recovered = await runs.recover();
   await journal.flush();
@@ -136,7 +153,7 @@ async function main() {
 
   const server = makeServer({
     port: PORT,
-    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs })]
+    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken })]
   });
   await server.listen();
   console.log(`MonkeyCraft is running: http://127.0.0.1:${PORT}/`);
@@ -149,7 +166,7 @@ async function main() {
     runs.halt('system');
     await new Promise(r => setTimeout(r, 500));
     await journal.flush();
-    await children.flush(); await grants.flush();
+    await children.flush(); await grants.flush(); await mailbox.flush(); await link.flush();
     await server.close();
     process.exit(0);
   };

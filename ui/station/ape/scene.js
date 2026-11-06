@@ -13,6 +13,7 @@
 //   asleep  → sleeps on its doorstep (Z plate)
 // The background monkeys on the far branch are villagers: scenery, never crew.
 
+import { makeToucan, drawToucan } from './toucan.js';
 import { FB, GROUND, H, SUN, W, WORLD, hash, mixc } from './fb.js';
 import { AGILE, CREW, LIGHT, P, SPECIES, TAU, blendPose, bodyLen, drawApe, pos } from './cast.js';
 import { noise1 } from './scenery.js';
@@ -47,6 +48,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   const shake = (x, y, par, n) => { for (let i = 0; i < n; i++) leaves.push({ x: x + (rnd() - 0.5) * 6, y: y - rnd() * 2, vx: (rnd() - 0.5) * 8, vy: -4 - rnd() * 6, life: 1.4 + rnd() * 0.8, par, ph: rnd() * 6, c: rnd() < 0.5 ? [86, 140, 62] : [124, 170, 78] }); };
   // a crew member's swing along the canopy branch (see swing.js)
   const crewBrachiator = (a, sp) => { const g = AGILE[sp.canopy]; return makeBrachiator({ R: (sp.ua + sp.la) * 0.9, halfPeriod: g.T, amp: g.amp, ricochet: sp.canopy === 'brachiate-fast', branchY: x => branchY(x) + 1, x0: a.x, lo: 30, hi: WORLD - 30, dir: a.facing || 1 }); };
+  const toucan = makeToucan();
   const flies = Array.from({ length: 5 }, (_, i) => ({ x: 100 + i * 180, y: 90, c: [[255, 170, 40], [90, 160, 255], [255, 110, 200], [250, 230, 80], [120, 220, 160]][i], ph: i * 1.7 }));
   const ID = Object.fromEntries(CREW.map((k, i) => [k, i + 1]));
   const actors = {};
@@ -154,6 +156,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     chat = reduced ? [] : chatter.step(dt, { speakers });
     for (const v of villagers) if (stepVillager(v, dt, rnd) === 'catch') shake(v.b.hx, v.b.branchY(v.b.hx), 0.55, v.fast ? 3 : 1);
     for (let i = leaves.length - 1; i >= 0; i--) { const l = leaves[i]; l.life -= dt; l.ph += dt * 5; l.vy = Math.min(9, l.vy + 18 * dt); l.vx *= 0.97; l.x += (l.vx + Math.sin(l.ph) * 6) * dt; l.y += l.vy * dt; if (l.life <= 0 || l.y > WATER) leaves.splice(i, 1); }
+    toucan.update(dt);
     for (const f of flies) { f.ph += dt; f.x += Math.sin(f.ph * 0.7) * 10 * dt + 4 * dt; f.y = 92 + Math.sin(f.ph * 1.3) * 8 + Math.sin(f.ph * 5) * 1.5; if (f.x > WORLD) f.x = 0; }
     for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.life -= dt; s.vy += s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; if (s.life <= 0) sparks.splice(i, 1); }
   }
@@ -262,6 +265,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     }
     fb.pid = -1;
     glowOutline();
+    drawToucan(fb, toucan.pose());
     for (const l of leaves) if (l.par === 1) { fb.put(l.x - cam, l.y, l.c); if (Math.sin(l.ph) > 0) fb.put(l.x - cam + 1, l.y, l.c); }
     for (const s of sparks) { if (s.steam) { fb.add(Math.round(s.x - cam), Math.round(s.y), s.c, 0.35 * s.life); fb.add(Math.round(s.x - cam) + 1, Math.round(s.y), s.c, 0.2 * s.life); } else fb.put(s.x - cam, s.y, s.c); }
     for (const f of flies) { const x = Math.round(f.x - cam), y = Math.round(f.y), up = Math.sin(f.ph * 18) > 0; fb.put(x, y, [40, 30, 30]); fb.put(x - 1, y - (up ? 1 : 0), f.c); fb.put(x + 1, y - (up ? 1 : 0), f.c); }
@@ -315,6 +319,8 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     positionOf: k => actors[k].x,
     /** A real event the villagers may remark on (see chatter.js). */
     notify: fact => chatter.notify(fact),
+    /** Is a request to Claude Code open? The toucan is away exactly while one is. `animate` false snaps (replayed history). */
+    mail: (open, animate = true) => toucan.setAway(open, animate && !reduced),
     /** Chatter bubbles to show now, each with where its speaker's head is, in CSS px relative to the canvas. */
     chatter() {
       const r = canvas.getBoundingClientRect(), pos = new Map();

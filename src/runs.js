@@ -27,7 +27,7 @@ const WORKER_PREAMBLE = `The Chief has given you this task as part of a larger j
 const MAX_REPORT = 8000;
 const LIVENESS = { idleMs: 450_000, toolMs: 1_200_000 };
 
-export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null }) {
+export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null, onRunEnd = () => {} }) {
   const active = new Map(); // runId -> run
   const dayStart = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const today = { day: -1, usd: 0 };
@@ -57,7 +57,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
   async function execute(run, agent, prompt) {
     const { runId, emit, controller } = run;
     const provider = providers[agent.provider];
-    emit('run.start', { trigger: run.parent ? 'crew' : 'user', provider: agent.provider, model: agent.model, task: prompt.slice(0, 500), ...(run.parent ? { parentRunId: run.parent.runId } : {}) });
+    emit('run.start', { trigger: run.parent ? 'crew' : 'user', provider: agent.provider, model: agent.model, task: prompt.slice(0, 500), ...(run.parent ? { parentRunId: run.parent.runId } : {}), ...(run.source ? { source: run.source } : {}) });
     if (!run.parent) { const day = daily(); if (day.near) emit('budget.threshold', { scope: 'day', limit: day.limit, spent: day.spent, hard: false }); }
     const left = run.family.limitUsd - run.family.usd;
     let res;
@@ -80,6 +80,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     const usd = Number.isFinite(res.usd) ? res.usd : 0;
     todayUsd(); today.usd += usd; run.family.usd += usd;
     emit('run.end', { reason: res.reason, usd: res.usd, tokens: res.tokens, turns: res.turns });
+    try { onRunEnd(runId); } catch (e) { console.error('[runs] onRunEnd failed:', e.message); }
     if (run.parent) run.parent.emit('crew.worker_end', { workerId: agent.id, workerRunId: runId, reason: res.reason, usd });
     try {
       await ledger.append({ runId, agentId: agent.id, provider: agent.provider, billing: res.billing, usd: res.usd, tokens: res.tokens, turns: res.turns, reason: res.reason, settled: true, ts: clock.now() });
@@ -87,7 +88,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     return { ...res, tainted: run.taint.tainted };
   }
 
-  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null }) {
+  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null, source = null }) {
     const agent = roster.get(agentId);
     if (!agent) return { error: `No crew member "${agentId}".` };
     if (!agent.awake) return { error: `${agent.name} is asleep until ${agent.wakes}.` };
@@ -107,7 +108,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     const controller = new AbortController(), raw = bus.emitFor(runId, agentId);
     const stop = reason => { if (!controller.signal.aborted) controller.abort(reason); };
     const run = {
-      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, interactive, stop, parent,
+      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, interactive, stop, parent, source: parent ? null : source,
       taint: makeTaint(), breaker: makeBreaker(), workers: new Map(),
       lastProgress: clock.now(), toolsRunning: 0
     };
@@ -135,7 +136,8 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
       listTools: () => registry.list(run.grants).map(t => ({ name: t.name.replace(/\./g, '_'), description: t.description, inputSchema: t.inputSchema })),
       callTool: (name, args) => registry.dispatch({ tool: name, args }, {
         emit: run.emit, newId, grants: run.grants, consent, interactive: run.interactive, signal: run.controller.signal, runId: run.runId, agentId: run.agentId,
-        taint: run.taint, breaker: run.breaker, stop: run.stop, crew: crewApi(run), maxToolMs: 1_800_000
+        taint: run.taint, breaker: run.breaker, stop: run.stop, crew: crewApi(run), maxToolMs: 1_800_000,
+        tainted: () => run.taint.tainted || [...run.workers.values()].some(j => j.tainted)   // did anything in this job read the web?
       })
     };
   }
@@ -220,6 +222,9 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
       await journal.flush();
       return { results };
     },
+
+    /** Emit an event on a job that is still running. Returns false if it has ended. */
+    emitTo(runId, type, payload) { const r = active.get(runId); if (!r) return false; return !!r.emit(type, payload); },
 
     cancel(runId) { const r = active.get(runId); if (!r) return false; r.controller.abort('cancel'); return true; },
 

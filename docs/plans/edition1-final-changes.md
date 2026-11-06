@@ -1,9 +1,9 @@
 # Edition 1: final changes (waiting list)
 
-Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 → 5 → 1, one branch each, checking in after each.
+Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 → 6 → 5 → 1, one branch each, checking in after each.
 - Item 2: DONE on `feature/swing-reanimation` (pushed).
 - Item 3: DONE on `feature/village-chatter` (pushed).
-- Item 4: IN PROGRESS on `feature/claude-link`.
+- Item 4: DONE on `feature/claude-link`.
 
 Each item records what the user asked for, the decisions already made, and an outline of how to build it.
 
@@ -133,7 +133,15 @@ Added 2026-11-06. **DONE** (branch `feature/village-chatter`). What was built:
 
 ## 4. Two-way link between a Claude Code session and the Chief
 
-Added 2026-11-06. The user accepted all of the recommendations below.
+Added 2026-11-06. The user accepted all of the recommendations below. **DONE** (branch `feature/claude-link`). What was built:
+- `src/link/session.js` is the outside toolset: give a job, check it, stop it, read the mailbox, reply. There is no tool for permission answers. It is served as MCP at `POST /link/mcp`, behind a bearer token in `data/link-token` (owner-only file, 127.0.0.1 only).
+- `src/link/mailbox.js` is the Chief's durable mailbox (`data/mailbox.json`). Requests left waiting at a restart are marked "the job that asked has ended".
+- The Chief has two new tools, `claude.ask` (waits up to `waitSeconds`, with 0 meaning don't wait) and `claude.check` (`src/crew/ask-claude.js`). A request is marked untrusted if the job or any of its workers read the web.
+- Events (additive): an optional `run.start.source` (`'claude-code'`), plus `link.request` and `link.reply`. The Job log shows "JOB FROM CLAUDE CODE" and the Chief's notes. The messenger toucan (`ui/station/ape/toucan.js`) is away exactly while a request is open.
+- Scripts: `npm run link` registers the toolset with Claude Code at user scope, and `npm run mailbox` is a watcher that prints one line per new request, for a background Monitor.
+- Checks: 9 tests in `test/link.test.js`, and a live round trip on 2026-11-06 (give job → `claude.ask` → reply → the Chief's report, about $0.015).
+- Known limit: MonkeyCraft's own screen API is guarded by a header, not a secret. Any program on this computer could still send it, including a session's shell, so "can't approve" rests on there being no tool for it plus the session's instructions.
+
 
 **What the user wants:** the Claude Code session running in WSL (the one building MonkeyCraft) can give the Chief jobs, and the Chief can give that session jobs.
 
@@ -173,9 +181,26 @@ Added 2026-11-06.
 **Planned design (outline):**
 - **World:** the scene is currently 320×180 pixels per view inside a 960-pixel-wide world, scrolling sideways only. Make the world about three views tall, with a camera that scrolls vertically as well as horizontally: mouse wheel, arrow keys (up/down), dragging, and up/down buttons next to the current left/right ones, plus a small "story" indicator (Ground · Canopy 1 · Canopy 2).
 - **Structure:** the big trunks continue up through all three stories. Each canopy level has branch platforms where boughs fork from the trunks, with rope bridges and ladders or vines connecting platforms and stories.
+- **Roaming between levels (user note, 2026-11-06):** every monkey, crew and villagers alike, may travel between all three levels when roaming, not just stay on its home story.
 - **Movement:** crew and villagers use the swing engine from item 2 to climb vines and brachiate between levels, so travel between stories looks natural and stays truthful (the UI still only animates from events).
 - **Plots:** each canopy level gets a few marked empty tree-house plots. The roster can say which story and plot a crew member's house sits on, and the Clerk's goes on canopy level 1.
 - **Chatter and villagers:** villagers can live and chat on the higher levels too, and chatter bubbles follow the camera properly.
 - **Performance:** draw only what is on screen, so the extra height doesn't slow the village down.
 - **Checks:** tests for the camera bounds and the plot layout. Screenshots of each story to judge the foliage, branches, flowers and vines. Then the user looks at it live.
 - **Order:** build it before item 1, so the Clerk has a home to move into.
+
+---
+
+## 6. The Chief roams: occasional walks and changing rest poses on his platform
+
+Added 2026-11-06. The user asked for it to be built right after item 4.
+
+**What the user wants:** the Chief walks around once in a while, but much less often than the other monkeys. He also moves around his lodge platform, changing between lying and sitting positions fairly often.
+
+**Planned design (outline):**
+- When free, the Chief mostly stays on his perch platform. Every so often he shifts to a new spot on it and settles into a new rest pose: sitting, lying on his side, lying on his back, or leaning against the trunk. The poses change every 20 to 60 seconds or so.
+- Rarely (every several minutes, much less often than the others) he takes a walk: down the ladder or trunk, a stroll through the village, then back up to the lodge.
+- Truthful: this happens only while he is free. A job sends him straight back to his station, as now.
+- Uses the existing pose blending, so the changes are smooth. Reduced motion means fewer, slower changes.
+- Checks: tests for the timing (he changes rest poses more often than he walks, and walks less often than the other crew) and that a job interrupts him, plus screenshots of each rest pose.
+

@@ -26,6 +26,17 @@ Open **Settings** (or go to `http://localhost:8787/#settings`) to choose, for ea
 - **Claude Code (your subscription).** This is the default, for personal use. Claude Code runs with its own tools switched off, so every action goes through MonkeyCraft's checks.
 - **Anthropic API (API key).** This option is for anyone without a Claude subscription. Set `ANTHROPIC_API_KEY` before `npm start`. MonkeyCraft runs its own agent loop through the same checks.
 
+## Linking a Claude Code session
+
+A Claude Code session on this computer can give the crew jobs, and the Chief can ask that session for help.
+
+1. Start MonkeyCraft once (`npm start`). It makes a private link key in `data/`.
+2. Run `npm run link`. It adds MonkeyCraft to Claude Code's tools. To undo it, run `npm run link -- --remove`.
+3. Restart your Claude Code session. It can now give jobs (`monkeycraft_give_job`), check them, stop them, read the Chief's mailbox and reply.
+4. To have the session notice the Chief's notes on its own, ask it to watch `npm run mailbox` in the background. Or just tell it "check the Chief's mailbox".
+
+Jobs from Claude Code show in the Job log as **from Claude Code**. When the Chief asks something, a messenger toucan flies off from its lodge, and it comes back when the answer arrives. Every change a MonkeyCraft job makes still asks **you** on the MonkeyCraft screen. Claude Code's own actions ask you in its terminal. Neither side can approve for the other.
+
 ## Settings by environment variable
 
 | Variable | Default | What it sets |

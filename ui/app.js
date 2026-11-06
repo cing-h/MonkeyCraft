@@ -15,6 +15,7 @@ let crew = [], state = null, station = null, filter = null;
 const names = {}, wakes = {};
 const runs = new Map();   // runId -> { box, agentId, say, tools: Map, asks: Map }
 const seen = new Set();
+const mailOpen = new Map();   // requestId -> runId: the Chief's requests to Claude Code still waiting (the toucan is away)
 
 // ---------- answering permission (shared by the log card and the floor bubble) ----------
 const answered = new Set();
@@ -65,8 +66,17 @@ function logRun(ev) {
   switch (ev.type) {
     case 'run.start':
       if (r.parent) r.box.append(el('div', 'who', `${(names[ev.agentId] || ev.agentId).toUpperCase()} · TASK FROM ${(names[r.parent.agentId] || r.parent.agentId).toUpperCase()}`), el('div', 'task', ev.task || '(task)'));
-      else r.box.append(el('div', 'you', ev.task || '(job)'));
+      else {
+        if (ev.source === 'claude-code') r.box.append(el('div', 'from', 'JOB FROM CLAUDE CODE (YOUR TERMINAL SESSION)'));
+        r.box.append(el('div', 'you', ev.task || '(job)'));
+      }
       break;
+    case 'link.request': {
+      r.say = null;
+      const m = el('div', 'mail'); m.append(el('div', 'q', `${(names[ev.agentId] || ev.agentId).toUpperCase()} ASKED CLAUDE CODE${ev.untrusted ? ' · FROM A JOB THAT READ THE WEB' : ''}`), el('div', '', ev.request));
+      r.box.append(m); break;
+    }
+    case 'link.reply': r.say = null; r.box.append(el('div', 'note', 'CLAUDE CODE ANSWERED')); break;
     case 'crew.dispatch': r.say = null; r.box.append(el('div', 'note', `SENT ${(names[ev.workerId] || ev.workerId).toUpperCase()}`)); break;
     case 'crew.worker_end': r.say = null; r.box.append(el('div', ev.reason === 'done' ? 'note' : 'warn', `${(names[ev.workerId] || ev.workerId).toUpperCase()} FINISHED: ${REASONS[ev.reason] || ev.reason.toUpperCase()}`)); break;
     case 'agent.token': saying(r, ev).textContent += ev.text; break;
@@ -147,6 +157,7 @@ function onEvent(ev) {
   reduce(state, ev);
   logEvent(ev);
   logRun(ev);
+  syncMail(ev);
   if (station) { syncStrip(Date.now()); syncBubbles(); } // show questions at once, not on the next tick
   // the villagers may remark on fresh, real events (never on replayed history)
   if (station && Date.now() - ev.ts < 5000) {
@@ -156,6 +167,16 @@ function onEvent(ev) {
     else if (ev.type === 'permission.prompt') station.notify({ type: 'asking', agentId: ev.agentId, name });
     else if (ev.type === 'crew.dispatch') station.notify({ type: 'sent', agentId: ev.workerId, name });
   }
+}
+
+// the messenger toucan is away exactly while a request to Claude Code is open
+function syncMail(ev) {
+  const before = mailOpen.size;
+  if (ev.type === 'link.request') mailOpen.set(ev.requestId, ev.runId);
+  else if (ev.type === 'link.reply') mailOpen.delete(ev.requestId);
+  else if (ev.type === 'run.end') for (const [id, run] of mailOpen) if (run === ev.runId) mailOpen.delete(id);   // nobody waits any more
+  else return;
+  if (station && (mailOpen.size > 0) !== (before > 0)) station.mail(mailOpen.size > 0, Date.now() - ev.ts < 5000);
 }
 
 // ---------- filter (click a creature to see only its jobs) ----------
@@ -263,6 +284,7 @@ state = initialState(crew);
 
 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), reduced });
+if (mailOpen.size) station.mail(true, false);   // requests opened before the village was built
 // scrolling the village: buttons, arrow keys and drag; a click without a drag picks a crew member
 const WORLD_W = 960;
 function syncThumb() { const t = $('thumb'); t.style.width = (SCENE_W / WORLD_W * 100) + '%'; t.style.left = (station.camera() / WORLD_W * 100) + '%'; }

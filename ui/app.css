@@ -161,3 +161,8 @@ textarea::placeholder { color: #7f8a74; }
 @keyframes chat-in { from { opacity: 0; translate: 0 4px; } }
 @media (prefers-reduced-motion: reduce) { .chat { animation: none; } }
 .settings .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+
+/* the link with Claude Code */
+.run .from { font-size: 10px; letter-spacing: .08em; font-family: var(--label); color: var(--muted); margin-bottom: 2px; }
+.run .mail { margin: 6px 0; padding: 6px 8px; border-left: 3px solid var(--sun); background: rgba(233,198,107,.08); white-space: pre-wrap; }
+.run .mail .q { font-family: var(--label); font-size: 10px; letter-spacing: .08em; color: var(--sun); margin-bottom: 3px; }

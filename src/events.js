@@ -20,7 +20,7 @@ const DECISIONS = ['allow_once', 'allow_session', 'allow_always', 'deny'];
 
 const TYPES = {
   // run lifecycle
-  'run.start': { trigger: ['user', 'crew', 'schedule', 'recovery'], provider: 'string', model: 'string', parentRunId: 'string?', task: 'string?' },
+  'run.start': { trigger: ['user', 'crew', 'schedule', 'recovery'], provider: 'string', model: 'string', parentRunId: 'string?', task: 'string?', source: 'string?' },   // source: 'claude-code' when an outside Claude Code session gave the job
   'run.end': { reason: RUN_END_REASONS, usd: 'number', tokens: 'integer', turns: 'integer' },
   'run.error': { message: 'string', code: 'string?' },
 
@@ -54,7 +54,11 @@ const TYPES = {
   // crew (delegation)
   'crew.dispatch': { workerId: 'string', workerRunId: 'string', task: 'string' },
   'crew.tool_step': { workerId: 'string', workerRunId: 'string', tool: 'string', summary: 'string' },
-  'crew.worker_end': { workerId: 'string', workerRunId: 'string', reason: RUN_END_REASONS, usd: 'number' }
+  'crew.worker_end': { workerId: 'string', workerRunId: 'string', reason: RUN_END_REASONS, usd: 'number' },
+
+  // the link with an outside Claude Code session (the Chief's mailbox; the messenger toucan)
+  'link.request': { requestId: 'string', request: 'string', untrusted: 'boolean' },
+  'link.reply': { requestId: 'string' }
 };
 
 // Every event carries this envelope.

@@ -24,7 +24,7 @@ export async function handleMcp(msg, deps) {
           protocolVersion: SUPPORTED.includes(asked) ? asked : SUPPORTED[0],
           capabilities: { tools: { listChanged: false } },
           serverInfo: SERVER_INFO,
-          instructions: 'MonkeyCraft tools. Every action that changes something asks the user first.'
+          instructions: deps.instructions || 'MonkeyCraft tools. Every action that changes something asks the user first.'
         });
       }
       case 'ping': return ok(msg.id, {});

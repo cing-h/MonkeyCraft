@@ -228,7 +228,7 @@ test('the Scout\'s own web search is reported from the stream, and Claude Code i
 test('roster: the working crew is awake with the planned tools; the Sage and Bell-ringer sleep', () => {
   const r = makeRoster({ workspace: '/ws' });
   const g = id => [...r.get(id).grantSet].sort();
-  assert.deepEqual(g('chief'), ['crew.dispatch', 'crew.spawn', 'crew.status', 'crew.wait', 'fs.read']);
+  assert.deepEqual(g('chief'), ['claude.ask', 'claude.check', 'crew.dispatch', 'crew.spawn', 'crew.status', 'crew.wait', 'fs.read']);
   assert.deepEqual(g('scout'), ['web.fetch']);
   assert.deepEqual(g('smith'), ['fs.read', 'fs.write', 'shell.exec']);
   assert.deepEqual(g('archivist'), ['fs.move', 'fs.read', 'fs.write']);
