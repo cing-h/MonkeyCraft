@@ -8,25 +8,31 @@
 //                   points becomes a council.say event.
 //   council.report  the Chief's verdict: a short report for the user, flagged significant or not.
 //                   The user is only told about the significant ones.
+// There is no cap on how much the council discusses except the meeting's time (COUNCIL.meetingMs):
+// members hear what has been said so far and can answer each other, the Chief can ask follow-ups,
+// and when the time is up the Chief is asked for his verdict (and the job ends soon after).
+// The usual per-job and daily spending limits still apply, as for every job.
 // It meets when the user calls it, or by itself at most once a day, and only if at least
 // COUNCIL.minJobs jobs have finished since the last council and nothing is running.
 // Pure: fsp, clock and the run host are injected.
 
-export const COUNCIL = { memberModel: 'claude-haiku-5-5', poolUsd: 0.6, minJobs: 3, maxJobs: 8, hearWaitMs: 300_000 };
+export const COUNCIL = { memberModel: 'claude-haiku-5-5', minJobs: 3, maxJobs: 8, hearWaitMs: 300_000, meetingMs: 20 * 60_000, graceMs: 3 * 60_000 };
+const mins = ms => Math.max(0, Math.round(ms / 60_000));
 
 const CHIEF_SYSTEM = `You are the Chief, a silverback gorilla who leads the MonkeyCraft crew, a crew of AI apes who do jobs on the user's computer. Right now you are chairing a council at the Ring on the great tree, not doing a job. You can't do any work, read files or send tasks: you can only hear crew members with council.hear and give your verdict with council.report. Be brief and plain. The user isn't a programmer.`;
 
-const MEMBER_PREAMBLE = `The council is meeting at the Ring, and the Chief wants to hear from you. This is not a task: you have no tools and can't do or check anything; just think and speak. Any spending cap you can see belongs to this short meeting, not to the user's jobs, so don't comment on it.\n\n`;
-const MEMBER_ASK = (name, role, digest, question) => `${digest}
+const MEMBER_PREAMBLE = `The council is meeting at the Ring, and the Chief wants to hear from you. This is not a task: you have no tools and can't do or check anything; just think and speak. There is no limit on how much you may say or how many points you make: the only limit is the meeting's time. Don't comment on spending or budgets; that's not what the council is for.\n\n`;
+const MEMBER_ASK = (name, role, digest, said, question, left) => `${digest}
+${said.length ? `\nWhat has been said at the council so far:\n${said.map(p => `- ${p.name} (${p.significant ? 'significant' : 'routine'}): ${p.point}`).join('\n')}\n` : ''}
+You are ${name} (${role}). Give your honest view, from your own role, of how this work went: what went well, what went wrong or wasted effort, ideas that would make jobs like these better, and any worries. You can agree, disagree or build on what others have said. Be specific and kind, and don't make things up: if you weren't involved, say what you'd watch for.${question ? `\n\nThe Chief asks you: ${question}` : ''}
+(About ${left} minute${left === 1 ? '' : 's'} of the meeting are left.)
 
-You are ${name} (${role}). Give your honest view, from your own role, of how this work went: what went well, what went wrong or wasted effort, ideas that would make jobs like these better, and any worries. Be specific and kind, and don't make things up: if you weren't involved, say what you'd watch for.${question ? `\n\nThe Chief also asks: ${question}` : ''}
+Make as many points as you have, each on its own line, each starting with SIGNIFICANT: (the user should hear about it: a real problem, a risk, a repeated failure, or an idea that would clearly save time or money) or ROUTINE: (worth saying here, not worth the user's time). If you have nothing worth saying, reply: ROUTINE: Nothing to add.`;
 
-Reply with 1 to 4 short points, each on its own line, each starting with SIGNIFICANT: (the user should hear about it: a real problem, a risk, a repeated failure, or an idea that would clearly save time or money) or ROUTINE: (worth saying here, not worth the user's time). If you have nothing worth saying, reply: ROUTINE: Nothing to add.`;
+const CHIEF_TASK = (digest, memberIds, minutes) => `${digest}
 
-const CHIEF_TASK = (digest, memberIds) => `${digest}
-
-Hold the council:
-1. Hear from the crew members who took part in this work with council.hear, one at a time (at most 4; awake members: ${memberIds.join(', ')}). If nobody took part, hear from two members you choose.
+Hold the council. There is no limit on how much the council discusses: the only limit is the meeting's time, about ${minutes} minutes.
+1. Hear from the crew members who took part in this work with council.hear, one at a time (awake members: ${memberIds.join(', ')}). If nobody took part, hear from members you choose. Each member hears what has been said so far, so they can answer each other. Ask follow-up questions, or hear someone again, whenever it would help.
 2. Weigh what they said. Something is significant only if the user would want to know: a real problem, a risk, something that keeps going wrong, or an idea that would clearly save time or money. Ordinary praise and small tips are not significant.
 3. Finish by calling council.report once. If anything is significant, set significant to true and write a short report for the user (a few plain sentences or bullet points: what, why it matters, what you suggest). Otherwise set significant to false with a one-line note.`;
 
@@ -35,10 +41,9 @@ export function parsePoints(text) {
   const out = [];
   for (const line of String(text || '').split('\n')) {
     const m = /^\s*(?:[-*•]\s*)?\**(SIGNIFICANT|ROUTINE)\**\s*[:–-]\s*(.+)$/i.exec(line);
-    if (m) out.push({ significant: m[1].toUpperCase() === 'SIGNIFICANT', point: m[2].trim().slice(0, 300) });
-    if (out.length === 4) break;
+    if (m) out.push({ significant: m[1].toUpperCase() === 'SIGNIFICANT', point: m[2].trim().slice(0, 2000) });
   }
-  if (!out.length && String(text || '').trim()) out.push({ significant: false, point: String(text).trim().replace(/\s+/g, ' ').slice(0, 300) });
+  if (!out.length && String(text || '').trim()) out.push({ significant: false, point: String(text).trim().replace(/\s+/g, ' ').slice(0, 2000) });
   return out;
 }
 
@@ -46,7 +51,7 @@ export function parsePoints(text) {
 export const councilMember = (m, model = COUNCIL.memberModel) => ({ ...m, grants: [], grantSet: new Set(), builtinTools: [], model, systemPrompt: `${m.persona}\n\nYou are speaking at a council of the MonkeyCraft crew. Be brief and honest.` });
 const councilChief = c => ({ ...c, grants: ['council.hear', 'council.report'], grantSet: new Set(['council.hear', 'council.report']), builtinTools: [], systemPrompt: CHIEF_SYSTEM });
 
-export function makeCouncilTools({ roster, councils }) {
+export function makeCouncilTools({ roster, councils, clock = { now: () => Date.now() } }) {
   const ids = roster.public().filter(c => c.awake && c.id !== 'chief').map(c => c.id);
   return [
     {
@@ -57,30 +62,32 @@ export function makeCouncilTools({ roster, councils }) {
       async run(args, ctx) {
         const c = councils.get(ctx.runId);
         if (!c) return { isError: true, content: 'council.hear only works at a council.', summary: 'not at a council' };
-        if (c.heard.size >= 5) return { isError: true, content: 'You have heard enough members; give your verdict with council.report.', summary: 'enough heard' };
+        const left = c.endsAt - clock.now();
+        if (left <= 0) return { isError: true, content: 'The meeting time is up. Give your verdict now with council.report.', summary: 'time is up' };
         const m = roster.get(args.member);
-        const s = ctx.crew.start(args.member, MEMBER_ASK(m.name, m.role, c.digest, args.question), { shape: councilMember, preamble: MEMBER_PREAMBLE });
+        const s = ctx.crew.start(args.member, MEMBER_ASK(m.name, m.role, c.digest, c.said, args.question, mins(left)), { shape: councilMember, preamble: MEMBER_PREAMBLE });
         if (s.error) return { isError: true, content: s.error, summary: 'not heard' };
         c.heard.add(args.member);
-        const [r] = await ctx.crew.wait([s.workerRunId], COUNCIL.hearWaitMs);
+        const [r] = await ctx.crew.wait([s.workerRunId], Math.min(COUNCIL.hearWaitMs, Math.max(30_000, left)));
         if (r.running) return { isError: true, content: `${m.name} is still thinking. Carry on without it.`, summary: 'still thinking' };
         if (r.reason !== 'done') return { isError: true, content: `${m.name} couldn't speak (${r.reason}).`, summary: r.reason };
         const points = parsePoints(r.text);
-        for (const p of points) ctx.emit('council.say', { memberId: args.member, point: p.point, significant: p.significant });
-        return { content: `${m.name} says:\n${points.map(p => `- ${p.significant ? 'SIGNIFICANT' : 'routine'}: ${p.point}`).join('\n')}`, summary: `${points.length} point${points.length === 1 ? '' : 's'}${points.some(p => p.significant) ? ', significant' : ''}` };
+        for (const p of points) { ctx.emit('council.say', { memberId: args.member, point: p.point, significant: p.significant }); c.said.push({ name: m.name, ...p }); }
+        const after = mins(c.endsAt - clock.now());
+        return { content: `${m.name} says:\n${points.map(p => `- ${p.significant ? 'SIGNIFICANT' : 'routine'}: ${p.point}`).join('\n')}\n\n(About ${after} minute${after === 1 ? '' : 's'} of the meeting left.)`, summary: `${points.length} point${points.length === 1 ? '' : 's'}${points.some(p => p.significant) ? ', significant' : ''}` };
       }
     },
     {
       name: 'council.report', capability: 'crew', scope: 'delegate', timeoutMs: 5_000,
       description: 'Give the council\'s verdict, once. significant: true only if the user should hear about it; then report says what, why it matters and what you suggest. Otherwise significant: false with a one-line note.',
-      inputSchema: { type: 'object', properties: { significant: { type: 'boolean' }, report: { type: 'string', maxLength: 3000 } }, required: ['significant', 'report'], additionalProperties: false },
+      inputSchema: { type: 'object', properties: { significant: { type: 'boolean' }, report: { type: 'string', maxLength: 20000 } }, required: ['significant', 'report'], additionalProperties: false },
       assess: async a => ({ summary: a.significant ? 'significant report' : 'nothing significant' }),
       async run(args, ctx) {
         const c = councils.get(ctx.runId);
         if (!c) return { isError: true, content: 'council.report only works at a council.', summary: 'not at a council' };
         if (c.reported) return { isError: true, content: 'The council has already reported.', summary: 'already reported' };
         c.reported = true;
-        ctx.emit('council.report', { significant: args.significant, report: args.report.trim().slice(0, 3000) });
+        ctx.emit('council.report', { significant: args.significant, report: args.report.trim() });
         return { content: 'Reported. The council is over: end with a one-line goodbye.', summary: args.significant ? 'reported to the user' : 'nothing for the user' };
       }
     }
@@ -88,7 +95,7 @@ export function makeCouncilTools({ roster, councils }) {
 }
 
 /** The council's scheduler and memory: when it last met, and the digest of jobs since then. */
-export function makeCouncil({ fsp, file, clock, runs, roster, ledger, journal, log = () => {} }) {
+export function makeCouncil({ fsp, file, clock, runs, roster, ledger, journal, log = () => {}, setTimer = (f, ms) => { const t = setTimeout(f, ms); t.unref?.(); return t; }, clearTimer = clearTimeout }) {
   let state = { lastTs: 0, lastDay: '' };
   const councils = new Map();   // council runId → { digest, heard, reported }
   const jobCache = new Map();
@@ -137,11 +144,13 @@ export function makeCouncil({ fsp, file, clock, runs, roster, ledger, journal, l
       if (running) return { error: 'The council is already meeting.' };
       const now = clock.now(), jobs = await jobsSince(state.lastTs), digest = digestOf(jobs);
       const members = roster.public().filter(c => c.awake && c.id !== 'chief').map(c => c.id);
-      const r = runs.start({ agentId: 'chief', prompt: CHIEF_TASK(digest, members), source: 'council', trigger, agentOverride: councilChief(roster.get('chief')), poolUsd: COUNCIL.poolUsd });
+      const r = runs.start({ agentId: 'chief', prompt: CHIEF_TASK(digest, members, mins(COUNCIL.meetingMs)), source: 'council', trigger, agentOverride: councilChief(roster.get('chief')) });
       if (r.error) return r;
-      running = r.runId; councils.set(r.runId, { digest, heard: new Set(), reported: false });
+      running = r.runId; councils.set(r.runId, { digest, heard: new Set(), said: [], reported: false, endsAt: now + COUNCIL.meetingMs });
+      // the meeting's time is its only limit: after it (and a little grace for the verdict) the job ends
+      const hard = setTimer(() => runs.cancel(r.runId), COUNCIL.meetingMs + COUNCIL.graceMs);
       state = { lastTs: now, lastDay: dayOf(now) }; await save();
-      r.done.finally(() => { running = null; setTimeout(() => councils.delete(r.runId), 60_000).unref?.(); });
+      r.done.finally(() => { running = null; clearTimer(hard); setTimer(() => councils.delete(r.runId), 60_000); });
       return { runId: r.runId, jobs: jobs.length, done: r.done };
     },
     /** The daily council: at most once a day, after enough finished jobs, and only when nothing is running. */

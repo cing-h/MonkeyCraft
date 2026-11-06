@@ -124,7 +124,7 @@ async function main() {
     makeWebFetch({ fetchImpl: fetch, lookup: host => dns.lookup(host, { all: true }) }),
     ...makeCrewTools({ roster }),
     ...makeAskClaudeTools({ mailbox }),
-    ...makeCouncilTools({ roster, councils: { get: id => council?.councils.get(id) } })
+    ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } })
   ]);
   const claudePath = await findClaude();
   // settings: env vars are the defaults, saved choices override them

@@ -28,7 +28,7 @@ async function world(minds, { now = Date.now() } = {}) {
   const roster = makeRoster({ workspace: '/ws' });
   let council = null;
   const fake = (name, scope) => ({ name, scope, capability: 'x', description: name, inputSchema: { type: 'object', properties: { q: { type: 'string' } }, additionalProperties: false }, run: async a => ({ content: `${name}:${a.q}` }) });
-  const registry = makeRegistry([...makeCrewTools({ roster }), ...makeCouncilTools({ roster, councils: { get: id => council?.councils.get(id) } }), fake('fs.read', 'read'), fake('fs.write', 'write'), fake('shell.exec', 'execute'), fake('web.fetch', 'read'), fake('fs.edit', 'write'), fake('fs.move', 'write'), fake('verify.run', 'execute')]);
+  const registry = makeRegistry([...makeCrewTools({ roster }), ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } }), fake('fs.read', 'read'), fake('fs.write', 'write'), fake('shell.exec', 'execute'), fake('web.fetch', 'read'), fake('fs.edit', 'write'), fake('fs.move', 'write'), fake('verify.run', 'execute')]);
   const consent = makeConsentBroker({ newId, grants: makeGrantStore({ fsp: memFs(), file: '/g', clock }) });
   const agents = [];
   let host;
@@ -56,11 +56,11 @@ const chiefHolds = (members, significant) => async ({ call, prompt }) => {
   return 'Goodbye.';
 };
 
-test('parsePoints reads the members\' marked points, and keeps unmarked replies as one routine point', () => {
+test('parsePoints reads all the members\' marked points, and keeps unmarked replies as one routine point', () => {
   assert.deepEqual(parsePoints('SIGNIFICANT: The tests keep failing.\n- ROUTINE: Nice poem.\nchit-chat'), [{ significant: true, point: 'The tests keep failing.' }, { significant: false, point: 'Nice poem.' }]);
   assert.deepEqual(parsePoints('**Significant**: bold works too'), [{ significant: true, point: 'bold works too' }]);
   assert.deepEqual(parsePoints('just talking'), [{ significant: false, point: 'just talking' }]);
-  assert.equal(parsePoints(Array(9).fill('ROUTINE: x').join('\n')).length, 4, 'at most four points');
+  assert.equal(parsePoints(Array(9).fill('ROUTINE: x').join('\n')).length, 9, 'no cap on how many points');
 });
 
 test('a council: the Chief hears members who have no tools at all, their points become events, and the significant report reaches the user', async () => {
@@ -131,4 +131,28 @@ test('the digest leaves out crew tasks and earlier councils, and the council rem
   const again = makeCouncil({ fsp: w.fs, file: '/council.json', clock: w.clock, runs: w.host, roster: makeRoster({ workspace: '/ws' }), ledger: { rows: async () => [] }, journal: w.journal });
   await again.load(); assert.ok((await again.status()).lastTs, 'remembered after a restart');
   assert.ok(c.runId);
+});
+
+test('no cap but the meeting\'s time: members hear what was said so far, follow-ups are allowed, and when time is up the Chief is asked for his verdict', async () => {
+  let w, late, prompts = {};
+  w = await world({
+    chief: async ({ call }) => {
+      await call('council_hear', { member: 'smith' });
+      await call('council_hear', { member: 'writer' });
+      await call('council_hear', { member: 'smith', question: 'Do you agree with the Writer?' });   // a follow-up: hearing someone again is fine
+      w.clock.set(w.clock.now() + COUNCIL.meetingMs + 1000);
+      late = await call('council_hear', { member: 'inspector' });
+      await call('council_report', { significant: false, report: 'Routine.' });
+      return 'bye';
+    },
+    smith: async ({ prompt }) => { (prompts.smith ||= []).push(prompt); return Array.from({ length: 7 }, (_, i) => `ROUTINE: point ${i + 1}`).join('\n'); },
+    writer: async ({ prompt }) => { prompts.writer = prompt; return 'SIGNIFICANT: I disagree with point 3.'; }
+  });
+  const c = await w.council.call(); await c.done;
+  assert.equal(w.seen.filter(e => e.type === 'council.say' && e.memberId === 'smith').length, 14, 'all seven points, twice: no cap on how much is said');
+  assert.match(prompts.writer, /What has been said at the council so far:[\s\S]*The Smith \(routine\): point 7/, 'the Writer hears what the Smith said');
+  assert.match(prompts.smith[1], /The Chief asks you: Do you agree with the Writer\?[\s\S]*/); assert.match(prompts.smith[1], /The Writer \(significant\): I disagree/);
+  assert.match(prompts.smith[0], /no limit on how much you may say|minutes? of the meeting are left/);
+  assert.ok(late.isError && /time is up/.test(late.content), 'after the meeting time, no more hearing: give the verdict');
+  assert.ok(w.agents.find(a => a.id === 'chief' && isCouncil(a.prompt)).prompt.includes('the only limit is the meeting\'s time'));
 });
