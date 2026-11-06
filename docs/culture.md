@@ -49,4 +49,4 @@ Each free-roaming villager has a trade and goes to it now and then:
   - Every few minutes the villagers gather at the Ring, and any crew who are free may join them. Busy crew never do, and a job calls them away at once.
   - One villager drums, the fire burns higher, and they talk; the chatter often turns to the sayings of the Leaf-Ledger.
 - **The lantern ritual.** One lantern at the Ring is lit for each job the crew worked on today, so the string of lanterns is a real tally. When a job finishes, the next lantern flares into light. They're all dark again the next day.
-- **The council** (part 2c). The drum calls the crew to the Ring for a real council: they review recent work, share feedback and ideas, and the Chief reports anything significant to the user.
+- **The council.** The drum calls the crew to the Ring for a real council: they review recent work, share feedback and ideas, and the Chief reports anything significant to the user.

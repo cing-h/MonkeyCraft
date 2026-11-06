@@ -22,6 +22,8 @@ import { makeFsMove } from './tools/fs-move.js';
 import { makeVerifyRun } from './tools/verify-run.js';
 import { makeWebFetch } from './tools/web-fetch.js';
 import { makeCrewTools } from './crew/orchestrate.js';
+import { makeCouncil, makeCouncilTools } from './crew/council.js';
+import { councilRoutes } from './routes/council.js';
 import { makeAskClaudeTools } from './crew/ask-claude.js';
 import { makeMailbox } from './link/mailbox.js';
 import { makeLinkSession } from './link/session.js';
@@ -111,6 +113,7 @@ async function main() {
   const consent = makeConsentBroker({ newId, grants, log: m => console.warn(m) });
   const roster = makeRoster({ workspace: realWorkspace });
   const shell = makeShellExec({ spawn: trackedSpawn('shell'), pathEnv, baseEnv: process.env, killProcessGroup });
+  let council = null;   // made once the run host exists (below); the council tools look it up when they run
   const registry = makeRegistry([
     makeFsRead({ fsp, pathEnv }),
     makeFsWrite({ fsp, pathEnv, undo }),
@@ -120,7 +123,8 @@ async function main() {
     makeVerifyRun({ shell }),
     makeWebFetch({ fetchImpl: fetch, lookup: host => dns.lookup(host, { all: true }) }),
     ...makeCrewTools({ roster }),
-    ...makeAskClaudeTools({ mailbox })
+    ...makeAskClaudeTools({ mailbox }),
+    ...makeCouncilTools({ roster, councils: { get: id => council?.councils.get(id) } })
   ]);
   const claudePath = await findClaude();
   // settings: env vars are the defaults, saved choices override them
@@ -140,6 +144,9 @@ async function main() {
   });
   await runs.init();
   setInterval(() => runs.checkLiveness(), 15_000).unref();
+  council = makeCouncil({ fsp, file: path.join(dataDir, 'council.json'), clock, runs, roster, ledger, journal, log: m => console.warn(m) });
+  await council.load();
+  setInterval(() => council.tick().catch(e => console.warn('[council]', e.message)), 60_000).unref();   // the daily council
 
   const link = makeLinkSession({ fsp, file: path.join(dataDir, 'link-jobs.json'), runs, roster, mailbox, clock, log: m => console.warn(m) });
   await link.load();
@@ -153,7 +160,7 @@ async function main() {
 
   const server = makeServer({
     port: PORT,
-    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken })]
+    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken }), ...councilRoutes({ council })]
   });
   await server.listen();
   console.log(`MonkeyCraft is running: http://127.0.0.1:${PORT}/`);

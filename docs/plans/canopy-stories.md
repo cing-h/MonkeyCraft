@@ -38,7 +38,7 @@ Branch `feature/canopy-stories`, built on `feature/chief-roams`. The design is i
        - an offering shrine with fruit and scrolls.
      - **The Council Ring:** the wide platform round the great trunk on Canopy 1, widened. The trunk is carved as the talking-totem. There's a fire bowl, woven mats and log stools, banners, hanging lanterns and a council drum.
      - **Scenery gatherings:** now and then, villagers and free crew gather there to drum and chat (written lines, which can now include culture sayings). These are scenery and never claim real work.
-   - **2c. The real council.** A council is an ordinary Chief job, so it gets the usual events, limits, Job log and STOP.
+   - **2c. The real council.** DONE (2026-11-06). In `src/crew/council.js` and `src/routes/council.js`. A live council on 2026-11-06 heard the Smith and the Archivist (real, specific points) and filed a significant report, for about $0.027 (subscription estimate). The user also asked to remove the hanging foreground fronds (done). A council is an ordinary Chief job, so it gets the usual events, limits, Job log and STOP.
      - **What it is:** a Chief job marked `source: 'council'` (an existing optional field).
        - The Chief gets a digest of the jobs since the last council: the task, the outcome and his final summary.
        - He asks each awake crew member for its thoughts. Members get no tools at all: they can only think and talk.

@@ -20,7 +20,7 @@ export const GLYPHS = {
   scroll: ['11110', '10011', '10001', '11001', '01111']
 };
 const OCHRE = [214, 150, 60], CHALK = [232, 222, 196], RED = [178, 58, 42], INDIGO = [70, 80, 150];
-function glyph(fb, name, x, y, c = CHALK) { GLYPHS[name].forEach((row, r) => { for (let k = 0; k < 5; k++) if (row[k] === '1') fb.put(x + k - fb.ox, y + r, c); }); }
+export function glyph(fb, name, x, y, c = CHALK) { GLYPHS[name].forEach((row, r) => { for (let k = 0; k < 5; k++) if (row[k] === '1') fb.put(x + k - fb.ox, y + r, c); }); }
 
 // ---------- the Council Ring: the wide platform round the great tree on Canopy 1 ----------
 const ringSeg = () => WALK[1].find(g => g.kind === 'trunk' && g.tx === 480);
@@ -39,6 +39,9 @@ export const TRADES = {
   weaver: { lane: 'c2', x: 912, facing: 1, anim: 'weave', what: 'weaves at the loom' },
   courier: { lane: 'ground', x: 550, facing: -1, anim: 'look', what: 'carries fruit up to the trees' }
 };
+/** Where each crew member sits at a council (the Chief nearest the great tree), and where the villagers stand to watch. */
+export const COUNCIL_SEATS = { chief: 459, smith: 448, scout: 437, archivist: 426, writer: 499, inspector: 510, sage: 499, ringer: 510 };
+export const AUDIENCE = [404, 411, 538, 545];
 /** Where the courier takes a basket: up to the Ring, or to the weaver's platform. */
 export const DELIVERIES = [{ lane: 'c1', x: 432 }, { lane: 'c2', x: 900 }];
 

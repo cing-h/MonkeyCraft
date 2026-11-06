@@ -37,7 +37,16 @@ h1 { font: 700 22px var(--display); margin: 0; text-shadow: 2px 2px 0 var(--bark
 h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--leaf); margin: 0; text-transform: uppercase; }
 .cam { display: flex; align-items: center; gap: 6px; font: 11px var(--label); color: var(--muted); }
 .cam button { padding: 4px 9px; font-size: 12px; }
+.council-note { color: #2a1c13; background: #e8c25a; border-color: #8a6a1e; animation: council-glow 2.4s ease-in-out infinite; }
+@keyframes council-glow { 50% { background: #f3d77e; } }
+@media (prefers-reduced-motion: reduce) { .council-note { animation: none; } }
+.run .said { font-size: 13px; margin: 2px 0 2px 10px; color: var(--fg); }
+.run .said b { font: 10px var(--label); letter-spacing: .06em; color: var(--muted); margin-right: 4px; }
+.run .said.sig { color: #f0d27a; }
+.run .report { margin: 8px 0 4px; padding: 8px 10px; border: 2px solid #8a6a1e; background: #2a2410; white-space: pre-wrap; }
+.run .report .q { font: 10px var(--label); letter-spacing: .08em; color: #e8c25a; margin-bottom: 4px; }
 .stories { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
+.stories button, .spend, .cam span, .council-note { white-space: nowrap; }
 .stories button { padding: 3px 6px; font-size: 10px; background: none; border-color: transparent; box-shadow: none; color: var(--muted); }
 .stories button[aria-pressed="true"] { color: var(--fg); border-color: var(--leaf); }
 .spend { font: 11px var(--label); color: var(--muted); }

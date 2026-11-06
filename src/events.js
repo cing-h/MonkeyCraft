@@ -58,7 +58,11 @@ const TYPES = {
 
   // the link with an outside Claude Code session (the Chief's mailbox; the messenger toucan)
   'link.request': { requestId: 'string', request: 'string', untrusted: 'boolean' },
-  'link.reply': { requestId: 'string' }
+  'link.reply': { requestId: 'string' },
+
+  // the council at the Ring (a Chief job with source 'council'): a member's point, and the Chief's verdict for the user
+  'council.say': { memberId: 'string', point: 'string', significant: 'boolean' },
+  'council.report': { significant: 'boolean', report: 'string' }
 };
 
 // Every event carries this envelope.

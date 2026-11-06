@@ -2,7 +2,7 @@
 // job log, the crew strip and the ape village all read the same events.
 // If an event didn't arrive, nothing on the page pretends it happened.
 
-import { initialState, reduce, modeOf, MODE_TEXT } from './station/state.js';
+import { initialState, reduce, modeOf, inCouncil, MODE_TEXT } from './station/state.js';
 import { makeStation, CREW_IDS, SCENE_W, SCENE_H } from './station/ape/scene.js';
 
 const $ = id => document.getElementById(id);
@@ -65,6 +65,8 @@ function logRun(ev) {
   const r = runBox(ev);
   switch (ev.type) {
     case 'run.start':
+      if (ev.source === 'council') { r.council = true; r.box.append(el('div', 'from', ev.trigger === 'schedule' ? 'THE DAILY COUNCIL AT THE RING' : 'COUNCIL AT THE RING · YOU CALLED IT'), el('div', 'you', 'The crew gather at the Ring to look back on recent work. The Chief will tell you only if something is significant.')); break; }
+      if (r.parent?.council) { r.quiet = true; r.box.append(el('div', 'who', `${(names[ev.agentId] || ev.agentId).toUpperCase()} · SPEAKS AT THE COUNCIL`)); break; }   // its points arrive as council.say
       if (r.parent) r.box.append(el('div', 'who', `${(names[ev.agentId] || ev.agentId).toUpperCase()} · TASK FROM ${(names[r.parent.agentId] || r.parent.agentId).toUpperCase()}`), el('div', 'task', ev.task || '(task)'));
       else {
         if (ev.source === 'claude-code') r.box.append(el('div', 'from', 'JOB FROM CLAUDE CODE (YOUR TERMINAL SESSION)'));
@@ -77,9 +79,16 @@ function logRun(ev) {
       r.box.append(m); break;
     }
     case 'link.reply': r.say = null; r.box.append(el('div', 'note', 'CLAUDE CODE ANSWERED')); break;
-    case 'crew.dispatch': r.say = null; r.box.append(el('div', 'note', `SENT ${(names[ev.workerId] || ev.workerId).toUpperCase()}`)); break;
+    case 'crew.dispatch': r.say = null; if (!r.council) r.box.append(el('div', 'note', `SENT ${(names[ev.workerId] || ev.workerId).toUpperCase()}`)); break;
+    case 'council.say': { r.say = null; const d = el('div', 'said' + (ev.significant ? ' sig' : '')); d.append(el('b', '', `${(names[ev.memberId] || ev.memberId).toUpperCase()}${ev.significant ? ' ★' : ''}`), document.createTextNode(ev.point)); r.box.append(d); break; }
+    case 'council.report': {
+      r.say = null;
+      if (!ev.significant) { r.box.append(el('div', 'note', `THE COUNCIL MET. NOTHING NEEDS YOUR ATTENTION.${ev.report ? ' (' + ev.report + ')' : ''}`)); break; }
+      const d = el('div', 'report'); d.id = `council-${ev.runId}`; d.append(el('div', 'q', 'COUNCIL REPORT FROM THE CHIEF'), el('div', '', ev.report)); r.box.append(d);
+      councilReports.add(ev.runId); syncCouncil(); break;
+    }
     case 'crew.worker_end': r.say = null; r.box.append(el('div', ev.reason === 'done' ? 'note' : 'warn', `${(names[ev.workerId] || ev.workerId).toUpperCase()} FINISHED: ${REASONS[ev.reason] || ev.reason.toUpperCase()}`)); break;
-    case 'agent.token': saying(r, ev).textContent += ev.text; break;
+    case 'agent.token': if (!r.quiet) saying(r, ev).textContent += ev.text; break;
     case 'agent.tool_call': {
       r.say = null;
       const t = el('div', 'tool'); t.append(el('b', '', ev.tool), document.createTextNode(' ' + argText(ev.args) + ' …'));
@@ -247,6 +256,29 @@ function syncChatter() {
   for (const [id, e] of chatEls) if (!live.has(id)) { e.remove(); chatEls.delete(id); }
 }
 
+// ---------- the council at the Ring: call one, and the report notice ----------
+// A significant report raises a notice in the header and a banner on the Chief's lodge until you read it.
+const councilReports = new Set();
+const readReports = () => { try { return new Set(JSON.parse(localStorage.getItem('mc-council-read') || '[]')); } catch { return new Set(); } };
+function syncCouncil() {
+  const read = readReports(), unread = [...councilReports].filter(id => !read.has(id));
+  $('council-report').hidden = !unread.length; station?.banner(unread.length > 0);
+}
+$('council-report').onclick = () => {
+  const read = readReports(), unread = [...councilReports].filter(id => !read.has(id));
+  const id = unread.at(-1); if (id) document.getElementById(`council-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  for (const u of unread) read.add(u);
+  try { localStorage.setItem('mc-council-read', JSON.stringify([...read].slice(-50))); } catch {}
+  syncCouncil();
+};
+$('call-council').onclick = async () => {
+  const b = $('call-council'); b.disabled = true;
+  const r = await post('/api/council');
+  b.disabled = false;
+  if (!r.ok) alert(r.data.error || 'The council could not meet just now.');
+  else { station.toStory(1); station.scrollTo(480); syncThumb(); }   // look up at the Ring
+};
+
 // ---------- spend, roster, controls ----------
 async function loadSpend() {
   try {
@@ -284,7 +316,8 @@ for (const c of crew) { names[c.id] = c.name; wakes[c.id] = c.wakes; }
 state = initialState(crew);
 
 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), reduced });
+station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), councilOf: id => inCouncil(state.creatures[id]), reduced });
+syncCouncil();
 if (mailOpen.size) station.mail(true, false);   // requests opened before the village was built
 // scrolling the village: buttons, arrow keys and drag; a click without a drag picks a crew member
 const WORLD_W = 960;

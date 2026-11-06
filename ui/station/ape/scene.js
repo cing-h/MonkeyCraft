@@ -25,7 +25,7 @@ import { makeChatter } from './chatter.js';
 import { LADDER_X, makeChiefIdle } from './chief.js';
 import { climbLevel, hangs, holdY, pickWander, route, surfaceY } from './lanes.js';
 import { FOLK } from './villagers.js';
-import { DELIVERIES, RING, TRADES, gourd, makeGatherings } from './culture.js';
+import { AUDIENCE, COUNCIL_SEATS, DELIVERIES, RING, TRADES, glyph, gourd, makeGatherings } from './culture.js';
 import { walkY } from './canopy.js';
 
 
@@ -40,7 +40,7 @@ export const PLATE = { asking: ['?', [242, 197, 49]], error: ['!', [255, 90, 90]
 export const CREW_IDS = CREW;
 export const SCENE_W = W, SCENE_H = H;
 
-export function makeStation(canvas, { modeOf, reduced = false }) {
+export function makeStation(canvas, { modeOf, councilOf = () => false, reduced = false }) {   // councilOf(id, now): is it at a council (a real council job)?
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d'), img = ctx.createImageData(W, H), fb = new FB(W, H);
   const L = buildLayers(), frame = buildFrame(), villagers = makeVillagers(L.back.w);
@@ -122,10 +122,19 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     folk.forEach((a, i) => { const seat = i === 0 ? drum : rest.shift(); if (seat) sit(a, seat, seat.drum ? 'drum' : 'sit'); a.carry = false; });
   }
   function endGathering() { for (const a of everyone) if (a.tasks?.[0]?.gather) { a.tasks = null; a.wait = 1 + rnd() * 4; if (a.key === 'chief') a.linger = 0; } }
+  // a real council: the villagers come to watch (one drums softly), and gatherings wait until it's over
+  let councilOn = false, bannerOn = false;
+  function startAudience() {
+    folk.forEach((a, i) => { const drum = i === 0, x = drum ? RING.seats.find(s => s.drum).x : AUDIENCE[(i - 1) % AUDIENCE.length]; a.tasks = [{ audience: true, lane: 'c1', x, anim: drum ? 'drum' : 'look', facing: x < 480 ? 1 : -1, t: Infinity, top: true }]; a.carry = false; });
+  }
+  function endAudience() { for (const a of folk) if (a.tasks?.[0]?.audience) { a.tasks = null; a.wait = 1 + rnd() * 4; } }
   let lanternsLit = 0; const flares = [];
 
   function update(dt, now) {
-    const g = gatherings.step(dt); if (g && !gathering) startGathering(); if (!g && gathering) endGathering(); gathering = g;
+    const g = gatherings.step(dt), councilNow = CREW.some(k => actors[k].council);
+    if (councilNow && !councilOn) { endGathering(); gathering = false; startAudience(); } else if (!councilNow && councilOn) endAudience();
+    councilOn = councilNow;
+    if (!councilNow) { if (g && !gathering) startGathering(); if (!g && gathering) endGathering(); gathering = g; }
     for (const a of everyone) {
       const sp = SPECIES[a.key], mode = a.folk ? 'idle' : modeOf(a.key, now), d = a.folk ? a.home : DOORS[a.key];
       a.mode = mode; a.blend = Math.min(1, a.blend + dt / (a.blendT || 0.22));
@@ -134,9 +143,13 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       const home = mode !== 'idle';
       if (a.key === 'chief' && home && !a.called) { a.called = true; a.rest = null; chiefIdle.interrupt(); }   // a job sends him straight back to his station
       if (!home) a.called = false; else if (a.tasks) a.tasks = null;   // a job comes before any gathering
-      const last = a.legs[a.legs.length - 1], goingHome = last && last.home;
-      if (home && !goingHome && !(a.atDoor && a.lane === d.lane)) { plan(a, d.lane, d.x); a.legs[a.legs.length - 1].home = true; }
-      if (!home && goingHome && !a.air && !(a.br && a.br.mode === 'flight') && a.anim !== 'climb') a.legs = [];
+      // a council job sends its members to their seats at the Ring instead of home (truthful: only while that job runs)
+      const council = home && !a.folk && councilOf(a.key, now), seatX = COUNCIL_SEATS[a.key];
+      a.council = council; if (!council) a.atSeat = false;
+      const last = a.legs[a.legs.length - 1], goingHome = last && last.home, goingCouncil = last && last.council;
+      if (home && !council && !goingHome && !(a.atDoor && a.lane === d.lane)) { plan(a, d.lane, d.x); a.legs[a.legs.length - 1].home = true; }
+      if (council && !goingCouncil && !a.atSeat) { plan(a, 'c1', seatX, { top: true }); a.legs[a.legs.length - 1].council = true; a.atDoor = false; }
+      if (!home && (goingHome || goingCouncil) && !a.air && !(a.br && a.br.mode === 'flight') && a.anim !== 'climb') a.legs = [];
       if (!home && !a.legs.length && !a.air && a.tasks?.length) doTask(a, dt);
       else if (!home && !a.legs.length && !a.air && a.key === 'chief' && !a.folk) chiefFree(a, dt);
       else if (!home && !a.legs.length && !a.air) {
@@ -169,7 +182,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
           if (a.br.step(dt, rnd) === 'catch') shake(a.br.hx, holdY(a.lane, a.br.hx), 1, a.br.ricochet ? 5 : 2);
           stepPose(a.br, sp, a.s, dt);
           a.x = a.br.chest()[0]; a.facing = a.br.dir; setAnim(a, 'brach');
-          if (a.br.arrived()) { a.legs.shift(); if (leg.home) a.atDoor = true; if (!a.legs.length || a.legs[0].k !== 'move') a.br.travelTo(null); }
+          if (a.br.arrived()) { a.legs.shift(); if (leg.home) a.atDoor = true; if (leg.council) a.atSeat = true; if (!a.legs.length || a.legs[0].k !== 'move') a.br.travelTo(null); }
         } else {
           const run = home, target = (a.lane === 'canopy' ? (run ? sp.run * 0.9 : sp.walk * 1.1) : (run ? sp.run : sp.walk));
           const brake = Math.sqrt(2 * 50 * Math.abs(dx));
@@ -178,7 +191,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
           a.facing = dir;
           setAnim(a, a.spd > (sp.walk + sp.run) * 0.5 ? 'run' : a.spd > 0.5 ? 'walk' : 'stand');
           a.phase += step / strideOf(sp) * TAU * (a.anim === 'run' ? 0.8 : 1);
-          if (Math.abs(dx) <= Math.max(step, 0.3)) { a.x = leg.x; a.legs.shift(); if (!a.legs.length) a.spd = 0; if (leg.home) a.atDoor = true; } else a.x += dir * step;   // the last leg of a trip home ends at the door
+          if (Math.abs(dx) <= Math.max(step, 0.3)) { a.x = leg.x; a.legs.shift(); if (!a.legs.length) a.spd = 0; if (leg.home) a.atDoor = true; if (leg.council) a.atSeat = true; } else a.x += dir * step;   // the last leg of a trip home ends at the door
         }
       } else if (leg && leg.k === 'climb') {
         a.br = null; a.x = leg.x - (leg.dx || 0); a.facing = 1; setAnim(a, 'climb');
@@ -186,7 +199,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
         a.climbY = a.climbY ?? y0;
         const surge = 0.3 + 0.7 * pos(Math.sin(a.phase + Math.PI)), step = (home ? 30 : 14) * (dir > 0 ? 1.25 : 1) * surge * dt;   // a little quicker going down, and hurrying home
         a.phase += dt * (home ? 7 : 5);
-        if ((y1 - a.climbY) * dir <= step) { a.lane = leg.to || 'canopy'; a.top = !!leg.top; a.climbY = undefined; a.legs.shift(); a.spd = 0; } else a.climbY += dir * step;
+        if ((y1 - a.climbY) * dir <= step) { a.lane = leg.to || 'canopy'; a.top = !!leg.top; a.climbY = undefined; a.legs.shift(); a.spd = 0; if (leg.council) a.atSeat = true; } else a.climbY += dir * step;
       } else {
         // standing still: hold a hang, or idle on the ground / branch
         if (hangs(a.lane, sp) && !a.top) {
@@ -199,7 +212,8 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
           if (a.lane === d.lane && Math.abs(a.x - d.x) < 0.5) a.atDoor = true;
           if (home && a.atDoor) a.facing = a.key === 'chief' ? 1 : -1;
           const job = a.tasks?.[0];
-          if (job?.arrived && !home) { a.facing = job.facing; setAnim(a, job.anim, 0.35); }
+          if (council && a.atSeat) { a.facing = seatX < 480 ? 1 : -1; setAnim(a, mode === 'talking' ? 'talk' : 'sit', 0.35); }   // at the council: sits, and talks while it really speaks
+          else if (job?.arrived && !home) { a.facing = job.facing; setAnim(a, job.anim, 0.35); }
           else if (a.key === 'chief' && !a.folk) {        // on his platform or out on a stroll; he keeps his dignity when asking
             if (!home && a.rest && a.lane === 'perch') { a.facing = a.rest.facing; setAnim(a, a.rest.pose, chiefIdle.timing.blend); }
             else setAnim(a, home ? (mode === 'talking' ? 'talk' : 'stand') : a.lane === 'ground' ? 'look' : 'stand');
@@ -321,7 +335,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     for (const [lx, ly] of L.lamps) for (let y = ly - 4; y <= ly + 4; y++) for (let x = lx - 4; x <= lx + 4; x++) { const dd = Math.hypot(x - lx, y - ly); if (dd > 0.5 && dd < 4.5) fb.add(x - cam, y, [255, 190, 110], 0.1 / dd * (0.85 + 0.15 * Math.sin(t * 7 + lx))); }
     // the Council Ring: the fire in its bowl (higher during a gathering), and one lantern lit for each job finished today
     if (onScreen(RING.y - 60, RING.y + 4)) {
-      const fx = RING.fire.x, fy = RING.fire.y, big = gathering ? 1.6 : 1;
+      const fx = RING.fire.x, fy = RING.fire.y, big = councilOn ? 2.1 : gathering ? 1.6 : 1;
       for (let i = 0; i < 14 * big; i++) { const h = hash(i, Math.floor(t * 10), 41), x = fx - 3 + hash(i, 42) * 6, y = fy - 2 - h * 6 * big * (1 - Math.abs(x - fx) / 4); fb.put(x - cam, y, h > 0.7 ? [255, 236, 150] : h > 0.35 ? [255, 170, 60] : [220, 80, 40]); }
       for (let y = fy - 12; y <= fy + 2; y++) for (let x = fx - 9; x <= fx + 9; x++) { const dd = Math.hypot(x - fx, (y - fy + 3) * 1.4); if (dd > 1 && dd < 10) fb.add(x - cam, y, [255, 150, 70], (0.12 * big) / dd * (0.85 + 0.15 * Math.sin(t * 9))); }
       RING.lanterns.forEach((l, i) => {
@@ -329,6 +343,12 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
         if (lit) for (let y = l.y - 5; y <= l.y + 5; y++) for (let x = l.x - 5; x <= l.x + 5; x++) { const dd = Math.hypot(x - l.x, y - l.y); if (dd > 1 && dd < 5.5) fb.add(x - cam, y, [255, 180, 90], 0.09 / dd); }
       });
       for (const f of flares) for (let k = 0; k < 6; k++) { const a = k / 6 * TAU + t * 3, r = (1 - f.life) * 7; fb.add(f.x + Math.cos(a) * r - cam, f.y + Math.sin(a) * r, [255, 220, 140], f.life * 0.8); }
+    }
+    // the council banner on the Chief's lodge, raised while a council report is waiting to be read
+    if (bannerOn && onScreen(PERCH_Y - 40, PERCH_Y)) {
+      const px = 534; fb.rect(px, PERCH_Y - 38, px + 1, PERCH_Y, [96, 70, 44]);
+      for (let y = 0; y < 16; y++) { const wave = Math.round(Math.sin(t * 3 + y * 0.5) * 0.8); fb.rect(px + 1 + wave, PERCH_Y - 37 + y, px + 11 + wave, PERCH_Y - 36 + y, y % 5 === 4 ? [214, 150, 60] : [178, 52, 42]); }
+      glyph(fb, 'scroll', px + 4, PERCH_Y - 32, [232, 222, 196]);
     }
     for (const l of L.lights) {
       const a = actors[l.key], lit = a && a.inside;
@@ -405,7 +425,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   const storyOf = y => STORIES.reduce((b, s, i) => Math.abs(s.camY - y) < Math.abs(STORIES[b].camY - y) ? i : b, 0);
   const worldYOf = a => a.anim === 'climb' && a.climbY !== undefined ? a.climbY : a.air ? a.air.y : surfaceY(a.lane, a.x);
   return {
-    _actors: actors, _villagers: villagers, _folk: folk, _gatherings: gatherings, _lanterns: () => lanternsLit, _heads: () => ({ ...heads, ...Object.fromEntries(fheads.map((h, i) => [`f:${i}`, h])) }), _chiefIdle: chiefIdle,
+    _actors: actors, _villagers: villagers, _folk: folk, _gatherings: gatherings, _lanterns: () => lanternsLit, _council: () => councilOn, _heads: () => ({ ...heads, ...Object.fromEntries(fheads.map((h, i) => [`f:${i}`, h])) }), _chiefIdle: chiefIdle,
     step(now, dt = 0.05) {
       t += dt;
       if (goalY !== null) { camY += (goalY - camY) * Math.min(1, reduced ? 1 : dt * 6); if (Math.abs(goalY - camY) < 0.5) { camY = goalY; goalY = null; } }
@@ -439,6 +459,8 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     },
     /** How many jobs finished today (from the server): that many lanterns are lit at the Council Ring. */
     lanterns(n) { lanternsLit = Math.max(0, Math.min(RING.lanterns.length, n | 0)); },
+    /** Raise or lower the council banner on the Chief's lodge (a council report is waiting to be read). */
+    banner(on) { bannerOn = !!on; },
     /** Is a gathering under way at the Ring? (scenery) */
     gathering: () => gathering,
     /** Is a request to Claude Code open? The toucan is away exactly while one is. `animate` false snaps (replayed history). */

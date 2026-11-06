@@ -69,3 +69,27 @@ test('the lantern ritual: one lit per job today, and a finished job lights the n
   st.lanterns(12); st.notify({ type: 'job_done', agentId: 'smith', name: 'The Smith' }); assert.equal(st._lanterns(), 12);
   st.scrollTo(475, -64); assert.doesNotThrow(() => st.step(0, 0.05));
 });
+
+test('a real council sends its members to their seats at the Ring, villagers come to watch, and it ends when the job does', () => {
+  const modes = Object.fromEntries(CREW_IDS.map(k => [k, 'idle'])); modes.sage = 'asleep'; modes.ringer = 'asleep';
+  const council = new Set();
+  const st = makeStation(fakeCanvas(), { modeOf: id => modes[id], councilOf: id => council.has(id) });
+  for (let i = 0; i < 200; i++) st.step(0, 0.05);
+  for (const k of ['chief', 'smith', 'writer']) { modes[k] = 'ready'; council.add(k); }
+  const A = st._actors;
+  let ok = false;
+  for (let i = 0; i < 20 * 120 && !ok; i++) { st.step(0, 0.05); ok = ['chief', 'smith', 'writer'].every(k => A[k].atSeat && A[k].lane === 'c1'); }
+  assert.ok(ok, 'the members reached their seats at the Ring');
+  assert.equal(st._council(), true);
+  for (let i = 0; i < 20 * 3; i++) st.step(0, 0.05);
+  for (const k of ['chief', 'smith', 'writer']) { assert.equal(A[k].anim, 'sit'); assert.equal(A[k].inside, false, 'not indoors'); }
+  assert.equal(A.smith.top, true, 'the Smith (a swinger) sits on the platform, not under it');
+  modes.smith = 'talking'; for (let i = 0; i < 20; i++) st.step(0, 0.05); assert.equal(A.smith.anim, 'talk', 'it talks while it really speaks');
+  modes.chief = 'working'; for (let i = 0; i < 20; i++) st.step(0, 0.05); assert.equal(A.chief.inside, false, 'the Chief stays at the Ring while hearing a member');
+  assert.ok(st._folk.some(f => f.tasks?.[0]?.audience), 'villagers come to watch');
+  // the council job ends: everyone goes back to their own business
+  for (const k of ['chief', 'smith', 'writer']) { modes[k] = 'idle'; council.delete(k); }
+  for (let i = 0; i < 20; i++) st.step(0, 0.05);
+  assert.equal(st._council(), false); assert.ok(st._folk.every(f => !f.tasks?.[0]?.audience));
+  assert.ok(!A.smith.atSeat);
+});

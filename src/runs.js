@@ -57,13 +57,13 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
   async function execute(run, agent, prompt) {
     const { runId, emit, controller } = run;
     const provider = providers[agent.provider];
-    emit('run.start', { trigger: run.parent ? 'crew' : 'user', provider: agent.provider, model: agent.model, task: prompt.slice(0, 500), ...(run.parent ? { parentRunId: run.parent.runId } : {}), ...(run.source ? { source: run.source } : {}) });
+    emit('run.start', { trigger: run.parent ? 'crew' : (run.trigger || 'user'), provider: agent.provider, model: agent.model, task: prompt.slice(0, 500), ...(run.parent ? { parentRunId: run.parent.runId } : {}), ...(run.source ? { source: run.source } : {}) });
     if (!run.parent) { const day = daily(); if (day.near) emit('budget.threshold', { scope: 'day', limit: day.limit, spent: day.spent, hard: false }); }
     const left = run.family.limitUsd - run.family.usd;
     let res;
     try {
       res = await provider.run({
-        agent, prompt: run.parent ? WORKER_PREAMBLE + prompt : prompt, signal: controller.signal, emit,
+        agent, prompt: run.parent ? (run.preamble ?? WORKER_PREAMBLE) + prompt : prompt, signal: controller.signal, emit,
         maxBudgetUsd: Math.max(0.05, Math.min(limits.perRunUsd, left)),
         onUsage: u => { run.budget.usage(u); run.family.usage(runId, weighTokens(u)); },
         onTaint: source => { if (run.taint.set(source)) emit('taint.set', { source }); },
@@ -88,8 +88,10 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     return { ...res, tainted: run.taint.tainted };
   }
 
-  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null, source = null }) {
-    const agent = roster.get(agentId);
+  // agentOverride: run this crew member in a different shape (the council: no tools, its own instructions and model).
+  // preamble: what a worker is told before its task. trigger: 'user' or 'schedule'. poolUsd: a smaller spending pool.
+  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null, source = null, agentOverride = null, preamble = null, trigger = null, poolUsd = null }) {
+    const agent = agentOverride && agentOverride.id === agentId ? agentOverride : roster.get(agentId);
     if (!agent) return { error: `No crew member "${agentId}".` };
     if (!agent.awake) return { error: `${agent.name} is asleep until ${agent.wakes}.` };
     if (typeof prompt !== 'string' || !prompt.trim()) return { error: 'Empty job.' };
@@ -108,7 +110,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     const controller = new AbortController(), raw = bus.emitFor(runId, agentId);
     const stop = reason => { if (!controller.signal.aborted) controller.abort(reason); };
     const run = {
-      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, interactive, stop, parent, source: parent ? null : source,
+      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, interactive, stop, parent, source: parent ? null : source, preamble, trigger: parent ? null : trigger,
       taint: makeTaint(), breaker: makeBreaker(), workers: new Map(),
       lastProgress: clock.now(), toolsRunning: 0
     };
@@ -121,6 +123,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     };
     run.budget = makeRunBudget({ perRunTokens: limits.perRunTokens ?? Infinity, emit: run.emit, stop });
     run.family = parent ? parent.family : makeFamily(run);
+    if (!parent && poolUsd != null) run.family.limitUsd = Math.min(run.family.limitUsd, poolUsd);
     if (parent) {   // stopping or cancelling the lead stops its workers
       const onAbort = () => { const why = parent.controller.signal.reason; stop(why === 'halt' || why === 'budget' ? why : 'cancel'); };
       parent.controller.signal.addEventListener('abort', onAbort, { once: true });
@@ -145,11 +148,13 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
   // ---------- the Chief's view of its crew (ctx.crew for delegation tools) ----------
   function crewApi(lead) {
     return {
-      start(workerId, task) {
+      /** opts.shape(member) → a different shape for this worker run (the council), opts.preamble → what it's told first */
+      start(workerId, task, opts = {}) {
         if (workerId === lead.agentId) return { error: 'You can\'t give a task to yourself.' };
         const w = roster.get(workerId);
         if (!w) return { error: `There is no crew member "${workerId}".` };
-        const r = startRun({ agentId: workerId, prompt: task, interactive: lead.interactive, parent: lead });
+        if (!w.awake) return { error: `${w.name} is asleep until ${w.wakes}.` };
+        const r = startRun({ agentId: workerId, prompt: task, interactive: lead.interactive, parent: lead, agentOverride: opts.shape ? opts.shape(w) : null, preamble: opts.preamble ?? null });
         if (r.error) return { error: r.error };
         const job = { workerId, workerRunId: r.runId, running: true, reason: null, text: '', tainted: false };
         job.done = r.done.then(res => { Object.assign(job, { running: false, reason: res.reason, tainted: !!res.tainted, text: String(res.text || '').slice(0, MAX_REPORT) }); return job; });

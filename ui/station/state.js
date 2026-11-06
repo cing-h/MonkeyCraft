@@ -10,16 +10,17 @@ export const ERROR_MS = 6000;  // the "!" plate stays this long after a failure
 export function initialState(crew) {
   const creatures = {};
   for (const c of crew) creatures[c.id] = { id: c.id, name: c.name, awake: !!c.awake, runId: null, active: false, tools: [], asks: [], toolEndAt: -Infinity, talkAt: -Infinity, errorAt: -Infinity, errorText: '' };
-  return { creatures, last: -Infinity };
+  return { creatures, last: -Infinity, councils: new Set() };   // councils: the runIds of council jobs (source 'council')
 }
 
 /** Apply one event. Unknown agents and unknown types change nothing. Returns the same state object. */
 export function reduce(state, ev) {
   const c = ev && state.creatures[ev.agentId];
   if (!c || !c.awake) return state;
+  if (ev.type === 'run.start' && ev.source === 'council') (state.councils ||= new Set()).add(ev.runId);
   if (Number.isFinite(ev.ts)) state.last = Math.max(state.last, ev.ts);
   switch (ev.type) {
-    case 'run.start': c.runId = ev.runId; c.active = true; c.tools = []; c.asks = []; break;
+    case 'run.start': c.runId = ev.runId; c.active = true; c.tools = []; c.asks = []; c.council = ev.source === 'council' || !!state.councils?.has(ev.parentRunId); break;
     case 'agent.tool_call': if (c.active) c.tools.push(ev.callId); break;
     case 'agent.tool_result': c.tools = c.tools.filter(id => id !== ev.callId); c.toolEndAt = ev.ts; break;
     case 'permission.prompt': if (c.active) c.asks.push({ promptId: ev.promptId, summary: ev.summary, scope: ev.scope, outsideWorkspace: ev.outsideWorkspace, runId: ev.runId }); break;
@@ -28,7 +29,7 @@ export function reduce(state, ev) {
     case 'run.error': c.errorAt = ev.ts; c.errorText = ev.message; break;
     case 'run.end':
       if (ev.runId !== c.runId) break;
-      c.active = false; c.tools = []; c.asks = []; c.talkAt = -Infinity;
+      c.active = false; c.tools = []; c.asks = []; c.talkAt = -Infinity; c.council = false;
       if (ev.reason !== 'done' && ev.reason !== 'cancelled') { c.errorAt = ev.ts; c.errorText ||= `Job ended: ${ev.reason}`; }
       break;
   }
@@ -55,5 +56,8 @@ export function modeOf(c, now) {
   if (c.active) return 'ready';
   return 'idle';
 }
+
+/** Is this creature at a council right now (the council job, or speaking at one)? The village sends it to the Ring. */
+export const inCouncil = c => !!(c && c.active && c.council);
 
 export const MODE_TEXT = { asleep: 'Asleep', asking: 'Needs your OK', working: 'Working', error: 'Something went wrong', talking: 'Thinking out loud', ready: 'On a job', idle: 'Free' };
