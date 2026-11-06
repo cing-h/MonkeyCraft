@@ -39,3 +39,37 @@ Added 2026-11-06.
 ---
 
 <!-- Add new items below as the user reports them, numbered in order. -->
+
+## 2. Reanimate the swinging and movement, as smoothly and dynamically as possible
+
+Added 2026-11-06.
+
+**What the user wants:** watch https://www.youtube.com/watch?v=9rdn26Hpdwo ("How Fast Can Gibbons Swing Through the Forest?") and reanimate the swinging and movement of the monkeys in the village, crew and background villagers alike, as smoothly and dynamically as possible.
+
+**Note:** Claude can't watch video, so only the page title was read. The design below rests on how gibbons are known to move, not on frames from that video. If the user wants specific moments matched, screenshots or a few frames from the video (as images) can be used as references.
+
+**Planned design:**
+- **Two swing styles**, chosen by speed and species:
+  - *Continuous* (slow, always one hand on): the current pendulum, tuned.
+  - *Ricochetal* (fast; gibbons especially): the ape lets go near the top of the forward swing and flies on a ballistic arc to the next hold, with no hand on the branch in between. Then it catches the hold with an outstretched arm and the swing absorbs the impact, a slight dip before the next pendulum.
+- **Real momentum:**
+  - Energy carries from swing to swing, so a fast ape speeds up over several swings, coasts, and slows by shortening its swings before it stops.
+  - It can pump to build speed.
+  - The gap it can cross grows with its speed.
+- **Body dynamics:**
+  - The torso rotates through the swing.
+  - The legs tuck on the upswing and extend on the down-swing, then trail during flight.
+  - The free arm reaches early for long gaps.
+  - The head stays steadier than the body, as a real animal keeps its eyes level.
+  - Fur or tail follow-through after a catch.
+- **Branch reaction:** branches dip and spring back at each catch, and leaves rustle.
+- **Ground and climbing:**
+  - The gibbon runs upright with its arms raised for balance.
+  - Chimps and gorillas knuckle-walk with a clearer weight shift.
+  - Mid-climb transitions are smoother, launches and landings have more anticipation, and turns are softer.
+- **Same truthful behaviour:** the modes and timings that come from events don't change; only how a creature moves between places does.
+- **Checks:**
+  - Frame-by-frame motion strips and per-frame jump measurements: no teleports, hands on the hold whenever they hold it, continuous flight arcs.
+  - The existing station tests still pass.
+  - A headless browser look at 20 fps.
+
