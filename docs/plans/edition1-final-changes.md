@@ -73,3 +73,37 @@ Added 2026-11-06.
   - The existing station tests still pass.
   - A headless browser look at 20 fps.
 
+
+## 3. Passive dialogue between the village members
+
+Added 2026-11-06.
+
+**What the user wants:** passive chatter between the monkeys in the village, written in monkey sounds, with the real English meaning in parentheses. For example: *"Hoo-hoo-hoo! (Nice weather for swinging.)"*
+
+**Planned design:**
+- **Speech bubbles:** small pixel bubbles over an ape's head. The sound is in bold, and the meaning is in parentheses in a smaller, softer type. The bubbles look clearly different from the crew's real status signs: the "…" plate for real thinking, and the yellow "?" and question bubble for real permission. Chatter can never be mistaken for work.
+- **Sounds that match each species:**
+  - gorilla: deep grunts (*"Hrrmph."*)
+  - gibbon: rising whoops (*"Whoop-whoop-whooo!"*)
+  - chimp: pant-hoots (*"Ooh-ooh-aah-aah!"*)
+  - orangutan: kiss-squeaks (*"Mwah-squeak."*)
+  - bonobo: high peeps (*"Hee-hee!"*)
+  - mandrill: low rumbles (*"Grrrumf."*)
+  - snow monkey: chirps (*"Kii-kii."*)
+  - howler: roars (*"HOOOooOOH!"*)
+  - capuchin (the Clerk, if built): trills (*"Chirr-chirr."*)
+- **Conversations:**
+  - Two apes near each other trade a short back-and-forth of two to four lines; a lone ape mutters now and then.
+  - The background villagers chatter too, from their branch, with smaller, fainter bubbles.
+  - The pacing is calm: at most one or two bubbles on screen at once, each up long enough to read.
+- **Truthful station, kept:**
+  - Chatter is scenery. It never claims work that isn't happening.
+  - Crew members chat only when they're free (idle) or asleep (sleep-talk: *"Zzz-hoo… (Bananas…)"*).
+  - Lines that mention the crew's work are only picked from real events. For example, after a job really finished: *"Ooh-aah! (The Smith just finished a job!)"*, or, after a real permission question: *"Hrrmph? (Someone's waiting for your OK.)"*
+  - A crew member that's busy doesn't chat.
+- **Written lines, not AI:** the lines are a hand-written pool of a few hundred, mixed and varied, so the chatter costs no tokens and can't say anything odd.
+- **Controls:** a "Village chatter" on/off switch in Settings. Chatter is off when the system asks for reduced motion, and the bubbles are hidden from screen readers (scenery only).
+- **Checks:**
+  - Tests: no chatter from a busy crew member; work-related lines only after the matching real event.
+  - Bubbles never overlap the question bubble.
+  - A screenshot and a frame strip to judge readability.
