@@ -10,7 +10,7 @@ Before changing this plan, also load: memory `monkeycraft-decisions`, and the va
 **What Edition 1 does.** You open MonkeyCraft in a window and see the station floor. You type a job to the Voidwyrm, for example "find out why my script fails and fix it". The Voidwyrm makes a plan and hands pieces to the crew: Hollow Plate researches the web, Cinder Smith runs commands, the Bone Scribe reads and files documents, the Silkscript Spider writes text and the Prism Gargoyle checks the result. You watch them walk to their stations and work. Every animation comes from something the AI is really doing.
 
 **How it stays safe and cheap.**
-- The crew can work anywhere on your computer (your choice). Its home base is an MonkeyCraft workspace folder.
+- The crew can work anywhere on your computer (your choice). Its home base is a MonkeyCraft workspace folder.
 - Anything that changes files or runs commands asks you first, unless you've already said yes to that kind of action. Changes outside the workspace always ask, every time.
 - A short never-touch list is blocked outright: system folders, your keys and passwords, and MonkeyCraft's own records.
 - Before a creature changes a file, MonkeyCraft saves a copy, so you can undo it.
