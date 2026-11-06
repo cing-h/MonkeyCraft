@@ -17,3 +17,4 @@ The user directs and never writes code; Claude writes all of it. Explain changes
 - Reach is the whole computer, so every path or shell change goes through: hardline list → outside-workspace prompt → undo copy (see PLAN.md).
 - No runtime dependencies without a reason. Pin exact versions when one is added.
 - Remove the Claude Co-author line after any changes or additions to the Repo.
+- Exception to the owner's general standards for THIS project: ignore "one feature per session". Keep building AutoCraft features in the same session; don't hand off to a new session just because a feature is done. (Owner's decision, 2026-11-06.)
