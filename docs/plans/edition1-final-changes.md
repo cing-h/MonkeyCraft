@@ -4,6 +4,7 @@ Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 →
 - Item 2: DONE on `feature/swing-reanimation` (pushed).
 - Item 3: DONE on `feature/village-chatter` (pushed).
 - Item 4: DONE on `feature/claude-link`.
+- Item 6: DONE on `feature/chief-roams`.
 
 Each item records what the user asked for, the decisions already made, and an outline of how to build it.
 
@@ -193,7 +194,18 @@ Added 2026-11-06.
 
 ## 6. The Chief roams: occasional walks and changing rest poses on his platform
 
-Added 2026-11-06. The user asked for it to be built right after item 4.
+Added 2026-11-06. The user asked for it to be built right after item 4. **DONE** (branch `feature/chief-roams`). What was built:
+- `ui/station/ape/chief.js`, the Chief's free-time planner (pure, with an injected random source):
+  - He changes rest pose every 20–60 s, never repeating the same pose twice running.
+  - He walks every 4–8 minutes.
+  - With reduced motion: a new pose every 45–90 s, a walk every 10–15 minutes, and slower blends between poses.
+- Three new poses in `cast.js`: `lieSide` (propped on an elbow), `lieBack` (one knee up, hands on his belly) and `lean` (sitting back against the great tree), plus the existing `sit`. They breathe slowly and blend in over 0.7 s.
+- Rest spots: open planks either side of the trunk, or leaning against the trunk.
+- A walk: across the platform → down the rope ladder → stroll to a spot in the village → a look round for 4–9 s → back up the ladder → settle into a new pose.
+- The scene's trip planner now routes between the platform and the ground by the ladder, and climbs go both ways. A trip that starts mid-climb carries on, or turns round if the new trip heads back where the climb began.
+- Truthful: the planner only runs while he's free. A job interrupts at once, and he hurries home and goes inside, whether he was resting, halfway down the ladder or out on the path.
+- Fixed on the way, an item-2 bug: the frame a swinging ape lets go of the branch to drop down was drawn as a swing with no branch, which crashed the drawing. It now switches to the leap at once.
+- Checks: `test/chief.test.js` covers the timing, that all four poses are used, that rest spots are on the platform, reduced motion, a full walk, and a job interrupting at three stages. 87 tests pass. Frame shots of each pose, the ladder and the stroll were looked at.
 
 **What the user wants:** the Chief walks around once in a while, but much less often than the other monkeys. He also moves around his lodge platform, changing between lying and sitting positions fairly often.
 

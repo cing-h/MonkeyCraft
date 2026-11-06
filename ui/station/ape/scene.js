@@ -22,6 +22,7 @@ import { makeVillagers, stepVillager, villagerPose } from './villagers.js';
 import { buildFrame, drawVines } from './frame.js';
 import { makeBrachiator, stepPose, brachiatePose } from './swing.js';
 import { makeChatter } from './chatter.js';
+import { LADDER_X, makeChiefIdle } from './chief.js';
 
 
 // ---------- 5×5 plate glyphs ----------
@@ -55,32 +56,54 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   for (const k of CREW) { const d = DOORS[k]; actors[k] = { key: k, lane: d.lane, x: d.x, legs: [], facing: -1, phase: rnd() * 6, spd: 0, anim: 'stand', prev: null, q: null, blend: 1, wait: 1 + rnd() * 3, inside: false, atDoor: true, mode: 'idle', tailA: 0.5, tailV: 0, idle: 'stand', idleT: 2 + rnd() * 3 }; }
 
   const surfaceY = (lane, x) => lane === 'ground' ? groundY(x) : lane === 'perch' ? PERCH_Y : branchY(x);
+  // where the pelvis is at each end of a climb: the foot of a trunk or ladder, the canopy branch, the lodge platform
+  const climbLevel = (lane, x, sp) => lane === 'ground' ? groundY(x) - 8 : lane === 'perch' ? PERCH_Y - 4 : branchY(x) + (sp.canopy?.startsWith('brachiate') ? 12 : -6);
   const strideOf = sp => (sp.posture === 'biped' ? 2.6 : 2.2) * (sp.ul + sp.ll);
+  // Plan a trip as legs: walk/swing along a lane, climb a trunk or the lodge ladder, or drop from the canopy.
   function plan(a, lane, x) {
-    a.legs = [];
-    if (a.lane === lane || lane === 'perch' || a.lane === 'perch') { a.legs.push({ k: 'move', x }); return; }
-    if (a.lane === 'canopy') { a.legs.push({ k: 'move', x: Math.max(30, Math.min(930, x + (x > a.x ? -14 : 14))) }, { k: 'drop' }, { k: 'move', x }); return; }   // swing over, then leap down
-    const tx = TRUNKS.reduce((b, c) => Math.abs(a.x - c) + Math.abs(c - x) < Math.abs(a.x - b) + Math.abs(b - x) ? c : b);
-    a.legs.push({ k: 'move', x: tx - 8 }, { k: 'climb', x: tx }, { k: 'move', x });
+    const cl = a.climbY !== undefined && a.legs[0] && a.legs[0].k === 'climb' ? a.legs[0] : null;
+    const legs = a.legs = [];
+    let from = a.lane, at = a.x;
+    if (cl) {   // caught mid-climb: carry on, or turn round if the new trip goes back where the climb started
+      const back = lane === cl.from;
+      legs.push(back ? { k: 'climb', x: cl.x, from: cl.to, to: cl.from } : cl); from = back ? cl.from : cl.to; at = cl.x;
+    }
+    while (from !== lane) {
+      if (from === 'perch') { legs.push({ k: 'move', x: LADDER_X }, { k: 'climb', x: LADDER_X, from: 'perch', to: 'ground' }); from = 'ground'; at = LADDER_X; }
+      else if (from === 'canopy') { const to = lane === 'perch' ? LADDER_X : x, lx = Math.max(30, Math.min(930, to + (to > at ? -14 : 14))); legs.push({ k: 'move', x: lx }, { k: 'drop' }); from = 'ground'; at = lx; }   // swing over, then leap down
+      else if (lane === 'perch') { legs.push({ k: 'move', x: LADDER_X }, { k: 'climb', x: LADDER_X, from: 'ground', to: 'perch' }); from = 'perch'; at = LADDER_X; }
+      else { const tx = TRUNKS.reduce((b, c) => Math.abs(at - c) + Math.abs(c - x) < Math.abs(at - b) + Math.abs(b - x) ? c : b); legs.push({ k: 'move', x: tx - 8 }, { k: 'climb', x: tx, from: 'ground', to: 'canopy' }); from = 'canopy'; at = tx; }
+    }
+    legs.push({ k: 'move', x });
   }
-  function setAnim(a, anim) { if (a.anim !== anim) { a.prev = a.q; a.blend = 0; a.anim = anim; } }
+  function setAnim(a, anim, blendT = 0.22) { if (a.anim !== anim) { a.prev = a.q; a.blend = 0; a.anim = anim; a.blendT = blendT; } }
+
+  // The Chief's free time (chief.js): rest poses on the lodge platform, and now and then a stroll through the village.
+  const chiefIdle = makeChiefIdle({ rnd: () => rnd(), reduced });
+  function chiefFree(a, dt) {
+    if (a.lane === 'ground') {                     // on a stroll: have a look round, then climb back up to the lodge
+      if ((a.linger -= dt) > 0) return;
+      plan(a, 'perch', LADDER_X - 8); a.rest = null; chiefIdle.interrupt(); return;
+    }
+    const act = chiefIdle.step(dt); if (!act) return;
+    if (act.kind === 'rest') { a.rest = act; a.legs = [{ k: 'move', x: act.x }]; }
+    else { a.rest = null; a.linger = act.linger; plan(a, 'ground', act.x); }
+  }
 
   function update(dt, now) {
     for (const a of Object.values(actors)) {
       const sp = SPECIES[a.key], mode = modeOf(a.key, now), d = DOORS[a.key];
-      a.mode = mode; a.blend = Math.min(1, a.blend + dt / 0.22);
+      a.mode = mode; a.blend = Math.min(1, a.blend + dt / (a.blendT || 0.22));
       if (mode !== 'working') a.inside = false;
-      if (mode === 'asleep') { Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true }); setAnim(a, 'sleep'); continue; }
+      if (mode === 'asleep') { Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true, climbY: undefined, rest: null }); setAnim(a, 'sleep'); continue; }
       const home = mode !== 'idle';
-      if (a.key === 'chief') {
-        a.atDoor = true; a.inside = mode === 'working'; a.facing = 1;
-        a.idleT -= dt; if (a.idleT <= 0) { a.idle = ['sit', 'look', 'sit', 'chestbeat'][Math.floor(rnd() * 4)]; a.idleT = a.idle === 'chestbeat' ? 1.6 : 3 + rnd() * 3; }
-        setAnim(a, home ? (mode === 'talking' ? 'talk' : 'stand') : a.idle); continue;
-      }
+      if (a.key === 'chief' && home && !a.called) { a.called = true; a.rest = null; chiefIdle.interrupt(); }   // a job sends him straight back to his station
+      if (!home) a.called = false;
       const last = a.legs[a.legs.length - 1], goingHome = last && last.home;
       if (home && !goingHome && !(a.atDoor && a.lane === d.lane)) { plan(a, d.lane, d.x); a.legs[a.legs.length - 1].home = true; }
       if (!home && goingHome && !a.air && !(a.br && a.br.mode === 'flight') && a.anim !== 'climb') a.legs = [];
-      if (!home && !a.legs.length && !a.air) {
+      if (!home && !a.legs.length && !a.air && a.key === 'chief') chiefFree(a, dt);
+      else if (!home && !a.legs.length && !a.air) {
         a.wait -= dt;
         if (a.wait <= 0) {
           const up = sp.canopy && (a.lane === 'canopy' ? rnd() < 0.55 : rnd() < 0.4);
@@ -96,7 +119,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       } else if (leg && leg.k === 'drop') {
         if (a.br) {                                        // let go of the branch: the swing's own speed carries into the fall
           const [cx, cy] = a.br.chest(), [vx, vy] = a.br.velocity();
-          a.air = { x: cx, y: cy + sp.tl, vx: Math.max(-40, Math.min(40, vx || a.facing * 10)), vy: Math.min(20, vy) }; a.facing = Math.sign(a.air.vx) || a.facing; a.br = null;
+          a.air = { x: cx, y: cy + sp.tl, vx: Math.max(-40, Math.min(40, vx || a.facing * 10)), vy: Math.min(20, vy) }; a.facing = Math.sign(a.air.vx) || a.facing; a.br = null; setAnim(a, 'leap');
         } else {                                           // a branch-walker crouches, then jumps down
           a.prepT = (a.prepT ?? 0.16) - dt; setAnim(a, 'land');
           if (a.prepT <= 0) { a.prepT = undefined; a.air = { x: a.x, y: branchY(a.x) - 2, vx: a.facing * (12 + sp.walk * 0.6), vy: -26 }; }
@@ -123,11 +146,11 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
         }
       } else if (leg && leg.k === 'climb') {
         a.br = null; a.x = leg.x; a.facing = 1; setAnim(a, 'climb');
-        a.climbY = a.climbY ?? groundY(a.x) - 8;
-        const surge = 0.3 + 0.7 * pos(Math.sin(a.phase + Math.PI)), step = (home ? 22 : 14) * surge * dt;
+        const y0 = climbLevel(leg.from || 'ground', a.x, sp), y1 = climbLevel(leg.to || 'canopy', a.x, sp), dir = Math.sign(y1 - y0) || -1;
+        a.climbY = a.climbY ?? y0;
+        const surge = 0.3 + 0.7 * pos(Math.sin(a.phase + Math.PI)), step = (home ? 22 : 14) * (dir > 0 ? 1.25 : 1) * surge * dt;   // a little quicker going down
         a.phase += dt * (home ? 7 : 5);
-        const top = branchY(a.x) + (sp.canopy?.startsWith('brachiate') ? 12 : -6);
-        if (a.climbY - step <= top) { a.lane = 'canopy'; a.climbY = undefined; a.legs.shift(); a.spd = 0; } else a.climbY -= step;
+        if ((y1 - a.climbY) * dir <= step) { a.lane = leg.to || 'canopy'; a.climbY = undefined; a.legs.shift(); a.spd = 0; } else a.climbY += dir * step;
       } else {
         // standing still: hold a hang, or idle on the ground / branch
         if (a.lane === 'canopy' && AGILE[sp.canopy]) {
@@ -138,9 +161,14 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
         } else {
           a.spd = 0;
           if (a.lane === d.lane && Math.abs(a.x - d.x) < 0.5) a.atDoor = true;
-          if (home && a.atDoor) a.facing = -1;
-          a.idleT -= dt; if (a.idleT <= 0) { a.idle = ['stand', 'look', 'sit', 'scratch', 'stand'][Math.floor(rnd() * 5)]; a.idleT = 2.5 + rnd() * 3; }
-          setAnim(a, home ? (mode === 'asking' ? 'wave' : mode === 'error' ? 'slump' : mode === 'talking' ? 'talk' : 'stand') : (a.lane === 'canopy' ? 'stand' : a.idle));
+          if (home && a.atDoor) a.facing = a.key === 'chief' ? 1 : -1;
+          if (a.key === 'chief') {                        // on his platform or out on a stroll; he keeps his dignity when asking
+            if (!home && a.rest && a.lane === 'perch') { a.facing = a.rest.facing; setAnim(a, a.rest.pose, chiefIdle.timing.blend); }
+            else setAnim(a, home ? (mode === 'talking' ? 'talk' : 'stand') : a.lane === 'ground' ? 'look' : 'stand');
+          } else {
+            a.idleT -= dt; if (a.idleT <= 0) { a.idle = ['stand', 'look', 'sit', 'scratch', 'stand'][Math.floor(rnd() * 5)]; a.idleT = 2.5 + rnd() * 3; }
+            setAnim(a, home ? (mode === 'asking' ? 'wave' : mode === 'error' ? 'slump' : mode === 'talking' ? 'talk' : 'stand') : (a.lane === 'canopy' ? 'stand' : a.idle));
+          }
         }
       }
       a.inside = mode === 'working' && a.atDoor;
@@ -257,7 +285,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       fb.pid = ID[k];
       const sp = SPECIES[k], target = poseFor(a), q = blendPose(a.prev, target, a.blend * a.blend * (3 - 2 * a.blend)); q.tail = a.tailA; a.q = q;
       let at;
-      if (a.anim === 'climb') at = { mode: 'pelvis', x: a.x - (k === 'chief' ? 13 : 7), y: a.climbY };
+      if (a.anim === 'climb') at = { mode: 'pelvis', x: a.x - (k === 'chief' ? 4 : 7), y: a.climbY };
       else if (a.anim === 'brach' && a.br) { const p = brachiatePose(sp, a.br, 1, { fast: sp.canopy === 'brachiate-fast' }); at = { mode: 'pelvis', x: p.px, y: p.py }; if (a.blend >= 1) { Object.assign(q, p.q); q.tail = a.tailA; } }
       else if (a.anim === 'leap') at = { mode: 'pelvis', x: a.x, y: a.air ? a.air.y - 4 : groundY(a.x) - 6 };
       else at = { mode: 'ground', x: a.x, y: surfaceY(a.lane, a.x) - (a.lane === 'canopy' ? 1.5 : 0) };
@@ -301,7 +329,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
 
   const clampCam = x => Math.max(0, Math.min(WORLD - W, x));
   return {
-    _actors: actors, _villagers: villagers,
+    _actors: actors, _villagers: villagers, _chiefIdle: chiefIdle,
     step(now, dt = 0.05) { t += dt; update(dt, now); draw(now); },
     redraw(now) { draw(now); },
     camera: () => cam,

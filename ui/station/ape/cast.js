@@ -126,6 +126,13 @@ export const P = {
       hip: [0.15, -0.1], kn: [-0.2, -0.15], tail: 0.8, lift: pos(hop) };
   },
   talk(sp, t) { const b = P.stand(sp, t); return { ...b, sh: [b.sh[0] + 0.5 + Math.sin(t * 5) * 0.3, b.sh[1]], el: [-0.8 + Math.sin(t * 5 + 1) * 0.3, b.el[1]], head: b.head + Math.sin(t * 6) * 0.08 }; },
+  // the Chief's rest poses on his platform (see chief.js); slow breathing keeps them alive
+  lieSide(sp, t) { const br = Math.sin(t * 1.1) * 0.03;   // on his side, propped up on one elbow, legs stretched out behind
+    return { torso: 1.2 + br, plant: 'all', head: -0.95 + Math.sin(t * 0.4) * 0.15, sh: [0.15, 0.55], el: [1.35, 1.1], hip: [-1.25, -0.95], kn: [0.1, -0.5], tail: 1.2, sitting: true, lying: true, lift: 0 }; },
+  lieBack(sp, t) { const br = Math.sin(t * 1.1) * 0.03;   // flat on his back, hands on his belly, one knee up
+    return { torso: -1.5 + br, plant: 'all', head: -0.15 + Math.sin(t * 0.35) * 0.12, sh: [1.15, 0.95], el: [-2.0, -1.8], hip: [2.75, 1.6], kn: [-2.55, -0.15], tail: 1.2, sitting: true, lying: true, lift: 0 }; },
+  lean(sp, t) { const br = Math.sin(t * 1.4) * 0.02;      // sitting back against the trunk, legs out, hands in his lap
+    return { torso: -0.32 + br, plant: 'feet', head: 0.2 + Math.sin(t * 0.5) * 0.2, sh: [0.55, 0.35], el: [-1.15, -0.95], hip: [1.45, 1.6], kn: [-0.45, -0.2], tail: 1.2, sitting: true, lift: 0 }; },
   chestbeat(sp, t) {
     const f = Math.sin(t * 16);
     return { torso: 0.02, plant: 'feet', head: -0.4, sh: [1.25 + 0.3 * f, 1.25 - 0.3 * f], el: [-2.25, -2.25], hip: [0.12, -0.1], kn: [-0.1, -0.05], lift: 0, tail: 0 };
