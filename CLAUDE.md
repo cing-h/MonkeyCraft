@@ -15,3 +15,4 @@ The user directs and never writes code; Claude writes all of it. Explain changes
 - Tool dispatch never throws; tool writes refuse truncated arguments.
 - Reach is the whole computer, so every path or shell change goes through: hardline list → outside-workspace prompt → undo copy (see PLAN.md).
 - No runtime dependencies without a reason. Pin exact versions when one is added.
+- Remove the Claude Co-author line after any changes or additions to the Repo.
