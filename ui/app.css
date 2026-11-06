@@ -81,6 +81,8 @@ h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--leaf); margin: 
 .crew li { border: 2px solid var(--bark); background: var(--moss); box-shadow: inset 2px 2px 0 var(--moss-hi), inset -2px -2px 0 var(--moss-lo); padding: 5px 8px; cursor: pointer; }
 .crew li:hover { border-color: var(--leaf); }
 .crew li.asleep { opacity: .55; }
+.crew li .home { display: block; font: 9px var(--label); letter-spacing: .06em; color: var(--muted); margin-top: 2px; }
+.crew li.plots { border-style: dashed; }
 .crew li.working { border-color: var(--ok); }
 .crew li.asking { border-color: var(--warn); }
 .crew li.error { border-color: var(--bad); }

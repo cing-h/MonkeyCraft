@@ -16,6 +16,12 @@ export const DOORS = {
   writer: { lane: 'ground', x: 398 }, inspector: { lane: 'ground', x: 606 }, sage: { lane: 'ground', x: 734 }, ringer: { lane: 'ground', x: 848 }
 };
 export const PERCH_Y = 34;
+/** Where each crew member lives: the story and the place (shown in the roster). A crew member who moves into a canopy plot gets `plot` (see canopy.js PLOTS). */
+export const HOMES = {
+  chief: { story: 'Ground', place: 'the lodge in the great tree' }, scout: { story: 'Ground', place: 'the lookout on the low branch' },
+  smith: { story: 'Ground', place: 'the smithy' }, archivist: { story: 'Ground', place: 'the archive on stilts' }, writer: { story: 'Ground', place: 'the lantern-lit hut' },
+  inspector: { story: 'Ground', place: 'the workshop' }, sage: { story: 'Ground', place: 'the bathhouse' }, ringer: { story: 'Ground', place: 'the bell tower' }
+};
 
 export function buildLayers() {
   // tall layers cover all three stories (world y TOP..H); the others only the ground village

@@ -238,7 +238,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     for (const k of CREW) { const h = heads[k], a = actors[k]; if (h && !a.inside) speakers.push({ ref: `crew:${k}`, kind: 'crew', species: k, mode: a.mode, x: h.headX - cam, y: h.headY }); }
     villagers.forEach((v, i) => { if (vheads[i]) speakers.push({ ref: `v:${i}`, kind: 'villager', species: v.key, mode: 'idle', x: vheads[i].x, y: vheads[i].y }); });
     folk.forEach((a, i) => { const h = fheads[i]; if (h) speakers.push({ ref: `f:${i}`, kind: 'villager', species: a.key, mode: 'idle', x: h.headX - cam, y: h.headY }); });
-    chat = reduced ? [] : chatter.step(dt, { speakers });
+    chat = reduced ? [] : chatter.step(dt, { speakers, width: VW });
     for (const v of villagers) if (stepVillager(v, dt, rnd) === 'catch') shake(v.b.hx, v.b.branchY(v.b.hx), 0.55, v.fast ? 3 : 1);
     for (let i = leaves.length - 1; i >= 0; i--) { const l = leaves[i]; l.life -= dt; l.ph += dt * 5; l.vy = Math.min(9, l.vy + 18 * dt); l.vx *= 0.97; l.x += (l.vx + Math.sin(l.ph) * 6) * dt; l.y += l.vy * dt; if (l.life <= 0 || l.y > WATER) leaves.splice(i, 1); }
     toucan.update(dt);

@@ -5,7 +5,7 @@ Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 →
 - Item 3: DONE on `feature/village-chatter` (pushed).
 - Item 4: DONE on `feature/claude-link`.
 - Item 6: DONE on `feature/chief-roams`.
-- Item 5: BUILDING on `feature/canopy-stories` (plan: `docs/plans/canopy-stories.md`). Phase 1 (world, camera and art) done. Phase 2 now also includes the user's culture, decorations, Council Ring and real council (added 2026-11-06). Phase 2 done (2a roaming, 2b culture and the Ring, 2c the real council); phase 3 (finish) is next.
+- Item 5: BUILDING on `feature/canopy-stories` (plan: `docs/plans/canopy-stories.md`). Phase 1 (world, camera and art) done. Phase 2 now also includes the user's culture, decorations, Council Ring and real council (added 2026-11-06). Phase 2 done (2a roaming, 2b culture and the Ring, 2c the real council). Phase 3 done (zoom, homes in the roster). Waiting for the user's live look; item 1 (the Clerk) is next.
 
 Each item records what the user asked for, the decisions already made, and an outline of how to build it.
 

@@ -25,7 +25,8 @@ export function makeChatter({ rnd, maxBubbles = 2 }) {
     bubbles.push({ id: ++nid, ref: sp.ref, sound, meaning, age: 0, life: lifeOf(meaning), faint: sp.kind === 'villager', kind: sp.kind });
     return true;
   }
-  const onScreen = sp => sp.x > 8 && sp.x < SCREEN_W - 8;
+  let screenW = SCREEN_W;   // the view's width (wider when zoomed out)
+  const onScreen = sp => sp.x > 8 && sp.x < screenW - 8;
   const canTalk = sp => onScreen(sp) && (sp.kind === 'villager' || sp.mode === 'idle');
 
   return {
@@ -37,6 +38,7 @@ export function makeChatter({ rnd, maxBubbles = 2 }) {
      * coordinates (x on screen, 0–320). Returns the bubbles to show.
      */
     step(dt, world) {
+      screenW = world.width || SCREEN_W;
       const speakers = world.speakers || [], byRef = new Map(speakers.map(s => [s.ref, s]));
       for (let i = bubbles.length - 1; i >= 0; i--) {
         const b = bubbles[i]; b.age += dt;

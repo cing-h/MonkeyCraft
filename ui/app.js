@@ -4,6 +4,8 @@
 
 import { initialState, reduce, modeOf, inCouncil, MODE_TEXT } from './station/state.js';
 import { makeStation, CREW_IDS } from './station/ape/scene.js';
+import { HOMES } from './station/ape/world.js';
+import { PLOTS } from './station/ape/canopy.js';
 
 const $ = id => document.getElementById(id);
 const H = { 'content-type': 'application/json', 'x-monkeycraft': '1' };
@@ -207,11 +209,20 @@ function syncStrip(now) {
   const ul = $('crew-status'); ul.replaceChildren();
   crew.forEach((c, i) => {
     const m = modes[i], li = el('li', m + (filter === c.id ? ' sel' : ''));
+    const home = HOMES[c.id];
     li.append(el('span', 'n', c.name.toUpperCase()), el('span', 'st', m === 'asleep' ? `Asleep · wakes in ${wakes[c.id]}` : MODE_TEXT[m]));
+    if (home) li.append(el('span', 'home', `HOME · ${home.story.toUpperCase()} · ${home.plot ? `PLOT ${home.plot.toUpperCase()}` : home.place.toUpperCase()}`));
     li.tabIndex = 0; li.onclick = () => setFilter(c.id); li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilter(c.id); } };
     ul.append(li);
   });
+  // the tree-house plots kept free for future crew members, on each canopy story
+  const taken = new Set(Object.values(HOMES).map(h => h.plot).filter(Boolean)), free = s => PLOTS.filter(p => p.story === s && !taken.has(p.id)).length;
+  const li = el('li', 'plots'); li.tabIndex = 0; li.title = 'Empty tree-house plots on the canopy stories, kept for future crew members. Click to look at Canopy 1.';
+  li.append(el('span', 'n', 'FREE TREE-HOUSE PLOTS'), el('span', 'st', `Canopy 1: ${free(1)} · Canopy 2: ${free(2)}`));
+  li.onclick = () => { setZoomTo1(); station.toStory(1); syncStories(); }; li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.onclick(); } };
+  ul.append(li);
 }
+const setZoomTo1 = () => { if (station.zoom() !== 1) { station.setZoom(1); syncZoom(); syncThumb(); } };
 const bubbles = new Map(); // promptId -> element
 function syncBubbles() {
   const live = new Set();

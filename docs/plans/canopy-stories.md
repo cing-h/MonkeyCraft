@@ -61,7 +61,12 @@ Branch `feature/canopy-stories`, built on `feature/chief-roams`. The design is i
        - nothing is reported when nothing is significant;
        - council apes go to the Ring only while the council job runs;
        - a live council run.
-3. **Finish.**
+3. **Finish.** DONE (2026-11-06), apart from the user's live look.
+   - The user added a zoom: 1×, 1.5×, 2× and ALL (the whole village). The view controls moved to a bar over the village.
+   - The roster shows each crew member's home, and counts the free tree-house plots on each canopy story.
+   - Chatter works across the wider zoomed views.
+   - Speed: about 5 ms a frame at 1×, and 28 ms for the whole village (the tick is 50 ms).
+   - Planned (kept for reference):
    - Chatter bubbles follow the camera.
    - The roster says which story and plot a crew member's house is on.
    - Speed checks.
