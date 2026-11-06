@@ -3,7 +3,7 @@
 // If an event didn't arrive, nothing on the page pretends it happened.
 
 import { initialState, reduce, modeOf, MODE_TEXT } from './station/state.js';
-import { makeStation, CREW_IDS, SCENE_W } from './station/ape/scene.js';
+import { makeStation, CREW_IDS, SCENE_W, SCENE_H } from './station/ape/scene.js';
 
 const $ = id => document.getElementById(id);
 const H = { 'content-type': 'application/json', 'x-monkeycraft': '1' };
@@ -216,7 +216,7 @@ function syncBubbles() {
       const btns = el('div', 'btns'); answerButtons(ask, btns); b.append(btns);
       $('overlay').append(b); bubbles.set(ask.promptId, b);
     }
-    if (!b.dataset.shown) { b.dataset.shown = '1'; station.scrollTo(station.positionOf(id)); station.redraw(Date.now()); syncThumb(); } // bring the asker into view
+    if (!b.dataset.shown) { b.dataset.shown = '1'; station.focus(id); station.redraw(Date.now()); syncThumb(); } // bring the asker into view
     const [x, y] = station.anchor(id);
     b.style.left = Math.max(170, Math.min(x, $('stage').clientWidth - 170)) + 'px';
     b.style.top = Math.max(b.offsetHeight + 14, y) + 'px';
@@ -288,17 +288,35 @@ if (mailOpen.size) station.mail(true, false);   // requests opened before the vi
 // scrolling the village: buttons, arrow keys and drag; a click without a drag picks a crew member
 const WORLD_W = 960;
 function syncThumb() { const t = $('thumb'); t.style.width = (SCENE_W / WORLD_W * 100) + '%'; t.style.left = (station.camera() / WORLD_W * 100) + '%'; }
-const scrollBy = dx => { station.scrollBy(dx); station.redraw(Date.now()); syncThumb(); syncBubbles(); };
+const scrollBy = (dx, dy = 0) => { station.scrollBy(dx, dy); station.redraw(Date.now()); syncThumb(); syncStories(); syncBubbles(); };
+// the three stories: Ground, Canopy 1, Canopy 2 (▲ goes up a story, ▼ down)
+let shownStory = -1;
+function syncStories() { const k = station.story(); if (k === shownStory) return; shownStory = k; for (const b of $('stories').querySelectorAll('button')) b.setAttribute('aria-pressed', String(+b.dataset.story === k)); }
+const toStory = k => { station.toStory(k); syncStories(); };
 $('scroll-l').onclick = () => scrollBy(-120);
 $('scroll-r').onclick = () => scrollBy(120);
+$('scroll-u').onclick = () => toStory(station.story() + 1);
+$('scroll-d').onclick = () => toStory(station.story() - 1);
+for (const b of $('stories').querySelectorAll('button')) b.onclick = () => toStory(+b.dataset.story);
 const canvas = $('scene');
-canvas.addEventListener('keydown', e => { if (e.key === 'ArrowLeft') { e.preventDefault(); scrollBy(-24); } if (e.key === 'ArrowRight') { e.preventDefault(); scrollBy(24); } });
+canvas.addEventListener('keydown', e => {
+  const k = { ArrowLeft: [-24, 0], ArrowRight: [24, 0], ArrowUp: [0, -24], ArrowDown: [0, 24] }[e.key];
+  if (k) { e.preventDefault(); scrollBy(...k); }
+  if (e.key === 'PageUp' || e.key === 'PageDown') { e.preventDefault(); toStory(station.story() + (e.key === 'PageUp' ? 1 : -1)); }
+});
+// the mouse wheel scrolls up and down the stories (sideways with Shift or a sideways swipe); at the top or bottom the page scrolls as usual
+canvas.addEventListener('wheel', e => {
+  const r = canvas.getBoundingClientRect(), k = SCENE_W / r.width, side = e.shiftKey || Math.abs(e.deltaX) > Math.abs(e.deltaY);
+  const before = [station.camera(), station.cameraY()];
+  if (side) scrollBy((e.deltaX || e.deltaY) * k * 0.5); else scrollBy(0, e.deltaY * k * 0.35);
+  if (station.camera() !== before[0] || station.cameraY() !== before[1]) e.preventDefault();
+}, { passive: false });
 let drag = null;
-canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, moved: 0 }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); });
 canvas.addEventListener('pointermove', e => {
   if (!drag) return;
-  const r = canvas.getBoundingClientRect(), dx = (e.clientX - drag.x) / r.width * SCENE_W;
-  if (Math.abs(e.clientX - drag.x) > 3 || drag.moved) { drag.moved += Math.abs(dx); canvas.classList.add('dragging'); drag.x = e.clientX; scrollBy(-dx); }
+  const r = canvas.getBoundingClientRect(), dx = (e.clientX - drag.x) / r.width * SCENE_W, dy = (e.clientY - drag.y) / r.height * SCENE_H;
+  if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 3 || drag.moved) { drag.moved += Math.abs(dx) + Math.abs(dy); canvas.classList.add('dragging'); drag.x = e.clientX; drag.y = e.clientY; scrollBy(-dx, -dy); }
 });
 canvas.addEventListener('pointerup', e => {
   const was = drag; drag = null; canvas.classList.remove('dragging');
@@ -363,4 +381,4 @@ es.onmessage = m => { try { onEvent(JSON.parse(m.data)); } catch (e) { console.e
 
 // draw at once (don't wait for the first tick), then 20 steps a second so moves flow smoothly
 station.step(Date.now(), 0.05); syncStrip(Date.now());
-setInterval(() => { const now = Date.now(); station.step(now, 0.05); syncStrip(now); syncBubbles(); syncChatter(); }, 50);
+setInterval(() => { const now = Date.now(); station.step(now, 0.05); syncStrip(now); syncBubbles(); syncChatter(); syncStories(); }, 50);

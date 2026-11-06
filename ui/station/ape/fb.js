@@ -2,6 +2,9 @@
 // No anti-aliasing; painter's order; every pixel can carry a pick id.
 
 export const W = 320, H = 180, WORLD = 960, GROUND = 110;
+// The world is three stories tall: the ground village (world y 0..180), Canopy 1 (−180..0) and Canopy 2 (−360..−180).
+export const TOP = -2 * H;
+export const STORIES = [{ name: 'Ground', camY: 0 }, { name: 'Canopy 1', camY: -H }, { name: 'Canopy 2', camY: -2 * H }];
 export const FOG = [126, 146, 140], SUN = [255, 214, 158];
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const mixc = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
@@ -25,22 +28,23 @@ export function shade(m, nx, ny, nz) {
 
 // ---------- a tiny software framebuffer (no anti-aliasing, painter's order) ----------
 export class FB {
-  constructor(w, h) { this.w = w; this.h = h; this.d = new Uint8ClampedArray(w * h * 4); this.id = new Int16Array(w * h).fill(-1); this.fog = 0; this.fogc = FOG; this.ox = 0; this.pid = -1; }
+  constructor(w, h, oy = 0) { this.w = w; this.h = h; this.oy = oy;   // oy: the world y of row 0 (the camera height, for the screen)
+    this.d = new Uint8ClampedArray(w * h * 4); this.id = new Int16Array(w * h).fill(-1); this.fog = 0; this.fogc = FOG; this.ox = 0; this.pid = -1; }
   put(x, y, c) {
-    x |= 0; y |= 0; if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+    x |= 0; y = Math.floor(y - this.oy); if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
     const i = (y * this.w + x), o = i * 4, f = this.fog;
     this.d[o] = f ? lerp(c[0], this.fogc[0], f) : c[0]; this.d[o + 1] = f ? lerp(c[1], this.fogc[1], f) : c[1]; this.d[o + 2] = f ? lerp(c[2], this.fogc[2], f) : c[2]; this.d[o + 3] = 255;
     this.id[i] = this.pid;
   }
   add(x, y, c, a) {
-    x |= 0; y |= 0; if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+    x |= 0; y = Math.floor(y - this.oy); if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
     const o = (y * this.w + x) * 4; this.d[o] += c[0] * a; this.d[o + 1] += c[1] * a; this.d[o + 2] += c[2] * a;
   }
-  rect(x0, y0, x1, y1, c) { for (let y = Math.max(0, Math.floor(y0)); y < Math.min(this.h, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0 - this.ox)); x < Math.min(this.w, Math.ceil(x1 - this.ox)); x++) this.put(x, y, c); }
+  rect(x0, y0, x1, y1, c) { for (let y = Math.max(this.oy, Math.floor(y0)); y < Math.min(this.oy + this.h, Math.ceil(y1)); y++) for (let x = Math.max(0, Math.floor(x0 - this.ox)); x < Math.min(this.w, Math.ceil(x1 - this.ox)); x++) this.put(x, y, c); }
   /** filled polygon (flat colour) */
   poly(pts, c) {
     let y0 = Infinity, y1 = -Infinity; for (const p of pts) { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
-    for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(this.h - 1, Math.ceil(y1)); y++) {
+    for (let y = Math.max(this.oy, Math.floor(y0)); y <= Math.min(this.oy + this.h - 1, Math.ceil(y1)); y++) {
       const yc = y + 0.5, xs = [];
       for (let i = 0; i < pts.length; i++) { const a = pts[i], b = pts[(i + 1) % pts.length]; if ((a[1] <= yc) !== (b[1] <= yc)) xs.push(a[0] + (yc - a[1]) / (b[1] - a[1]) * (b[0] - a[0])); }
       xs.sort((a, b) => a - b);

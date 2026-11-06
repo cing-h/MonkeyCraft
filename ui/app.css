@@ -37,6 +37,9 @@ h1 { font: 700 22px var(--display); margin: 0; text-shadow: 2px 2px 0 var(--bark
 h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--leaf); margin: 0; text-transform: uppercase; }
 .cam { display: flex; align-items: center; gap: 6px; font: 11px var(--label); color: var(--muted); }
 .cam button { padding: 4px 9px; font-size: 12px; }
+.stories { display: flex; align-items: center; gap: 2px; margin-left: 6px; }
+.stories button { padding: 3px 6px; font-size: 10px; background: none; border-color: transparent; box-shadow: none; color: var(--muted); }
+.stories button[aria-pressed="true"] { color: var(--fg); border-color: var(--leaf); }
 .spend { font: 11px var(--label); color: var(--muted); }
 .stop { background: var(--plank), #5a1712; border-color: #2a0806; color: #ffd8d0; font-size: 14px; padding: 8px 18px; box-shadow: inset -2px -2px 0 #2a0806, inset 2px 2px 0 #8a2a20; }
 .stop:hover { border-color: var(--bad); }
@@ -48,7 +51,7 @@ h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--leaf); margin: 
 .stage::before, .stage::after, .stage .tie { content: ""; position: absolute; width: 14px; height: 14px; background: repeating-linear-gradient(45deg, #c9a46a 0 2px, #8a6a3e 2px 4px); }
 .stage::before { left: -3px; top: -3px; } .stage::after { right: -3px; top: -3px; }
 .stage .tie.l { left: -3px; bottom: -3px; } .stage .tie.r { right: -3px; bottom: -3px; }
-.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 320 / 180; image-rendering: pixelated; cursor: grab; touch-action: pan-y; background: #0b0e0c; }
+.stage canvas { display: block; width: 100%; height: auto; aspect-ratio: 320 / 180; image-rendering: pixelated; cursor: grab; touch-action: none; background: #0b0e0c; }
 .stage canvas.dragging { cursor: grabbing; }
 .scrollbar { height: 8px; margin-top: 6px; background: var(--bark-lo); position: relative; }
 .scrollbar span { position: absolute; top: 0; bottom: 0; background: var(--vine) repeat-x left center / 32px 10px, #24401f; image-rendering: pixelated; border-inline: 2px solid var(--leaf); }

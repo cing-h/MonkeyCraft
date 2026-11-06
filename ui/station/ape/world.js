@@ -1,11 +1,12 @@
 // MonkeyCraft ape village: the world layout and its pre-painted parallax layers.
 
-import { FB, GROUND, H, W, WORLD, bayer, hash, mat, mixc } from './fb.js';
+import { FB, GROUND, H, TOP, W, WORLD, bayer, hash, mat, mixc } from './fb.js';
 import { C } from './cast.js';
 import { GREENS, banana, bush, canopy, fern, flower, foliage, palm, trunk } from './scenery.js';
+import { TRUNKS, paintCanopy, paintCanopyBack, paintHighSky } from './canopy.js';
+export { TRUNKS };
 
 // ---------- the world ----------
-export const TRUNKS = [50, 232, 480, 664, 912];
 export const branchY = x => 56 + Math.sin(x / 41) * 3 + Math.sin(x / 17) * 1.2;
 export const groundY = x => GROUND + Math.sin(x / 29) * 0.8;
 export const WATER = 122;
@@ -16,9 +17,10 @@ export const DOORS = {
 export const PERCH_Y = 34;
 
 export function buildLayers() {
-  const layer = (f, clear = true) => { const b = new FB(Math.ceil(W + (WORLD - W) * f), H); if (clear) b.d.fill(0); return b; };
+  // tall layers cover all three stories (world y TOP..H); the others only the ground village
+  const layer = (f, clear = true, tall = false) => { const b = new FB(Math.ceil(W + (WORLD - W) * f), tall ? H - TOP : H, tall ? TOP : 0); if (clear) b.d.fill(0); return b; };
   // sky: a tropical sunset, finely dithered, with a low sun on the left
-  const sky = layer(0.05, false);
+  const sky = layer(0.05, false, true);
   const SK = [[34, 52, 78], [86, 92, 120], [196, 132, 120], [246, 186, 128], [252, 220, 160]];
   for (let y = 0; y < H; y++) for (let x = 0; x < sky.w; x++) {
     const u = Math.min(1, y / (WATER - 4)) * 4, i = Math.min(3, Math.floor(u)), f = u - i, d = bayer(x, y) * 0.9;
@@ -28,6 +30,7 @@ export function buildLayers() {
     if (dd < 9) c = mixc([255, 236, 190], [255, 250, 230], 1 - dd / 9); else if (dd < 40) c = mixc(c, [255, 214, 150], (1 - dd / 40) * 0.5 * (bayer(x, y) < 0.8 ? 1 : 0.85));
     sky.put(x, y, c);
   }
+  paintHighSky(sky, SK[0]);
   // clouds: big soft cumulus, lit on the sun side
   const clouds = layer(0.1);
   for (let i = 0; i < 9; i++) {
@@ -60,7 +63,7 @@ export function buildLayers() {
   jungle.fog = 0;
   for (let i = 0; i < 9; i++) { const x = i * 56 + 20 + hash(i, 65) * 20; palm(jungle, x, WATER, 24 + hash(i, 66) * 10, (hash(i, 67) - 0.5) * 2, 200 + i, GREENS.palm.map(c => mixc(c, [176, 150, 140], 0.45)), 0.8); }
   // back trees (parallax 0.55): detailed but hazy, where the villagers swing
-  const back = layer(0.55); back.fog = 0.3; back.fogc = [150, 140, 130];
+  const back = layer(0.55, true, true); paintCanopyBack(back); back.fog = 0.3; back.fogc = [150, 140, 130];
   for (let i = 0; i < 12; i++) {
     const x = 20 + i * (back.w - 40) / 11 + (hash(i, 3) - 0.5) * 16;
     trunk(back, x, 18, WATER, 4.5, 3, [92, 74, 58], i);
@@ -74,7 +77,8 @@ export function buildLayers() {
   for (let i = 0; i < 18; i++) { const x = hash(i, 123) * back.w; foliage(back, x, backBranchY(x) - 1.5, 4 + hash(i, 124) * 3, 2, GREENS.canopy, 700 + i); }
   back.fog = 0;
   // the village (parallax 1)
-  const mid = layer(1);
+  const mid = layer(1, true, true);
+  paintCanopy(mid);
   // the bank: grass lip, then a cut-away of earth and stones down to the water
   for (let x = 0; x < WORLD; x++) {
     const top = groundY(x);

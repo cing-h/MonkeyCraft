@@ -15,6 +15,11 @@
       <button id="scroll-l" type="button" aria-label="Scroll the village left">◀</button>
       <span>VILLAGE</span>
       <button id="scroll-r" type="button" aria-label="Scroll the village right">▶</button>
+      <button id="scroll-u" type="button" aria-label="Up a story">▲</button>
+      <button id="scroll-d" type="button" aria-label="Down a story">▼</button>
+      <div class="stories" id="stories" role="group" aria-label="Which story of the village to show">
+        <button type="button" data-story="0" aria-pressed="true">GROUND</button><span aria-hidden="true">·</span><button type="button" data-story="1" aria-pressed="false">CANOPY 1</button><span aria-hidden="true">·</span><button type="button" data-story="2" aria-pressed="false">CANOPY 2</button>
+      </div>
     </div>
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
     <button id="open-settings" type="button">Settings</button>
@@ -23,7 +28,7 @@
 
   <section class="floor" aria-label="The ape village">
     <div class="stage" id="stage">
-      <canvas id="scene" tabindex="0" aria-describedby="crew-status" aria-label="The ape village. Drag or use the arrow keys to scroll. Click a crew member or its home to see only its jobs."></canvas>
+      <canvas id="scene" tabindex="0" aria-describedby="crew-status" aria-label="The ape village, three stories tall. Drag, use the mouse wheel or the arrow keys to scroll. Click a crew member or its home to see only its jobs."></canvas>
       <div class="overlay" id="overlay"></div>
       <div class="scrollbar" aria-hidden="true"><span id="thumb"></span></div>
       <span class="tie l" aria-hidden="true"></span><span class="tie r" aria-hidden="true"></span>
