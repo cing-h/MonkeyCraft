@@ -6,16 +6,16 @@ import { makeStreamParser } from '../src/providers/stream-json.js';
 import { makeClaudeCodeProvider, buildArgs } from '../src/providers/claude-code.js';
 import { handleMcp } from '../src/mcp/handler.js';
 
-const INIT = { type: 'system', subtype: 'init', model: 'claude-sonnet-5-5', apiKeySource: 'none', mcp_servers: [{ name: 'autocraft', status: 'connected' }], tools: ['mcp__autocraft__shell_exec'] };
+const INIT = { type: 'system', subtype: 'init', model: 'claude-sonnet-5-5', apiKeySource: 'none', mcp_servers: [{ name: 'monkeycraft', status: 'connected' }], tools: ['mcp__monkeycraft__shell_exec'] };
 const RESULT = { type: 'result', subtype: 'success', is_error: false, result: 'Done.', total_cost_usd: 0.0123, num_turns: 2, usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 1000, cache_creation_input_tokens: 10 } };
 
 test('stream parser: init, deltas, no double text, result', () => {
   const p = makeStreamParser();
-  assert.deepEqual(p.feed(INIT)[0], { kind: 'init', model: 'claude-sonnet-5-5', apiKeySource: 'none', mcpStatus: 'connected', tools: ['mcp__autocraft__shell_exec'] });
+  assert.deepEqual(p.feed(INIT)[0], { kind: 'init', model: 'claude-sonnet-5-5', apiKeySource: 'none', mcpStatus: 'connected', tools: ['mcp__monkeycraft__shell_exec'] });
   p.feed({ type: 'stream_event', event: { type: 'message_start', message: { id: 'm1' } } });
   assert.deepEqual(p.feed({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hel' } } }), [{ kind: 'token', text: 'Hel' }]);
   assert.deepEqual(p.feed({ type: 'assistant', message: { id: 'm1', content: [{ type: 'text', text: 'Hello' }] } }), [], 'already streamed');
-  assert.deepEqual(p.feed({ type: 'assistant', message: { id: 'm2', content: [{ type: 'text', text: 'Whole' }, { type: 'tool_use', id: 't', name: 'x', input: {} }] } }), [{ kind: 'token', text: 'Whole' }]);
+  assert.deepEqual(p.feed({ type: 'assistant', message: { id: 'm2', content: [{ type: 'text', text: 'Whole' }, { type: 'tool_use', id: 't', name: 'mcp__monkeycraft__fs_read', input: {} }] } }), [{ kind: 'token', text: 'Whole' }]);
   const [r] = p.feed(RESULT);
   assert.equal(r.reason, 'done'); assert.equal(r.usd, 0.0123); assert.equal(r.cacheReadTokens, 1000); assert.equal(r.turns, 2);
   assert.equal(p.feed({ ...RESULT, subtype: 'error_max_turns', is_error: true })[0].reason, 'max_iters');
@@ -24,11 +24,11 @@ test('stream parser: init, deltas, no double text, result', () => {
   assert.deepEqual(p.feed(null), []); assert.deepEqual(p.feed({ type: 'weird' }), []);
 });
 
-test('CLI args: built-in tools off, only the AutoCraft MCP server', () => {
+test('CLI args: built-in tools off, only the MonkeyCraft MCP server', () => {
   const a = buildArgs({ agent: { model: 'm', systemPrompt: 'sp' }, mcpConfig: { mcpServers: {} }, maxBudgetUsd: 2 });
   const val = f => a[a.indexOf(f) + 1];
   assert.equal(val('--tools'), ''); assert.ok(a.includes('--strict-mcp-config'));
-  assert.equal(val('--allowedTools'), 'mcp__autocraft'); assert.equal(val('--permission-mode'), 'dontAsk');
+  assert.equal(val('--allowedTools'), 'mcp__monkeycraft'); assert.equal(val('--permission-mode'), 'dontAsk');
   assert.equal(val('--max-budget-usd'), '2'); assert.equal(val('--system-prompt'), 'sp');
   assert.ok(!a.some(x => x.includes('dangerously')));
 });
@@ -69,7 +69,7 @@ test('provider: no result → error event; MCP not connected → error event; ab
   let r = await p.run({ agent, prompt: 'x', mcpConfig: {}, emit: (t, x) => events.push({ type: t, ...x }) });
   assert.equal(r.reason, 'error'); assert.equal(events[0].code, 'cli_failed');
 
-  s = fakeSpawn([{ ...INIT, mcp_servers: [{ name: 'autocraft', status: 'failed' }] }, { ...RESULT, subtype: 'error_during_execution', is_error: true, result: 'boom' }]);
+  s = fakeSpawn([{ ...INIT, mcp_servers: [{ name: 'monkeycraft', status: 'failed' }] }, { ...RESULT, subtype: 'error_during_execution', is_error: true, result: 'boom' }]);
   events = [];
   p = makeClaudeCodeProvider({ spawn: s.spawn, claudePath: 'c', baseEnv: {}, killProcessGroup: () => {}, cwd: '/' });
   r = await p.run({ agent, prompt: 'x', mcpConfig: {}, emit: (t, x) => events.push({ type: t, ...x }) });

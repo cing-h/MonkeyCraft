@@ -11,7 +11,7 @@ export function makeFsRead({ fsp, pathEnv }) {
     capability: 'files',
     scope: 'read',
     timeoutMs: 15_000,
-    description: 'Read a text file, or list the contents of a folder. Relative paths start in the AutoCraft workspace; ~ is the home folder.',
+    description: 'Read a text file, or list the contents of a folder. Relative paths start in the MonkeyCraft workspace; ~ is the home folder.',
     inputSchema: {
       type: 'object',
       properties: {

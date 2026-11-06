@@ -3,37 +3,110 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AutoCraft</title>
+<title>MonkeyCraft</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=Silkscreen&display=swap">
 <link rel="stylesheet" href="/ui/app.css">
 </head>
 <body>
 <div class="app">
   <header class="top">
-    <div class="brand"><span class="logo" aria-hidden="true"></span><h1>AutoCraft</h1></div>
+    <div class="brand"><span class="logo" aria-hidden="true"></span><h1>MonkeyCraft</h1></div>
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
+    <button id="council-report" class="council-note" type="button" hidden title="A council report: the Chief thinks you should know something. Click to read it." aria-label="Read the council report">★ REPORT</button>
+    <button id="call-council" type="button" title="Call the crew to the Ring to review recent work. You choose how long the meeting lasts.">Council</button>
+    <button id="open-settings" type="button">Settings</button>
     <button id="stop" class="stop" type="button" title="Stop every job right now">STOP</button>
   </header>
 
-  <aside class="crew" aria-label="The crew"><h2>Crew</h2><ul id="crew"></ul></aside>
+  <section class="floor" aria-label="The ape village">
+    <div class="stage" id="stage">
+      <canvas id="scene" tabindex="0" aria-describedby="crew-status" aria-label="The ape village, three stories tall. Drag, use the mouse wheel or the arrow keys to scroll. Click a crew member or its home to see only its jobs."></canvas>
+      <div class="overlay" id="overlay"></div>
+      <div class="scrollbar" aria-hidden="true"><span id="thumb"></span></div>
+      <div class="cam viewbar" role="toolbar" aria-label="Move and zoom the village view">
+        <button id="scroll-l" type="button" aria-label="Scroll the village left">◀</button>
+        <button id="scroll-r" type="button" aria-label="Scroll the village right">▶</button>
+        <button id="scroll-u" type="button" aria-label="Up a story">▲</button>
+        <button id="scroll-d" type="button" aria-label="Down a story">▼</button>
+        <button id="zoom-out" type="button" aria-label="Zoom out (see more of the village)" title="Zoom out: see more of the village, up to all of it (or press −)">−</button>
+        <span id="zoom-level" aria-live="polite" title="Zoom">1×</span>
+        <button id="zoom-in" type="button" aria-label="Zoom in" title="Zoom in (or press +)">+</button>
+        <div class="stories" id="stories" role="group" aria-label="Which story of the village to show">
+          <button type="button" data-story="0" aria-pressed="true">GROUND</button><span aria-hidden="true">·</span><button type="button" data-story="1" aria-pressed="false">CANOPY 1</button><span aria-hidden="true">·</span><button type="button" data-story="2" aria-pressed="false">CANOPY 2</button>
+        </div>
+      </div>
+      <span class="tie l" aria-hidden="true"></span><span class="tie r" aria-hidden="true"></span>
+    </div>
+    <ul class="crew" id="crew-status" aria-label="What each crew member is doing" aria-live="polite"></ul>
+    <details class="events">
+      <summary>Remembered answers<span id="grants-count"></span></summary>
+      <p class="hint">Actions you chose "Always allow" for. They only ever apply inside the workspace; outside it, MonkeyCraft always asks.</p>
+      <ul id="grants" class="grants"></ul>
+    </details>
+    <details class="events">
+      <summary>Live events</summary>
+      <p class="hint">Everything the crew really does, as it happens. The floor animates only from these.</p>
+      <ol id="events"></ol>
+    </details>
+  </section>
 
-  <main class="chat">
+  <aside class="side" aria-label="Job log">
+    <div class="side-head">
+      <h2>Job log</h2>
+      <button id="filter" class="chip" type="button" hidden>Showing one crew member · show all</button>
+    </div>
     <div id="log" class="log" aria-live="polite">
-      <p class="empty" id="empty">Give the <b>Cinder Smith</b> a job. Try: <em>"List what's in my workspace, then tell me how much disk space is free."</em> It will ask before running any command.</p>
+      <p class="empty" id="empty">Give <b>the Chief</b> a job, and it hands the pieces to the crew. Try: <em>"Find out what the tallest tree species in the world is and write a short summary into tallest-trees.txt."</em> Watch the Scout swing off to research and the Writer go to its hut. Anyone who wants to change something asks you first.</p>
     </div>
     <form id="composer" class="composer">
-      <label for="prompt" class="sr">Job for the Cinder Smith</label>
-      <textarea id="prompt" rows="2" placeholder="A job for the Cinder Smith…" maxlength="20000"></textarea>
+      <div class="to"><label for="to">TO</label><select id="to"></select></div>
+      <label for="prompt" class="sr" id="prompt-label">Job for the Chief</label>
+      <textarea id="prompt" rows="2" placeholder="A job for the Chief…" maxlength="20000"></textarea>
       <button type="submit" id="send">Send</button>
     </form>
-  </main>
-
-  <aside class="events" aria-label="Live events">
-    <h2>Live events</h2>
-    <p class="hint">Everything the crew really does, as it happens.</p>
-    <ol id="events"></ol>
   </aside>
 </div>
+<dialog id="council-dialog" class="settings council-dialog" aria-labelledby="council-title">
+  <form method="dialog" id="council-form">
+    <h2 id="council-title">Call a council</h2>
+    <p class="hint">The crew gather at the Ring to look back on the work since the last council. They can discuss as much as they like until the meeting's time is up, and the Chief tells you only if something is significant. It uses a little of today's budget.</p>
+    <label class="limits"><span>How long the meeting lasts</span>
+      <select id="council-minutes"><option value="1">1 minute</option><option value="2">2 minutes</option><option value="3" selected>3 minutes</option><option value="5">5 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select>
+    </label>
+    <p class="hint">The daily council (at most once a day, after 3 finished jobs) always lasts 3 minutes.</p>
+    <p class="error" id="council-error" hidden></p>
+    <div class="settings-btns"><button type="button" id="council-cancel">Cancel</button><button type="submit" id="council-go" class="primary">Call the council</button></div>
+  </form>
+</dialog>
+<dialog id="settings" class="settings" aria-labelledby="settings-title">
+  <form method="dialog" id="settings-form">
+    <h2 id="settings-title">Settings</h2>
+    <p class="hint">Changes apply to jobs you start after saving.</p>
+    <fieldset>
+      <legend>Who thinks with what</legend>
+      <p class="hint" id="api-status"></p>
+      <table class="crew-table"><thead><tr><th scope="col">Crew member</th><th scope="col">Thinks with</th><th scope="col">Model</th></tr></thead><tbody id="crew-rows"></tbody></table>
+    </fieldset>
+    <fieldset>
+      <legend>Spending limits</legend>
+      <div class="limits">
+        <label for="lim-perRunUsd">Per job ($)</label><input id="lim-perRunUsd" type="number" step="0.05">
+        <label for="lim-perRunTokens">Per job (tokens)</label><input id="lim-perRunTokens" type="number" step="10000">
+        <label for="lim-familyUsd">A job and its crew together ($)</label><input id="lim-familyUsd" type="number" step="0.5">
+        <label for="lim-familyTokens">A job and its crew together (tokens)</label><input id="lim-familyTokens" type="number" step="100000">
+        <label for="lim-dailyUsd">Per day, soft limit ($)</label><input id="lim-dailyUsd" type="number" step="1">
+      </div>
+      <p class="hint">Token limits count cache reads at one tenth. Subscription jobs show an estimate in dollars, so their token limit is the one that really caps them.</p>
+    </fieldset>
+    <fieldset>
+      <legend>Village</legend>
+      <label class="check"><input type="checkbox" id="chatter-on"> Village chatter: the monkeys chat in monkey sounds, with the meaning in brackets</label>
+      <p class="hint">Only free crew members chat, and anything they say about work comes from real events. It's off by default if your computer asks apps to reduce motion. Saved in this browser.</p>
+    </fieldset>
+    <p class="error" id="settings-error" hidden></p>
+    <div class="settings-btns"><button type="button" id="settings-cancel">Cancel</button><button type="submit" id="settings-save" class="primary">Save</button></div>
+  </form>
+</dialog>
 <script type="module" src="/ui/app.js"></script>
 </body>
 </html>

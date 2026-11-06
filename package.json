@@ -1,13 +1,20 @@
 {
-  "name": "autocraft",
+  "name": "monkeycraft",
   "version": "0.0.1",
   "private": true,
-  "description": "A local AI crew harness with a voxel station floor.",
+  "description": "A local AI crew harness: a jungle village of apes who do your jobs.",
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "test": "node --test",
+    "test": "node --test test/*.test.js",
     "check": "node scripts/check.js",
-    "start": "node src/main.js"
+    "start": "node src/main.js",
+    "link": "node scripts/link-setup.js",
+    "mailbox": "node scripts/mailbox-watch.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.1.0"
   }
 }
