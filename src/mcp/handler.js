@@ -5,7 +5,7 @@
 // handleMcp(message, deps) returns a JSON-RPC response object, or null for a
 // notification. It never throws.
 
-export const SERVER_INFO = { name: 'autocraft', version: '0.1.0' };
+export const SERVER_INFO = { name: 'monkeycraft', version: '0.1.0' };
 const SUPPORTED = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
 
 const err = (id, code, message) => ({ jsonrpc: '2.0', id: id ?? null, error: { code, message } });
@@ -24,7 +24,7 @@ export async function handleMcp(msg, deps) {
           protocolVersion: SUPPORTED.includes(asked) ? asked : SUPPORTED[0],
           capabilities: { tools: { listChanged: false } },
           serverInfo: SERVER_INFO,
-          instructions: 'AutoCraft tools. Every action that changes something asks the user first.'
+          instructions: 'MonkeyCraft tools. Every action that changes something asks the user first.'
         });
       }
       case 'ping': return ok(msg.id, {});

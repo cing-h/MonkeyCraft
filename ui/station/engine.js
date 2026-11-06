@@ -1,4 +1,4 @@
-// AutoCraft voxel engine: materials, voxel models, and a 55° orthographic
+// MonkeyCraft voxel engine: materials, voxel models, and a 55° orthographic
 // renderer with a z-buffer, 5-tone face lighting, a 1px inner outline, and glow
 // only for lights that belong to working creatures.
 // Ported from the art-direction page (artifact 9FoPZGP6EqqC553pVZKsnc).

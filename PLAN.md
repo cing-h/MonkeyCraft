@@ -1,22 +1,22 @@
-# AutoCraft — Edition 1 plan
+# MonkeyCraft — Edition 1 plan
 
 Status: draft, 2026-11-06. Owner: the user directs; Claude writes all code.
-Before changing this plan, also load: memory `autocraft-decisions`, and the vault notes "Building my own StarNet" (hub) and "StarNet build reference".
+Before changing this plan, also load: memory `monkeycraft-decisions`, and the vault notes "Building my own StarNet" (hub) and "StarNet build reference".
 
 ---
 
 ## Part 1 — In plain words (for you)
 
-**What Edition 1 does.** You open AutoCraft in a window and see the station floor. You type a job to the Voidwyrm, for example "find out why my script fails and fix it". The Voidwyrm makes a plan and hands pieces to the crew: Hollow Plate researches the web, Cinder Smith runs commands, the Bone Scribe reads and files documents, the Silkscript Spider writes text and the Prism Gargoyle checks the result. You watch them walk to their stations and work. Every animation comes from something the AI is really doing.
+**What Edition 1 does.** You open MonkeyCraft in a window and see the station floor. You type a job to the Voidwyrm, for example "find out why my script fails and fix it". The Voidwyrm makes a plan and hands pieces to the crew: Hollow Plate researches the web, Cinder Smith runs commands, the Bone Scribe reads and files documents, the Silkscript Spider writes text and the Prism Gargoyle checks the result. You watch them walk to their stations and work. Every animation comes from something the AI is really doing.
 
 **How it stays safe and cheap.**
-- The crew can work anywhere on your computer (your choice). Its home base is an AutoCraft workspace folder.
+- The crew can work anywhere on your computer (your choice). Its home base is an MonkeyCraft workspace folder.
 - Anything that changes files or runs commands asks you first, unless you've already said yes to that kind of action. Changes outside the workspace always ask, every time.
-- A short never-touch list is blocked outright: system folders, your keys and passwords, and AutoCraft's own records.
-- Before a creature changes a file, AutoCraft saves a copy, so you can undo it.
+- A short never-touch list is blocked outright: system folders, your keys and passwords, and MonkeyCraft's own records.
+- Before a creature changes a file, MonkeyCraft saves a copy, so you can undo it.
 - Once a creature has read a web page, it loses the ability to run commands for the rest of that job, so a malicious page can't make it do something dangerous.
 - There is a per-job spending limit, a soft daily limit, and a big red STOP button that halts everyone.
-- Because your subscription turns show as "$0", AutoCraft also counts tokens, so the limits still apply.
+- Because your subscription turns show as "$0", MonkeyCraft also counts tokens, so the limits still apply.
 
 **What it runs on.** Your own signed-in Claude Code does the thinking (your subscription, personal use). An API-key option is built too, for anyone else who uses it later.
 
@@ -43,7 +43,7 @@ The Seer and Bat appear on the floor, asleep, so nothing pretends to work when i
 - **Server:** one sidecar process bound to `127.0.0.1:8787`. HTTP API plus one NDJSON stream per run and an SSE hub. Plain ESM JavaScript, no framework and no build step.
 - **UI:** a browser page served by the sidecar (plain JS modules). The voxel renderer from the art page (artifact 9FoPZGP6EqqC553pVZKsnc) becomes `ui/station/`.
 - **Tests:** `node:test`. Every pure module takes an injected clock and IO; only `src/main.js` touches the real clock, filesystem, network and processes.
-- **Repo:** `~/autocraft`, git, small files. Don't build a 30k-line composition root: routes live in `src/routes/*`.
+- **Repo:** `~/monkeycraft`, git, small files. Don't build a 30k-line composition root: routes live in `src/routes/*`.
 
 ### Directory layout (target)
 ```
@@ -66,12 +66,12 @@ test/
 ### Key design: one safety pipeline for both providers
 - **Claude Code provider:** spawn `claude -p --output-format stream-json --input-format stream-json --verbose --include-partial-messages` with:
   - `--tools ""`, which disables every built-in tool;
-  - `--mcp-config <generated> --strict-mcp-config`, so only AutoCraft's MCP server is available;
-  - `--permission-mode` set so MCP tools don't prompt in the CLI, because AutoCraft's consent broker decides instead;
+  - `--mcp-config <generated> --strict-mcp-config`, so only MonkeyCraft's MCP server is available;
+  - `--permission-mode` set so MCP tools don't prompt in the CLI, because MonkeyCraft's consent broker decides instead;
   - `--system-prompt` (persona plus crew rules), `--model`, `--no-session-persistence`, `--setting-sources ""`, and `--max-budget-usd` as an outer seatbelt.
 
-  Every tool call therefore enters `registry.dispatch()`. Map the stream-json messages (system/init, assistant deltas, tool_use, result with usage and total_cost_usd) to AutoCraft events. Before coding, verify these flags with `claude --help` on the installed version (2.1.319 has `--tools`, `--strict-mcp-config`, `--permission-mode`, `--max-budget-usd`, `--no-session-persistence`).
-- **API provider:** use AutoCraft's own `runAgentLoop` with the same registry, called directly. Default model `claude-opus-5-5`, adaptive thinking, streaming. Use the claude-api skill when writing it.
+  Every tool call therefore enters `registry.dispatch()`. Map the stream-json messages (system/init, assistant deltas, tool_use, result with usage and total_cost_usd) to MonkeyCraft events. Before coding, verify these flags with `claude --help` on the installed version (2.1.319 has `--tools`, `--strict-mcp-config`, `--permission-mode`, `--max-budget-usd`, `--no-session-persistence`).
+- **API provider:** use MonkeyCraft's own `runAgentLoop` with the same registry, called directly. Default model `claude-opus-5-5`, adaptive thinking, streaming. Use the claude-api skill when writing it.
 - **Model call and run identity:** each crew member is one roster record, with its model and provider set per agent. A run binds one CLI process or one API loop to `{agentId, runId}`, and its MCP server instance knows that binding, so dispatch has `ctx`.
 
 ### Dispatch pipeline (port the StarNet order)
@@ -92,7 +92,7 @@ It never throws. It returns `{ok, isError, content, summary}`. Write tools refus
 | Tide Seer, Clockwork Bat | none (asleep until Edition 2) | — |
 
 - **Reach is the whole computer (user decision Q1).**
-  - `~/AutoCraftWorkspace/` is the default cwd and the "home" scope.
+  - `~/MonkeyCraftWorkspace/` is the default cwd and the "home" scope.
   - Resolve every path, symlinks included, before checking it.
   - Mutations inside the workspace follow the normal ladder (a cached grant is allowed).
   - Mutations outside the workspace prompt every time: no permanent grant, and denied on any non-interactive surface.
@@ -100,7 +100,7 @@ It never throws. It returns `{ok, isError, content, summary}`. Write tools refus
     - `/etc /usr /bin /boot /proc /sys`
     - `/mnt/c/Windows`, `/mnt/c/Program Files*`
     - `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config/gh`, `~/.claude/` credentials
-    - `.env*` files, browser profile folders, and AutoCraft's own `data/` (ledger, journal, grants).
+    - `.env*` files, browser profile folders, and MonkeyCraft's own `data/` (ledger, journal, grants).
   - Shell commands must match the denylist patterns `rm -rf /`, `mkfs`, `dd of=/dev`, `shutdown` and `format`. They run with cwd set to the workspace unless the user approves another cwd.
 - **Undo store:** before any write, move or delete, copy the prior bytes to `data/undo/<runId>/` and log them in the journal. A "Revert this job" button is in M3. Shell side effects can't be undone this way, so shell commands prompt with the exact command shown.
 - A delegated worker gets the attenuated intersection of the lead's grants and its own, never their union.
@@ -139,7 +139,7 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
    - Node 22 in WSL, the repo, `node --test` green, lint-free;
    - `events.js` frozen at v1 with a validator test.
 2. **M1 One creature — DONE 2026-11-06.** 27 tests pass. In a live run, the Smith ran `ls -la` after an on-screen prompt; the ledger row was recorded as a subscription run (3,862 tokens). Killing the sidecar mid-prompt left a clean journal; on restart it was closed as interrupted, with an unsettled ledger row. Live events go over SSE (`/api/events`), with replay from the journal at `/api/runs/:id`; there is no per-run NDJSON stream yet.
-   - *Finding:* the orphaned `claude -p` outlived the killed sidecar by a few seconds. It's harmless, since its only tools are inside AutoCraft. M3 adds a durable child-PID file and kills leftovers at startup, after checking each process's `/proc/<pid>/cmdline`.
+   - *Finding:* the orphaned `claude -p` outlived the killed sidecar by a few seconds. It's harmless, since its only tools are inside MonkeyCraft. M3 adds a durable child-PID file and kills leftovers at startup, after checking each process's `/proc/<pid>/cmdline`.
    - Original scope:
    - the Claude Code adapter, the MCP tool server, the registry with `fs.read` and `shell.exec`, the bus, the chat UI and the ledger;
    - *check:* the user asks the Smith to `ls` the workspace; the events stream; the ledger row is written; killing the sidecar mid-run leaves a consistent journal.

@@ -1,4 +1,4 @@
-# AutoCraft — notes for Claude
+# MonkeyCraft — notes for Claude
 
 General rules first: the owner's standing instructions for every project (plan first, one feature per session, permission to create sessions, a branch per feature, saving tokens, helper agents) live in cing-h/claude-standards and are installed as ~/.claude/CLAUDE.md. If they aren't loaded in this session, read https://github.com/cing-h/claude-standards/blob/main/CLAUDE.md before doing anything else.
 The user directs and never writes code; Claude writes all of it. Explain changes in plain language.
@@ -7,6 +7,7 @@ The user directs and never writes code; Claude writes all of it. Explain changes
 - **Background:** the vault notes "Building my own StarNet" and "StarNet build reference" (design source; fresh code only, no StarNet code copied).
 - **Node:** Node 22 lives in WSL via nvm and is not on the default PATH. Prefix commands with `. ~/.nvm/nvm.sh &&`. Never use the Windows node at `/mnt/c/Program Files/nodejs`.
 - **Checks:** run `npm test` (node:test) and `npm run check` (syntax gate) before calling anything done.
+- **Zettelkasten:** the project has its own folder in the user's vault, `wiki/MonkeyCraft/` (hub note "MonkeyCraft"). After each milestone (and any big design change), add or update notes there in one reviewed claude-obsidian transaction: what was built, decisions made, and what's next.
 
 ## Rules
 - `src/events.js` is a FROZEN, additive-only contract. You may add types or optional fields and extend the snapshot in `test/events.test.js`. Never rename, remove or retype anything.

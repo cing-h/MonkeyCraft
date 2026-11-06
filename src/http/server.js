@@ -2,7 +2,7 @@
 //
 // Guards for a server on localhost:
 // - Host must be 127.0.0.1:<port> or localhost:<port> (blocks DNS rebinding).
-// - Every state-changing /api request needs the header `X-AutoCraft: 1`. A
+// - Every state-changing /api request needs the header `X-MonkeyCraft: 1`. A
 //   custom header forces a CORS preflight that this server never approves,
 //   so another website can't start jobs or answer prompts.
 // - /mcp/* needs the run's secret bearer token (checked by the route).
@@ -21,7 +21,7 @@ export function makeServer({ port, routes, log = console.log }) {
         if (r.method !== req.method) continue;
         const m = r.path instanceof RegExp ? url.pathname.match(r.path) : (url.pathname === r.path ? [] : null);
         if (!m) continue;
-        if (r.guard !== false && req.method !== 'GET' && req.headers['x-autocraft'] !== '1') return send(res, 403, { error: 'missing X-AutoCraft header' });
+        if (r.guard !== false && req.method !== 'GET' && req.headers['x-monkeycraft'] !== '1') return send(res, 403, { error: 'missing X-MonkeyCraft header' });
         const body = (req.method === 'POST') ? await readJson(req) : undefined;
         if (body === BAD) return send(res, 400, { error: 'body must be JSON (max 1 MB)' });
         return await r.handle({ req, res, url, params: m.slice(1), body });

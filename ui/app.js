@@ -1,4 +1,4 @@
-// AutoCraft UI. Everything shown here comes from the live event stream: the
+// MonkeyCraft UI. Everything shown here comes from the live event stream: the
 // job log, the crew strip and the station floor all read the same events.
 // If an event didn't arrive, nothing on the page pretends it happened.
 
@@ -6,7 +6,7 @@ import { initialState, reduce, modeOf, MODE_TEXT } from './station/state.js';
 import { makeStation, CREW_IDS } from './station/scene.js';
 
 const $ = id => document.getElementById(id);
-const H = { 'content-type': 'application/json', 'x-autocraft': '1' };
+const H = { 'content-type': 'application/json', 'x-monkeycraft': '1' };
 const post = (url, body) => fetch(url, { method: 'POST', headers: H, body: JSON.stringify(body || {}) }).then(async r => ({ ok: r.ok, data: await r.json().catch(() => ({})) }));
 const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
 const fmtTokens = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n);

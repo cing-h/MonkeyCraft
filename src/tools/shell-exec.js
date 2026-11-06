@@ -7,7 +7,7 @@ import { checkPath } from '../safety/paths.js';
 import { checkCommand } from '../safety/shell-guard.js';
 
 const MAX_OUT = 16_000;
-const SECRET_ENV = /^(ANTHROPIC_|OPENAI_|AWS_|AZURE_|GH_|GITHUB_TOKEN|AUTOCRAFT_|CLAUDE_CODE_OAUTH|NPM_TOKEN)/;
+const SECRET_ENV = /^(ANTHROPIC_|OPENAI_|AWS_|AZURE_|GH_|GITHUB_TOKEN|MONKEYCRAFT_|CLAUDE_CODE_OAUTH|NPM_TOKEN)/;
 
 export function makeShellExec({ spawn, pathEnv, baseEnv, killProcessGroup }) {
   const env = Object.fromEntries(Object.entries(baseEnv).filter(([k]) => !SECRET_ENV.test(k) && k !== 'CLAUDECODE'));
@@ -16,7 +16,7 @@ export function makeShellExec({ spawn, pathEnv, baseEnv, killProcessGroup }) {
     capability: 'shell',
     scope: 'execute',
     timeoutMs: 600_000,
-    description: 'Run one bash command and return its exit code and output. The user must approve every command, so explain why you need it. Default folder: the AutoCraft workspace.',
+    description: 'Run one bash command and return its exit code and output. The user must approve every command, so explain why you need it. Default folder: the MonkeyCraft workspace.',
     inputSchema: {
       type: 'object',
       properties: {

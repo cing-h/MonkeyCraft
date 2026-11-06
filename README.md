@@ -1,2 +1,2 @@
-# AutoCraft
+# MonkeyCraft
 Personal AI Agent Harness

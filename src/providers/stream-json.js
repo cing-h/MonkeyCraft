@@ -4,7 +4,7 @@
 // Tool calls are NOT taken from this stream. They are reported by
 // registry.dispatch() when they actually run, so nothing is double-counted.
 
-export function makeStreamParser({ mcpServer = 'autocraft' } = {}) {
+export function makeStreamParser({ mcpServer = 'monkeycraft' } = {}) {
   const deltaMsgs = new Set();
   let currentMsg = null;
 

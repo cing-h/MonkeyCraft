@@ -63,7 +63,7 @@ export function makeRegistry(tools) {
       if (ctx.signal?.aborted) return finish(true, 'The job was stopped. Nothing ran.', 'stopped');
 
       const a = tool.assess ? await tool.assess(args, ctx) : { summary: tool.name };
-      if (a.deny) return finish(true, `Blocked by an AutoCraft safety rule: ${a.deny}. This can't be approved; do not retry it.`, `blocked: ${a.deny}`);
+      if (a.deny) return finish(true, `Blocked by an MonkeyCraft safety rule: ${a.deny}. This can't be approved; do not retry it.`, `blocked: ${a.deny}`);
 
       const needsConsent = tool.scope !== 'read';
       if (needsConsent) {

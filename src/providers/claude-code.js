@@ -1,8 +1,8 @@
 // Provider: the user's own signed-in Claude Code CLI, run headless.
 //
 // Claude Code is started with every built-in tool switched off (--tools "")
-// and only AutoCraft's MCP server available (--strict-mcp-config). So it can
-// think, but every action goes through AutoCraft's dispatch pipeline.
+// and only MonkeyCraft's MCP server available (--strict-mcp-config). So it can
+// think, but every action goes through MonkeyCraft's dispatch pipeline.
 // The API key is removed from its environment, so it uses the user's
 // subscription login (personal use only; future users take the API-key provider).
 
@@ -21,7 +21,7 @@ export function buildArgs({ agent, mcpConfig, maxBudgetUsd }) {
     '--permission-mode', 'dontAsk',
     '--strict-mcp-config',
     '--mcp-config', JSON.stringify(mcpConfig),
-    '--allowedTools', 'mcp__autocraft',
+    '--allowedTools', 'mcp__monkeycraft',
     '--tools', ''
   ];
 }
@@ -57,7 +57,7 @@ export function makeClaudeCodeProvider({ spawn, claudePath, baseEnv, killProcess
             else if (a.kind === 'init') {
               initSeen = true;
               billing = a.apiKeySource === 'none' ? 'subscription' : a.apiKeySource ? 'api' : 'unknown';
-              if (a.mcpStatus !== 'connected') emit('run.error', { message: `Claude Code could not reach AutoCraft's tools (status: ${a.mcpStatus}).`, code: 'mcp_unavailable' });
+              if (a.mcpStatus !== 'connected') emit('run.error', { message: `Claude Code could not reach MonkeyCraft's tools (status: ${a.mcpStatus}).`, code: 'mcp_unavailable' });
             } else if (a.kind === 'result') result = a;
           }
         };

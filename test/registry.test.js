@@ -47,7 +47,7 @@ test('pipeline order: unknown, not granted, bad args, blocked, denied — nothin
   assert.match((await s.reg.dispatch({ tool: 'shell.exec', args: 'ls' }, s.ctx)).content, /must be a JSON object/);
   assert.match((await s.reg.dispatch({ tool: 'shell.exec', args: { path: 'a' }, parseError: 'cut off' }, s.ctx)).content, /weren't valid JSON/);
   s = setup([{ ...t, assess: async () => ({ deny: 'protected location /etc' }) }]);
-  assert.match((await s.reg.dispatch({ tool: 'shell.exec', args: { path: 'a' } }, s.ctx)).content, /Blocked by an AutoCraft safety rule/);
+  assert.match((await s.reg.dispatch({ tool: 'shell.exec', args: { path: 'a' } }, s.ctx)).content, /Blocked by an MonkeyCraft safety rule/);
   assert.equal(s.asked.length, 0, 'hardline is decided before any prompt');
   s = setup([t], { allow: false });
   const r = await s.reg.dispatch({ tool: 'shell.exec', args: { path: 'a' } }, s.ctx);

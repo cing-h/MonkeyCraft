@@ -14,7 +14,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     try {
       res = await provider.run({
         agent, prompt, signal: controller.signal, emit, maxBudgetUsd: limits.perRunUsd,
-        mcpConfig: { mcpServers: { autocraft: { type: 'http', url: mcpUrl(runId), headers: { Authorization: `Bearer ${run.token}` } } } }
+        mcpConfig: { mcpServers: { monkeycraft: { type: 'http', url: mcpUrl(runId), headers: { Authorization: `Bearer ${run.token}` } } } }
       });
     } catch (e) {
       emit('run.error', { message: `Provider failed: ${e.message}`, code: 'provider_threw' });
@@ -72,7 +72,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
       const out = [];
       for (const u of await journal.unfinished()) {
         const emit = bus.emitFor(u.runId, u.agentId, u.lastSeq + 1);
-        emit('run.error', { message: 'AutoCraft stopped while this job was running. Its spend is unknown, and any command it started may or may not have finished.', code: 'interrupted' });
+        emit('run.error', { message: 'MonkeyCraft stopped while this job was running. Its spend is unknown, and any command it started may or may not have finished.', code: 'interrupted' });
         emit('run.end', { reason: 'error', usd: 0, tokens: 0, turns: 0 });
         await ledger.append({ runId: u.runId, agentId: u.agentId, provider: u.provider, billing: 'unknown', usd: 0, tokens: 0, turns: 0, reason: 'interrupted', settled: false, ts: clock.now() });
         out.push(u.runId);

@@ -1,4 +1,4 @@
-// AutoCraft event contract, version 1.
+// MonkeyCraft event contract, version 1.
 //
 // Every real thing the harness does is reported as one of these events. The UI
 // (chat log and station floor) may animate ONLY from these events: if it is not

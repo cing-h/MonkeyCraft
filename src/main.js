@@ -25,9 +25,9 @@ import { mcpRoutes } from './routes/mcp.js';
 import { staticRoutes } from './routes/static.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PORT = Number(process.env.AUTOCRAFT_PORT || 8787);
+const PORT = Number(process.env.MONKEYCRAFT_PORT || 8787);
 const home = os.homedir();
-const workspace = path.resolve(process.env.AUTOCRAFT_WORKSPACE || path.join(home, 'AutoCraftWorkspace'));
+const workspace = path.resolve(process.env.MONKEYCRAFT_WORKSPACE || path.join(home, 'MonkeyCraftWorkspace'));
 const dataDir = path.join(ROOT, 'data');
 
 const clock = { now: () => Date.now() };
@@ -36,7 +36,7 @@ const newToken = () => randomBytes(32).toString('hex');
 const killProcessGroup = pid => { try { process.kill(-pid, 'SIGKILL'); } catch { try { process.kill(pid, 'SIGKILL'); } catch {} } };
 
 async function findClaude() {
-  if (process.env.AUTOCRAFT_CLAUDE) return process.env.AUTOCRAFT_CLAUDE;
+  if (process.env.MONKEYCRAFT_CLAUDE) return process.env.MONKEYCRAFT_CLAUDE;
   for (const p of [path.join(home, '.local/bin/claude'), '/usr/local/bin/claude', '/usr/bin/claude']) {
     try { await fsp.access(p); return p; } catch {}
   }
@@ -64,7 +64,7 @@ async function main() {
   const runs = makeRunHost({
     bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken,
     mcpUrl: runId => `http://127.0.0.1:${PORT}/mcp/${runId}`,
-    limits: { perRunUsd: Number(process.env.AUTOCRAFT_MAX_RUN_USD || 2), maxConcurrent: 2 }
+    limits: { perRunUsd: Number(process.env.MONKEYCRAFT_MAX_RUN_USD || 2), maxConcurrent: 2 }
   });
 
   const recovered = await runs.recover();
@@ -76,7 +76,7 @@ async function main() {
     routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, roster, journal, ledger, clock }), ...mcpRoutes({ runs })]
   });
   await server.listen();
-  console.log(`AutoCraft is running: http://127.0.0.1:${PORT}/`);
+  console.log(`MonkeyCraft is running: http://127.0.0.1:${PORT}/`);
   console.log(`Workspace: ${realWorkspace}  ·  Claude Code: ${claudePath}`);
 
   let stopping = false;
@@ -93,4 +93,4 @@ async function main() {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
-main().catch(e => { console.error('AutoCraft failed to start:', e.message); process.exit(1); });
+main().catch(e => { console.error('MonkeyCraft failed to start:', e.message); process.exit(1); });

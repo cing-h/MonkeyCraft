@@ -13,7 +13,7 @@ import { makeConsentBroker } from '../src/safety/consent.js';
 import { validateEvent } from '../src/events.js';
 
 async function world(provider) {
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'autocraft-test-'));
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), 'monkeycraft-test-'));
   let n = 0, now = 1000;
   const clock = { now: () => now++ };
   const newId = p => `${p}_${++n}`;
@@ -33,7 +33,7 @@ test('a job: run.start → tool via MCP context → run.end, journaled and in th
     seenConfig = mcpConfig;
     emit('agent.token', { text: 'Looking…' });
     // what Claude Code would do over MCP:
-    const url = mcpConfig.mcpServers.autocraft.url, token = mcpConfig.mcpServers.autocraft.headers.Authorization.slice(7);
+    const url = mcpConfig.mcpServers.monkeycraft.url, token = mcpConfig.mcpServers.monkeycraft.headers.Authorization.slice(7);
     const ctx = w.runs.mcpContext(url.split('/').pop(), token);
     assert.deepEqual(ctx.listTools().map(t => t.name), ['fs_read']);
     const r = await ctx.callTool('fs_read', { path: 'a.txt' });
@@ -43,7 +43,7 @@ test('a job: run.start → tool via MCP context → run.end, journaled and in th
   const w = await world(provider);
   const { runId, done } = w.runs.start({ agentId: 'smith', prompt: 'read a.txt' });
   await done; await w.journal.flush();
-  assert.equal(seenConfig.mcpServers.autocraft.type, 'http');
+  assert.equal(seenConfig.mcpServers.monkeycraft.type, 'http');
   const types = w.seen.map(e => e.type);
   assert.deepEqual(types, ['run.start', 'agent.token', 'agent.tool_call', 'agent.tool_result', 'run.end']);
   for (const e of w.seen) assert.ok(validateEvent(e).ok);

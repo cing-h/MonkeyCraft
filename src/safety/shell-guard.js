@@ -13,17 +13,17 @@ const RULES = [
   [/:\(\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:/, 'fork bomb'],
   [/\bchmod\s+(-[a-zA-Z]*\s+)*-?R?\s*[0-7]*7{2}[0-7]?\s+\/(\s|$)/, 'opening permissions on /'],
   [/\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/, 'piping a download straight into a shell'],
-  [/\bsudo\b/, 'sudo (AutoCraft never runs as administrator)'],
+  [/\bsudo\b/, 'sudo (MonkeyCraft never runs as administrator)'],
   [/(~|\$HOME|\/home\/[^/\s]+|\/root)\/\.(ssh|gnupg|aws|azure|kube|docker|claude|netrc|git-credentials)\b/, 'touching saved keys or credentials'],
   [/\.credentials\.json|\bid_(rsa|ed25519|ecdsa|dsa)\b/, 'touching saved keys or credentials'],
   [/\/mnt\/[a-z]\/(windows|program\s*files)/i, 'touching Windows system folders']
 ];
 
-/** Returns { ok: true } or { ok: false, reason }. `extra` holds paths that must never appear (e.g. AutoCraft's data dir). */
+/** Returns { ok: true } or { ok: false, reason }. `extra` holds paths that must never appear (e.g. MonkeyCraft's data dir). */
 export function checkCommand(cmd, { extra = [] } = {}) {
   if (typeof cmd !== 'string' || !cmd.trim()) return { ok: false, reason: 'empty command' };
   if (cmd.includes('\0')) return { ok: false, reason: 'command contains a NUL byte' };
   for (const [re, reason] of RULES) if (re.test(cmd)) return { ok: false, reason };
-  for (const p of extra) if (p && cmd.includes(p)) return { ok: false, reason: `touching AutoCraft's own records (${p})` };
+  for (const p of extra) if (p && cmd.includes(p)) return { ok: false, reason: `touching MonkeyCraft's own records (${p})` };
   return { ok: true };
 }
