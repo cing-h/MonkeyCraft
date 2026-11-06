@@ -43,6 +43,14 @@ export function makeUndoStore({ fsp, dir, newId, clock }) {
     async settle(runId, undoId, bytes) {
       await appendDurable(fsp, index(runId), JSON.stringify({ undoId, afterHash: sha256(bytes) }) + '\n');
     },
+    /** Before a move: record where it came from (nothing to copy; reverting moves it back). */
+    async saveMove({ runId, from, to }) {
+      const undoId = newId('undo');
+      await fsp.mkdir(runDir(runId), { recursive: true });
+      await appendDurable(fsp, index(runId), JSON.stringify({ undoId, path: to, from, op: 'move', existed: false, ts: clock.now() }) + '\n');
+      return { undoId };
+    },
+    async settleMove(runId, undoId) { await appendDurable(fsp, index(runId), JSON.stringify({ undoId, moved: true }) + '\n'); },
     async list(runId) { return (await records(runId)).filter(r => r.path); },
     /**
      * Undo a job's changes, newest first. `guard(path)` returns a reason the path
@@ -54,6 +62,17 @@ export function makeUndoStore({ fsp, dir, newId, clock }) {
       for (const r of (await records(runId)).filter(x => x.path).reverse()) {
         const res = { undoId: r.undoId, path: r.path };
         if (r.reverted) { out.push({ ...res, result: 'skipped: already reverted' }); continue; }
+        if (r.op === 'move') {
+          if (!r.moved) { out.push({ ...res, result: 'skipped: the move never finished' }); continue; }
+          const why = (await guard(r.path)) || (await guard(r.from));
+          if (why) { out.push({ ...res, result: `skipped: ${why}` }); continue; }
+          const has = async p => { try { await fsp.stat(p); return true; } catch { return false; } };
+          if (!(await has(r.path))) { out.push({ ...res, result: 'skipped: it is no longer where it was moved to' }); continue; }
+          if (await has(r.from)) { out.push({ ...res, result: 'skipped: something new is in its old place' }); continue; }
+          await fsp.rename(r.path, r.from);
+          await appendDurable(fsp, index(runId), JSON.stringify({ undoId: r.undoId, reverted: true, revertedAt: clock.now() }) + '\n');
+          out.push({ ...res, result: 'moved back' }); continue;
+        }
         if (!r.afterHash) { out.push({ ...res, result: 'skipped: the change never finished' }); continue; }
         const why = await guard(r.path);
         if (why) { out.push({ ...res, result: `skipped: ${why}` }); continue; }

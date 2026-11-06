@@ -125,3 +125,12 @@ textarea::placeholder { color: #7f8a74; }
   .side { border-left: 0; border-top: 2px solid var(--bark); }
   .top { flex-wrap: wrap; }
 }
+
+/* crew: who the prompt box talks to, and a worker's job nested inside the Chief's */
+.composer .to { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font: 10px var(--label); color: var(--leaf); letter-spacing: .08em; }
+.composer select { font: 13px var(--body); color: var(--fg); background: #0a120c; border: 2px solid var(--bark); padding: 3px 6px; }
+.run.worker { margin-left: 4px; padding: 8px 0 8px 12px; border-left: 3px solid var(--fern); background: linear-gradient(90deg, rgba(63,110,55,.12), transparent 60%); }
+.task { white-space: pre-wrap; color: var(--muted); font-size: 14px; border-left: 2px dashed var(--bark-hi); padding-left: 8px; max-width: 75ch; }
+/* long paths and links wrap inside the log instead of running off the edge */
+.log, .run, .run.worker { min-width: 0; }
+.say, .task, .you, .tool, .note, .warn, .lock, .error, .ask code, .who { overflow-wrap: anywhere; word-break: break-word; }

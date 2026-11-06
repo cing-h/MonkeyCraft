@@ -40,10 +40,13 @@ function runBox(ev) {
   if (!r) {
     $('empty')?.remove();
     const box = el('section', 'run'); box.dataset.agent = ev.agentId;
-    if (filter && filter !== ev.agentId) box.classList.add('hide');
-    r = { box, agentId: ev.agentId, say: null, tools: new Map(), asks: new Map(), undos: 0, ended: false, revertBtn: null };
+    const parent = ev.type === 'run.start' && ev.parentRunId ? runs.get(ev.parentRunId) : null;
+    if (filter && filter !== ev.agentId && !(parent && parent.agentId === filter)) box.classList.add('hide');
+    r = { box, agentId: ev.agentId, say: null, tools: new Map(), asks: new Map(), undos: 0, ended: false, revertBtn: null, parent };
     if (ev.type !== 'run.start') box.append(el('div', 'foot', `EARLIER JOB · ${(names[ev.agentId] || ev.agentId).toUpperCase()}`));
-    runs.set(ev.runId, r); $('log').append(box);
+    runs.set(ev.runId, r);
+    if (parent) { box.classList.add('worker'); parent.say = null; parent.box.append(box); }   // a crew member's job sits inside the Chief's
+    else $('log').append(box);
   }
   return r;
 }
@@ -52,12 +55,20 @@ function saying(r, ev) {
   return r.say;
 }
 const REASONS = { done: 'DONE', cancelled: 'CANCELLED', error: 'FAILED', max_iters: 'STOPPED: TOO MANY STEPS', budget: 'STOPPED: SPENDING LIMIT', halted: 'STOPPED BY STOP BUTTON', stale: 'STOPPED: NO PROGRESS' };
-const argText = a => { const s = a && (a.command || a.path) ? (a.command || a.path) : JSON.stringify(a); return s.length > 120 ? s.slice(0, 117) + '…' : s; };
+const argText = a => {
+  const s = !a ? '' : a.command || a.path || (a.worker && a.task ? `${a.worker}: ${a.task}` : '') || a.url || a.query || (a.from && a.to ? `${a.from} → ${a.to}` : '') || (Array.isArray(a.jobs) ? a.jobs.join(', ') : '') || JSON.stringify(a);
+  return s.length > 140 ? s.slice(0, 137) + '…' : s;
+};
 
 function logRun(ev) {
   const r = runBox(ev);
   switch (ev.type) {
-    case 'run.start': r.box.append(el('div', 'you', ev.task || '(job)')); break;
+    case 'run.start':
+      if (r.parent) r.box.append(el('div', 'who', `${(names[ev.agentId] || ev.agentId).toUpperCase()} · TASK FROM ${(names[r.parent.agentId] || r.parent.agentId).toUpperCase()}`), el('div', 'task', ev.task || '(task)'));
+      else r.box.append(el('div', 'you', ev.task || '(job)'));
+      break;
+    case 'crew.dispatch': r.say = null; r.box.append(el('div', 'note', `SENT ${(names[ev.workerId] || ev.workerId).toUpperCase()}`)); break;
+    case 'crew.worker_end': r.say = null; r.box.append(el('div', ev.reason === 'done' ? 'note' : 'warn', `${(names[ev.workerId] || ev.workerId).toUpperCase()} FINISHED: ${REASONS[ev.reason] || ev.reason.toUpperCase()}`)); break;
     case 'agent.token': saying(r, ev).textContent += ev.text; break;
     case 'agent.tool_call': {
       r.say = null;
@@ -97,6 +108,7 @@ function logRun(ev) {
     case 'agent.cost': r.cost = ev; break;
     case 'run.end': {
       const c = r.cost, est = c && c.billing === 'subscription' ? ' (subscription: estimate, not charged)' : '';
+      if (r.parent) r.parent.say = null;
       r.box.append(el('div', 'foot', `${REASONS[ev.reason] || ev.reason.toUpperCase()} · ${ev.turns} TURNS · ${fmtTokens(ev.tokens)} TOKENS · ~$${ev.usd.toFixed(3)}${est}`));
       r.ended = true;
       if (r.undos) addRevert(r, ev.runId);
@@ -140,7 +152,7 @@ function onEvent(ev) {
 // ---------- filter (click a creature to see only its jobs) ----------
 function setFilter(id) {
   filter = filter === id ? null : id;
-  for (const r of runs.values()) r.box.classList.toggle('hide', !!filter && r.agentId !== filter);
+  for (const r of runs.values()) r.box.classList.toggle('hide', !!filter && r.agentId !== filter && !(r.parent && r.parent.agentId === filter) && !(!r.parent && [...runs.values()].some(w => w.parent === r && w.agentId === filter)));
   const f = $('filter'); f.hidden = !filter;
   if (filter) f.textContent = `Showing ${names[filter]} · show all`;
   lastStrip = '';
@@ -195,8 +207,9 @@ $('composer').addEventListener('submit', async e => {
   e.preventDefault();
   const prompt = $('prompt').value.trim(); if (!prompt) return;
   $('send').disabled = true;
-  let r = await post('/api/run', { agentId: 'smith', prompt });
-  if (!r.ok && r.data.code === 'daily_cap' && confirm(`${r.data.error}\n\nRun this job anyway?`)) r = await post('/api/run', { agentId: 'smith', prompt, allowOverDaily: true });
+  const agentId = $('to').value;
+  let r = await post('/api/run', { agentId, prompt });
+  if (!r.ok && r.data.code === 'daily_cap' && confirm(`${r.data.error}\n\nRun this job anyway?`)) r = await post('/api/run', { agentId, prompt, allowOverDaily: true });
   $('send').disabled = false;
   if (!r.ok) { if (r.data.code !== 'daily_cap') alert(r.data.error || 'Could not start the job.'); return; }
   $('prompt').value = '';
@@ -207,6 +220,13 @@ $('stop').addEventListener('click', () => post('/api/halt'));
 const roster = await fetch('/api/roster').then(r => r.json());
 crew = CREW_IDS.map(id => roster.crew.find(c => c.id === id)).filter(Boolean);
 for (const c of crew) { names[c.id] = c.name; wakes[c.id] = c.wakes; }
+// who the prompt box talks to: the Chief by default, or any awake crew member directly
+{
+  const to = $('to');
+  for (const c of [...crew].sort((a, b) => (a.id === 'chief' ? -1 : b.id === 'chief' ? 1 : 0))) if (c.awake) to.append(Object.assign(document.createElement('option'), { value: c.id, textContent: c.id === 'chief' ? `${c.name} (hands out the work)` : `${c.name} directly` }));
+  const sync = () => { const n = names[to.value] || 'the crew'; $('prompt').placeholder = `A job for ${n.replace(/^The /, 'the ')}…`; $('prompt-label').textContent = `Job for ${n}`; };
+  to.onchange = sync; sync();
+}
 state = initialState(crew);
 
 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -230,7 +250,7 @@ canvas.addEventListener('pointerup', e => {
   const was = drag; drag = null; canvas.classList.remove('dragging');
   if (was && was.moved < 2) { const r = canvas.getBoundingClientRect(), id = station.pick(e.clientX - r.left, e.clientY - r.top); if (id) setFilter(id); }
 });
-station.scrollTo(station.positionOf('smith')); syncThumb();
+station.scrollTo(station.positionOf('chief')); syncThumb();
 
 // remembered answers: list them, forget any
 async function loadGrants() {

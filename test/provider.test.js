@@ -15,7 +15,7 @@ test('stream parser: init, deltas, no double text, result', () => {
   p.feed({ type: 'stream_event', event: { type: 'message_start', message: { id: 'm1' } } });
   assert.deepEqual(p.feed({ type: 'stream_event', event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'Hel' } } }), [{ kind: 'token', text: 'Hel' }]);
   assert.deepEqual(p.feed({ type: 'assistant', message: { id: 'm1', content: [{ type: 'text', text: 'Hello' }] } }), [], 'already streamed');
-  assert.deepEqual(p.feed({ type: 'assistant', message: { id: 'm2', content: [{ type: 'text', text: 'Whole' }, { type: 'tool_use', id: 't', name: 'x', input: {} }] } }), [{ kind: 'token', text: 'Whole' }]);
+  assert.deepEqual(p.feed({ type: 'assistant', message: { id: 'm2', content: [{ type: 'text', text: 'Whole' }, { type: 'tool_use', id: 't', name: 'mcp__monkeycraft__fs_read', input: {} }] } }), [{ kind: 'token', text: 'Whole' }]);
   const [r] = p.feed(RESULT);
   assert.equal(r.reason, 'done'); assert.equal(r.usd, 0.0123); assert.equal(r.cacheReadTokens, 1000); assert.equal(r.turns, 2);
   assert.equal(p.feed({ ...RESULT, subtype: 'error_max_turns', is_error: true })[0].reason, 'max_iters');

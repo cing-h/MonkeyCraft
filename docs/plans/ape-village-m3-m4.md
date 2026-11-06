@@ -1,6 +1,6 @@
 # Plan: ape village in the app, then M3 Safety, then M4 Crew
 
-Status: APPROVED by the user 2026-11-06. Phase 1 DONE (ape village in the app, plus the crew glow). Phase 2 DONE (M3 Safety). Q-web answered: (a) Claude Code's own web search. Order chosen by the user: port the ape look first, then M3, then M4.
+Status: APPROVED by the user 2026-11-06. Phase 1 DONE (ape village in the app, plus the crew glow). Phase 2 DONE (M3 Safety). Phase 3 DONE (M4 Crew). Decision during Phase 3: the user chose to keep the web-read lockout on the Scout only. Q-web answered: (a) Claude Code's own web search. Order chosen by the user: port the ape look first, then M3, then M4.
 Each phase has its own branch, and I check in with you when each phase is done before starting the next.
 
 ## In plain words (for you)

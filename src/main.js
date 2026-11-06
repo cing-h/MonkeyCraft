@@ -17,6 +17,12 @@ import { makeGrantStore } from './safety/grants.js';
 import { makeChildTracker } from './safety/children.js';
 import { makeUndoStore } from './store/undo.js';
 import { makeFsWrite } from './tools/fs-write.js';
+import { makeFsEdit } from './tools/fs-edit.js';
+import { makeFsMove } from './tools/fs-move.js';
+import { makeVerifyRun } from './tools/verify-run.js';
+import { makeWebFetch } from './tools/web-fetch.js';
+import { makeCrewTools } from './crew/orchestrate.js';
+import dns from 'node:dns/promises';
 import { makeRegistry } from './tools/registry.js';
 import { makeFsRead } from './tools/fs-read.js';
 import { makeShellExec } from './tools/shell-exec.js';
@@ -43,7 +49,10 @@ const LIMITS = {
   perRunUsd: Number(process.env.MONKEYCRAFT_MAX_RUN_USD || 2),
   perRunTokens: Number(process.env.MONKEYCRAFT_MAX_RUN_TOKENS || 600_000),   // weighted: cache reads count 1/10
   dailyUsd: Number(process.env.MONKEYCRAFT_DAILY_USD || 25),
-  maxConcurrent: 2
+  familyUsd: Number(process.env.MONKEYCRAFT_MAX_FAMILY_USD || 5),            // a lead and all its workers together
+  familyTokens: Number(process.env.MONKEYCRAFT_MAX_FAMILY_TOKENS || 2_000_000),
+  maxConcurrent: 2,   // top-level jobs at once
+  maxWorkers: 2       // crew members working for leads at once
 };
 
 async function findClaude() {
@@ -85,12 +94,18 @@ async function main() {
   const ledger = makeLedger({ fsp, file: path.join(dataDir, 'ledger.ndjson') });
   const bus = makeBus({ clock, journal, log: m => console.warn(m) });
   const consent = makeConsentBroker({ newId, grants, log: m => console.warn(m) });
+  const roster = makeRoster({ workspace: realWorkspace });
+  const shell = makeShellExec({ spawn: trackedSpawn('shell'), pathEnv, baseEnv: process.env, killProcessGroup });
   const registry = makeRegistry([
     makeFsRead({ fsp, pathEnv }),
     makeFsWrite({ fsp, pathEnv, undo }),
-    makeShellExec({ spawn: trackedSpawn('shell'), pathEnv, baseEnv: process.env, killProcessGroup })
+    makeFsEdit({ fsp, pathEnv, undo }),
+    makeFsMove({ fsp, pathEnv, undo }),
+    shell,
+    makeVerifyRun({ shell }),
+    makeWebFetch({ fetchImpl: fetch, lookup: host => dns.lookup(host, { all: true }) }),
+    ...makeCrewTools({ roster })
   ]);
-  const roster = makeRoster({ workspace: realWorkspace });
   const claudePath = await findClaude();
   const providers = { 'claude-code': makeClaudeCodeProvider({ spawn: trackedSpawn('claude'), claudePath, baseEnv: process.env, killProcessGroup, cwd: realWorkspace }) };
   const runs = makeRunHost({
@@ -99,6 +114,7 @@ async function main() {
     limits: LIMITS, undo, guardPath
   });
   await runs.init();
+  setInterval(() => runs.checkLiveness(), 15_000).unref();
 
   const recovered = await runs.recover();
   await journal.flush();

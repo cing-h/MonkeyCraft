@@ -46,11 +46,12 @@
       <button id="filter" class="chip" type="button" hidden>Showing one crew member · show all</button>
     </div>
     <div id="log" class="log" aria-live="polite">
-      <p class="empty" id="empty">Give <b>the Smith</b> a job. Try: <em>"List what's in my workspace, then tell me how much disk space is free."</em> Watch it hurry home to the smithy. It will ask before running any command.</p>
+      <p class="empty" id="empty">Give <b>the Chief</b> a job, and it hands the pieces to the crew. Try: <em>"Find out what the tallest tree species in the world is and write a short summary into tallest-trees.txt."</em> Watch the Scout swing off to research and the Writer go to its hut. Anyone who wants to change something asks you first.</p>
     </div>
     <form id="composer" class="composer">
-      <label for="prompt" class="sr">Job for the Smith</label>
-      <textarea id="prompt" rows="2" placeholder="A job for the Smith…" maxlength="20000"></textarea>
+      <div class="to"><label for="to">TO</label><select id="to"></select></div>
+      <label for="prompt" class="sr" id="prompt-label">Job for the Chief</label>
+      <textarea id="prompt" rows="2" placeholder="A job for the Chief…" maxlength="20000"></textarea>
       <button type="submit" id="send">Send</button>
     </form>
   </aside>

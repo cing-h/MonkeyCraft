@@ -80,7 +80,7 @@ export function makeRegistry(tools) {
         return finish(true, `Locked: this job has read untrusted content (${ctx.taint.source()}), so for safety it can't run commands or change files any more. Nothing ran. Finish with what you can read, and tell the user what is left to do in a new job.`, 'locked: web content was read', false);
       }
 
-      const needsConsent = tool.scope !== 'read';
+      const needsConsent = tool.scope !== 'read' && tool.scope !== 'delegate';   // delegating asks nothing itself: each worker asks for its own actions
       if (needsConsent) {
         const allowed = await ctx.consent.request({
           emit, runId: ctx.runId, interactive: ctx.interactive, signal: ctx.signal, callId, tool: tool.name,
