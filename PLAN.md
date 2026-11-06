@@ -138,7 +138,9 @@ The renderer keeps 2 px per voxel, a 55° tilt, 45° camera steps and 10 fps ste
 1. **M0 Setup — DONE 2026-11-06** (Node v22.23.4 via nvm; 7 tests green; the freeze test is mutation-checked):
    - Node 22 in WSL, the repo, `node --test` green, lint-free;
    - `events.js` frozen at v1 with a validator test.
-2. **M1 One creature:**
+2. **M1 One creature — DONE 2026-11-06.** 27 tests pass. In a live run, the Smith ran `ls -la` after an on-screen prompt; the ledger row was recorded as a subscription run (3,862 tokens). Killing the sidecar mid-prompt left a clean journal; on restart it was closed as interrupted, with an unsettled ledger row. Live events go over SSE (`/api/events`), with replay from the journal at `/api/runs/:id`; there is no per-run NDJSON stream yet.
+   - *Finding:* the orphaned `claude -p` outlived the killed sidecar by a few seconds. It's harmless, since its only tools are inside AutoCraft. M3 adds a durable child-PID file and kills leftovers at startup, after checking each process's `/proc/<pid>/cmdline`.
+   - Original scope:
    - the Claude Code adapter, the MCP tool server, the registry with `fs.read` and `shell.exec`, the bus, the chat UI and the ledger;
    - *check:* the user asks the Smith to `ls` the workspace; the events stream; the ledger row is written; killing the sidecar mid-run leaves a consistent journal.
 3. **M2 Station:**

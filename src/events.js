@@ -27,7 +27,7 @@ const TYPES = {
   // model output
   'agent.token': { text: 'string' },
   'agent.reasoning': { text: 'string' },
-  'agent.cost': { usd: 'number', priced: 'boolean', inputTokens: 'integer', outputTokens: 'integer', cacheReadTokens: 'integer?', cacheWriteTokens: 'integer?' },
+  'agent.cost': { usd: 'number', priced: 'boolean', inputTokens: 'integer', outputTokens: 'integer', cacheReadTokens: 'integer?', cacheWriteTokens: 'integer?', billing: 'string?' }, // billing: 'api' | 'subscription' | 'unknown'
   'agent.waiting': { why: ['permission', 'budget', 'concurrency', 'provider'] },
   'agent.compact': { beforeTokens: 'integer', afterTokens: 'integer' },
 

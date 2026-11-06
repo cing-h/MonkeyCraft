@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoCraft</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&family=Silkscreen&display=swap">
+<link rel="stylesheet" href="/ui/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><span class="logo" aria-hidden="true"></span><h1>AutoCraft</h1></div>
+    <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
+    <button id="stop" class="stop" type="button" title="Stop every job right now">STOP</button>
+  </header>
+
+  <aside class="crew" aria-label="The crew"><h2>Crew</h2><ul id="crew"></ul></aside>
+
+  <main class="chat">
+    <div id="log" class="log" aria-live="polite">
+      <p class="empty" id="empty">Give the <b>Cinder Smith</b> a job. Try: <em>"List what's in my workspace, then tell me how much disk space is free."</em> It will ask before running any command.</p>
+    </div>
+    <form id="composer" class="composer">
+      <label for="prompt" class="sr">Job for the Cinder Smith</label>
+      <textarea id="prompt" rows="2" placeholder="A job for the Cinder Smith…" maxlength="20000"></textarea>
+      <button type="submit" id="send">Send</button>
+    </form>
+  </main>
+
+  <aside class="events" aria-label="Live events">
+    <h2>Live events</h2>
+    <p class="hint">Everything the crew really does, as it happens.</p>
+    <ol id="events"></ol>
+  </aside>
+</div>
+<script type="module" src="/ui/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+:root {
+  color-scheme: dark;
+  --bg: #0e0c12; --panel: #17141e; --edge: #2a2433; --fg: #e8e3f0; --muted: #9c93ad;
+  --accent: #b35cff; --ok: #57d18a; --warn: #f2c531; --bad: #ff5a5a; --lava: #ef5a1d;
+  --display: "Pixelify Sans", "Silkscreen", ui-monospace, monospace;
+  --label: "Silkscreen", ui-monospace, monospace;
+  --body: "Atkinson Hyperlegible", system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--body); }
+button { font: 12px var(--label); letter-spacing: .06em; color: var(--fg); background: var(--panel); border: 2px solid var(--edge); padding: 7px 12px; cursor: pointer; box-shadow: inset -2px -2px 0 #0a080e, inset 2px 2px 0 #2f2939; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: .5; cursor: default; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+
+.app { height: 100%; display: grid; grid-template: "top top top" auto "crew chat events" 1fr / 220px minmax(0, 1fr) 300px; }
+.top { grid-area: top; display: flex; align-items: center; gap: 16px; padding: 10px 16px; border-bottom: 2px solid var(--edge); background: var(--panel); }
+.brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
+.logo { width: 18px; height: 18px; background: var(--accent); box-shadow: 4px 4px 0 #6b34a3; }
+h1 { font: 700 22px var(--display); margin: 0; }
+h2 { font: 12px var(--label); letter-spacing: .1em; color: var(--muted); margin: 0 0 10px; text-transform: uppercase; }
+.spend { font: 11px var(--label); color: var(--muted); }
+.stop { background: #3a0d0d; border-color: #7a1c1c; color: #ffd0d0; font-size: 14px; padding: 8px 18px; }
+.stop:hover { border-color: var(--bad); }
+
+.crew { grid-area: crew; padding: 16px; border-right: 2px solid var(--edge); overflow: auto; }
+.crew ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.crew li { padding: 8px; border: 2px solid var(--edge); background: var(--panel); }
+.crew li.asleep { opacity: .45; }
+.crew li.busy { border-color: var(--ok); }
+.crew .n { font: 11px var(--label); display: block; }
+.crew .r { font-size: 12px; color: var(--muted); }
+.crew .st { font: 10px var(--label); color: var(--muted); }
+.crew li.busy .st { color: var(--ok); }
+
+.chat { grid-area: chat; display: grid; grid-template-rows: 1fr auto; min-height: 0; }
+.log { overflow: auto; padding: 18px; display: grid; align-content: start; gap: 14px; }
+.empty { color: var(--muted); max-width: 60ch; }
+.run { display: grid; gap: 8px; }
+.you { justify-self: end; max-width: 75%; background: #241d31; border: 2px solid #3a2f4d; padding: 8px 12px; white-space: pre-wrap; }
+.who { font: 10px var(--label); color: var(--lava); letter-spacing: .08em; }
+.say { white-space: pre-wrap; max-width: 75ch; }
+.tool { font: 13px var(--mono); border-left: 3px solid var(--edge); padding: 4px 10px; color: var(--muted); }
+.tool.ok { border-color: var(--ok); }
+.tool.err { border-color: var(--bad); }
+.tool b { color: var(--fg); font-weight: 400; }
+.ask { border: 2px solid var(--warn); background: #241f0c; padding: 10px 12px; display: grid; gap: 8px; max-width: 75ch; }
+.ask .q { font: 11px var(--label); color: var(--warn); }
+.ask code { font: 13px var(--mono); white-space: pre-wrap; word-break: break-word; background: #120f06; padding: 6px 8px; display: block; }
+.ask .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ask .allow { border-color: #2c6b45; }
+.ask .deny { border-color: #7a1c1c; }
+.ask.done { border-color: var(--edge); background: var(--panel); }
+.ask .ans { font: 11px var(--label); color: var(--muted); }
+.error { color: #ffb4b4; border-left: 3px solid var(--bad); padding: 4px 10px; }
+.foot { font: 10px var(--label); color: var(--muted); letter-spacing: .05em; }
+.composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 12px 18px; border-top: 2px solid var(--edge); background: var(--panel); }
+textarea { resize: vertical; min-height: 44px; font: 15px var(--body); color: var(--fg); background: #0b0a0f; border: 2px solid var(--edge); padding: 8px 10px; }
+
+.events { grid-area: events; border-left: 2px solid var(--edge); padding: 16px; overflow: auto; }
+.events .hint { color: var(--muted); font-size: 12px; margin: -4px 0 10px; }
+.events ol { list-style: none; margin: 0; padding: 0; font: 12px var(--mono); display: grid; gap: 2px; }
+.events li { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.events li .t { color: var(--fg); }
+
+@media (max-width: 900px) {
+  .app { grid-template: "top" auto "chat" 1fr "crew" auto "events" 200px / 1fr; }
+  .crew, .events { border: 0; border-top: 2px solid var(--edge); }
+  .crew ul { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
