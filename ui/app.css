@@ -151,3 +151,13 @@ textarea::placeholder { color: #7f8a74; }
 .settings-btns { display: flex; justify-content: flex-end; gap: 8px; }
 .settings .primary { border-color: var(--leaf); }
 @media (max-width: 560px) { .limits { grid-template-columns: 1fr; } }
+
+/* village chatter: speech bubbles, clearly not the yellow question bubble */
+.chat { position: absolute; transform: translate(-50%, calc(-100% - 8px)); pointer-events: none; max-width: 250px; padding: 5px 9px 6px; background: #f3ead2; color: #2a1c13; border: 2px solid #2a1c13; border-radius: 9px; font: 13px/1.3 var(--body); box-shadow: 2px 2px 0 rgba(0,0,0,.35); animation: chat-in .18s ease-out; }
+.chat::after { content: ""; position: absolute; left: 50%; bottom: -8px; margin-left: -5px; border: 5px solid transparent; border-top-color: #2a1c13; }
+.chat b { font: 700 13px var(--display); letter-spacing: .02em; }
+.chat span { color: #5d4a38; font-size: 12.5px; }
+.chat.faint { opacity: .78; transform: translate(-50%, calc(-100% - 6px)) scale(.86); }
+@keyframes chat-in { from { opacity: 0; translate: 0 4px; } }
+@media (prefers-reduced-motion: reduce) { .chat { animation: none; } }
+.settings .check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }

@@ -1,7 +1,8 @@
 # Edition 1: final changes (waiting list)
 
 Status: BUILDING (the user said go on 2026-11-06). Order: item 2 → 3 → 4 → 1, one branch each, checking in after each.
-- Item 2: DONE on `feature/swing-reanimation`.
+- Item 2: DONE on `feature/swing-reanimation` (pushed).
+- Item 3: DONE on `feature/village-chatter`.
 
 Each item records what the user asked for, the decisions already made, and an outline of how to build it.
 
@@ -88,7 +89,16 @@ Added 2026-11-06. **DONE** (branch `feature/swing-reanimation`). What was built:
 
 ## 3. Passive dialogue between the village members
 
-Added 2026-11-06.
+Added 2026-11-06. **DONE** (branch `feature/village-chatter`). What was built:
+- `ui/station/ape/chatter-lines.js`: monkey sounds per species, 50 written conversations of 2–4 lines, 30 mutters, sleep-talk, and event lines.
+- `ui/station/ape/chatter.js`: the pure scheduler.
+  - Free crew and villagers chat; busy crew never do, and a speaker who gets busy stops at once.
+  - Asleep crew only sleep-talk.
+  - Event lines (job done or failed, a question waiting, the Chief sending someone) are said only within 6 s of the real event, by someone else. A question is only mentioned by someone well away from the asker.
+  - At most 2 bubbles at once; lone apes mutter.
+- The scene tracks speakers' heads, villagers included, and exposes `chatter()` and `notify()`. The app draws cream speech bubbles in the overlay: hidden from screen readers, hidden where they would overlap a question bubble, and fed only fresh events (never replayed history).
+- A "Village chatter" switch in Settings (saved per browser); off by default with reduced motion.
+- Tests in `test/chatter.test.js` (the busy-crew rule was mutation-tested); 74 pass.
 
 **What the user wants:** passive chatter between the monkeys in the village, written in monkey sounds, with the real English meaning in parentheses. For example: *"Hoo-hoo-hoo! (Nice weather for swinging.)"*
 

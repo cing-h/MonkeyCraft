@@ -20,6 +20,7 @@ import { DOORS, PERCH_Y, TRUNKS, WATER, branchY, buildLayers, groundY } from './
 import { makeVillagers, stepVillager, villagerPose } from './villagers.js';
 import { buildFrame, drawVines } from './frame.js';
 import { makeBrachiator, stepPose, brachiatePose } from './swing.js';
+import { makeChatter } from './chatter.js';
 
 
 // ---------- 5×5 plate glyphs ----------
@@ -40,6 +41,8 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
   let t = 0, cam = 330, seed = 11;
   const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
   const sparks = [];
+  const chatter = makeChatter({ rnd: () => rnd() }), vheads = [];   // vheads: villagers' heads on screen, from the last frame
+  let chat = [];
   const leaves = [];   // leaves shaken loose by a catch: { x, y, vx, vy, life, par (parallax of their layer), c }
   const shake = (x, y, par, n) => { for (let i = 0; i < n; i++) leaves.push({ x: x + (rnd() - 0.5) * 6, y: y - rnd() * 2, vx: (rnd() - 0.5) * 8, vy: -4 - rnd() * 6, life: 1.4 + rnd() * 0.8, par, ph: rnd() * 6, c: rnd() < 0.5 ? [86, 140, 62] : [124, 170, 78] }); };
   // a crew member's swing along the canopy branch (see swing.js)
@@ -144,6 +147,11 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       // the tail follows its pose like a spring: it swings and settles on its own
       const want = a.q ? (a.q.tail ?? 0.5) : 0.5; a.tailV += ((want - a.tailA) * 60 - a.tailV * 9) * dt; a.tailA += a.tailV * dt;
     }
+    // chatter: who is where on screen, and what mode each crew member is in (scenery only, see chatter.js)
+    const speakers = [];
+    for (const k of CREW) { const h = heads[k], a = actors[k]; if (h && !a.inside) speakers.push({ ref: `crew:${k}`, kind: 'crew', species: k, mode: a.mode, x: h.headX - cam, y: h.headY }); }
+    villagers.forEach((v, i) => { if (vheads[i]) speakers.push({ ref: `v:${i}`, kind: 'villager', species: v.key, mode: 'idle', x: vheads[i].x, y: vheads[i].y }); });
+    chat = reduced ? [] : chatter.step(dt, { speakers });
     for (const v of villagers) if (stepVillager(v, dt, rnd) === 'catch') shake(v.b.hx, v.b.branchY(v.b.hx), 0.55, v.fast ? 3 : 1);
     for (let i = leaves.length - 1; i >= 0; i--) { const l = leaves[i]; l.life -= dt; l.ph += dt * 5; l.vy = Math.min(9, l.vy + 18 * dt); l.vx *= 0.97; l.x += (l.vx + Math.sin(l.ph) * 6) * dt; l.y += l.vy * dt; if (l.life <= 0 || l.y > WATER) leaves.splice(i, 1); }
     for (const f of flies) { f.ph += dt; f.x += Math.sin(f.ph * 0.7) * 10 * dt + 4 * dt; f.y = 92 + Math.sin(f.ph * 1.3) * 8 + Math.sin(f.ph * 5) * 1.5; if (f.x > WORLD) f.x = 0; }
@@ -218,7 +226,7 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
     }
     blit(L.back, 0.55);
     fb.ox = Math.round(cam * 0.55); fb.fog = 0.26; fb.fogc = [150, 140, 130];
-    for (const v of villagers) { const { q, px, py } = villagerPose(v); drawApe(fb, v.key, q, { mode: 'pelvis', x: px, y: py }, v.b.dir, v.s, t); }
+    villagers.forEach((v, i) => { const { q, px, py } = villagerPose(v), h = drawApe(fb, v.key, q, { mode: 'pelvis', x: px, y: py }, v.b.dir, v.s, t); vheads[i] = { x: h.headX - fb.ox, y: h.headY }; });
     for (const l of leaves) if (l.par !== 1) fb.put(l.x - fb.ox, l.y, l.c);
     fb.fog = 0; fb.ox = 0;
     // low mist drifting through the trees behind the village
@@ -304,7 +312,16 @@ export function makeStation(canvas, { modeOf, reduced = false }) {
       return best;
     },
     anchor(k) { const r = canvas.getBoundingClientRect(), h = heads[k] || { headX: DOORS[k].x, headY: surfaceY(DOORS[k].lane, DOORS[k].x) - 20 }; return [(h.headX - cam) / W * r.width, h.headY / H * r.height]; },
-    positionOf: k => actors[k].x
+    positionOf: k => actors[k].x,
+    /** A real event the villagers may remark on (see chatter.js). */
+    notify: fact => chatter.notify(fact),
+    /** Chatter bubbles to show now, each with where its speaker's head is, in CSS px relative to the canvas. */
+    chatter() {
+      const r = canvas.getBoundingClientRect(), pos = new Map();
+      for (const k of CREW) if (heads[k]) pos.set(`crew:${k}`, [heads[k].headX - cam, heads[k].headY]);
+      vheads.forEach((h, i) => h && pos.set(`v:${i}`, [h.x, h.y]));
+      return chat.filter(b => pos.has(b.ref)).map(b => { const [x, y] = pos.get(b.ref); return { ...b, x: x / W * r.width, y: y / H * r.height }; });
+    }
   };
 }
 

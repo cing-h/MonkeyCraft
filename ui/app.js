@@ -148,6 +148,14 @@ function onEvent(ev) {
   logEvent(ev);
   logRun(ev);
   if (station) { syncStrip(Date.now()); syncBubbles(); } // show questions at once, not on the next tick
+  // the villagers may remark on fresh, real events (never on replayed history)
+  if (station && Date.now() - ev.ts < 5000) {
+    const name = names[ev.workerId || ev.agentId] || 'someone';
+    if (ev.type === 'run.end' && ev.reason === 'done') station.notify({ type: 'job_done', agentId: ev.agentId, name });
+    else if (ev.type === 'run.end' && ev.reason === 'error') station.notify({ type: 'job_failed', agentId: ev.agentId, name });
+    else if (ev.type === 'permission.prompt') station.notify({ type: 'asking', agentId: ev.agentId, name });
+    else if (ev.type === 'crew.dispatch') station.notify({ type: 'sent', agentId: ev.workerId, name });
+  }
 }
 
 // ---------- filter (click a creature to see only its jobs) ----------
@@ -193,6 +201,29 @@ function syncBubbles() {
     b.style.top = Math.max(b.offsetHeight + 14, y) + 'px';
   }
   for (const [pid, b] of bubbles) if (!live.has(pid)) { b.remove(); bubbles.delete(pid); }
+}
+
+// ---------- village chatter (scenery: hidden from screen readers, never over a question) ----------
+const chatEls = new Map();
+let chatterOn = true;
+try { const v = localStorage.getItem('mc-chatter'); chatterOn = v === null ? !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches : v === '1'; } catch {}
+function syncChatter() {
+  const list = chatterOn ? station.chatter() : [], live = new Set();
+  const asks = [...document.querySelectorAll('#overlay .bubble')].map(b => b.getBoundingClientRect());
+  const stageW = $('stage').clientWidth;
+  for (const c of list) {
+    live.add(c.id);
+    let e = chatEls.get(c.id);
+    if (!e) {
+      e = el('div', 'chat' + (c.faint ? ' faint' : '')); e.setAttribute('aria-hidden', 'true');
+      e.append(el('b', '', c.sound), document.createTextNode(' '), el('span', '', `(${c.meaning})`));
+      $('overlay').append(e); chatEls.set(c.id, e);
+    }
+    e.style.left = Math.max(80, Math.min(c.x, stageW - 80)) + 'px'; e.style.top = Math.max(e.offsetHeight + 6, c.y) + 'px';
+    const r = e.getBoundingClientRect(), hit = asks.some(a => r.left < a.right && r.right > a.left && r.top < a.bottom && r.bottom > a.top);
+    e.style.visibility = hit ? 'hidden' : 'visible';
+  }
+  for (const [id, e] of chatEls) if (!live.has(id)) { e.remove(); chatEls.delete(id); }
 }
 
 // ---------- spend, roster, controls ----------
@@ -286,6 +317,7 @@ async function openSettings() {
     const td1 = el('td'), td2 = el('td'); td1.append(p); td2.append(m); tr.append(td1, td2); rows.append(tr);
   }
   for (const k of LIMIT_KEYS) { const i = $(`lim-${k}`), r = options.ranges[k]; i.min = r[0]; i.max = r[1]; i.value = effective.limits[k]; }
+  $('chatter-on').checked = chatterOn;
   $('settings-error').hidden = true;
   $('settings').showModal();
 }
@@ -296,6 +328,7 @@ $('settings-form').addEventListener('submit', async e => {
   const crewS = {}, limits = {};
   for (const c of settingsView.effective.crew) crewS[c.id] = { provider: $(`prov-${c.id}`).value, model: $(`model-${c.id}`).value };
   for (const k of LIMIT_KEYS) limits[k] = Number($(`lim-${k}`).value);
+  chatterOn = $('chatter-on').checked; try { localStorage.setItem('mc-chatter', chatterOn ? '1' : '0'); } catch {}
   const res = await post('/api/settings', { crew: crewS, limits });
   if (!res.ok) { const er = $('settings-error'); er.textContent = res.data.error || 'Could not save.'; er.hidden = false; return; }
   $('settings').close(); loadSpend();
@@ -308,4 +341,4 @@ es.onmessage = m => { try { onEvent(JSON.parse(m.data)); } catch (e) { console.e
 
 // draw at once (don't wait for the first tick), then 20 steps a second so moves flow smoothly
 station.step(Date.now(), 0.05); syncStrip(Date.now());
-setInterval(() => { const now = Date.now(); station.step(now, 0.05); syncStrip(now); syncBubbles(); }, 50);
+setInterval(() => { const now = Date.now(); station.step(now, 0.05); syncStrip(now); syncBubbles(); syncChatter(); }, 50);
