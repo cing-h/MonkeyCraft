@@ -26,7 +26,7 @@ export function fakeGoogle({ clientId = 'abc123-test.apps.googleusercontent.com'
   let failNext = null;
 
   const fake = {
-    docRequests: [],
+    docRequests: [], sheetRequests: [],
     files, calls, clientId, clientSecret, rootId,
     keyJson: () => JSON.stringify({ installed: { client_id: clientId, client_secret: clientSecret, redirect_uris: ['http://localhost'] } }),
     /** The user says yes on Google's consent page: returns the redirect query Google would send. */
@@ -42,6 +42,7 @@ export function fakeGoogle({ clientId = 'abc123-test.apps.googleusercontent.com'
     /** A file the user already had, not made by MonkeyCraft (hidden unless opened). */
     addFile({ name, mimeType, visible = false, text = '' }) {
       const f = { id: id(), name, mimeType, parents: [rootId], trashed: false, visible, text };
+      if (mimeType === SHEET) f.sheet = newSheet();
       if (mimeType === DOC) { f.doc = newDoc(); if (text) f.doc.tokens.unshift(...[...text].map(ch => ch === '\n' ? { ch, ts: {}, ps: { namedStyleType: 'NORMAL_TEXT' } } : { ch, ts: {} })); }
       files.set(f.id, f); return f;
     },
@@ -71,13 +72,15 @@ export function fakeGoogle({ clientId = 'abc123-test.apps.googleusercontent.com'
       }
       if (u.host === 'oauth2.googleapis.com' && u.pathname === '/revoke') { refresh.delete(u.searchParams.get('token')); return json(200, {}); }
       const isDocs = u.host === 'docs.googleapis.com' && u.pathname.startsWith('/v1/documents');
-      if (!isDocs && (u.host !== 'www.googleapis.com' || !u.pathname.startsWith('/drive/v3/files'))) return json(404, { error: { message: 'no such API in the fake' } });
+      const isSheets = u.host === 'sheets.googleapis.com' && u.pathname.startsWith('/v4/spreadsheets/');
+      if (!isDocs && !isSheets && (u.host !== 'www.googleapis.com' || !u.pathname.startsWith('/drive/v3/files'))) return json(404, { error: { message: 'no such API in the fake' } });
 
       const tok = String(opts.headers?.authorization || '').replace(/^Bearer /, '');
       if (!ok(tok)) return json(401, { error: { message: 'Invalid Credentials' } });
       if (failNext) { const f = failNext; failNext = null; return json(f.status, f.body); }
       const body = opts.body ? JSON.parse(opts.body) : {};
       if (isDocs) return docsApi(u, method, body);
+      if (isSheets) return sheetsApi(u, method, body);
       const rest = u.pathname.slice('/drive/v3/files'.length).split('/').filter(Boolean).map(decodeURIComponent);
 
       if (!rest.length && method === 'GET') {
@@ -92,12 +95,13 @@ export function fakeGoogle({ clientId = 'abc123-test.apps.googleusercontent.com'
       if (!rest.length && method === 'POST') {
         const f = { id: id(), name: body.name, mimeType: body.mimeType, parents: (body.parents || [rootId]).map(resolve), trashed: false, visible: true, text: '' };
         if (f.mimeType === DOC) f.doc = newDoc();
+        if (f.mimeType === SHEET) f.sheet = newSheet();
         files.set(f.id, f); return json(200, pub(f));
       }
       const f = see(rest[0]);
       if (!f) return json(404, { error: { message: `File not found: ${rest[0]}.` } });
       if (rest[1] === 'export') return textRes(200, f.doc ? docText(f.doc) : (f.text || ''));
-      if (rest[1] === 'copy' && method === 'POST') { const c = { ...f, id: id(), name: body.name || `Copy of ${f.name}`, parents: [...f.parents], visible: true, doc: f.doc && structuredClone(f.doc) }; files.set(c.id, c); return json(200, pub(c)); }
+      if (rest[1] === 'copy' && method === 'POST') { const c = { ...f, id: id(), name: body.name || `Copy of ${f.name}`, parents: [...f.parents], visible: true, doc: f.doc && structuredClone(f.doc), sheet: f.sheet && cloneSheet(f.sheet) }; files.set(c.id, c); return json(200, pub(c)); }
       if (method === 'GET') return json(200, pub(f));
       if (method === 'PATCH') {
         if (body.name !== undefined) f.name = body.name;
@@ -128,8 +132,101 @@ export function fakeGoogle({ clientId = 'abc123-test.apps.googleusercontent.com'
     }
     return json(405, { error: { message: 'no' } });
   }
+  // ---------- Google Sheets: tabs of cells holding what was typed ----------
+  function sheetsApi(u, method, body) {
+    const path = u.pathname.slice('/v4/spreadsheets/'.length);
+    const [idPart, ...rest] = path.split('/');
+    const [fid, action] = decodeURIComponent(idPart).split(':');
+    const f = see(fid);
+    if (!f || !f.sheet) return json(404, { error: { message: 'Requested entity was not found.' } });
+    const S = f.sheet;
+    if (!rest.length && method === 'GET') return json(200, { spreadsheetId: f.id, sheets: S.tabs.map(t => ({ properties: { sheetId: t.sheetId, title: t.title, gridProperties: { rowCount: 1000, columnCount: 26, ...(t.frozen ? { frozenRowCount: t.frozen } : {}) } }, ...(t.charts.length ? { charts: t.charts.map(c => ({ chartId: c.chartId })) } : {}) })) });
+    if (!rest.length && method === 'POST' && action === 'batchUpdate') {
+      const replies = [];
+      try { for (const r of body.requests) replies.push(sheetRequest(S, r)); } catch (e) { return json(400, { error: { message: e.message } }); }
+      fake.sheetRequests.push(...body.requests);
+      return json(200, { spreadsheetId: f.id, replies });
+    }
+    if (rest[0] === 'values') {
+      const [rangeRaw, verb] = decodeURIComponent(rest.slice(1).join('/')).split(/:(append)$/);
+      const { tab, r } = parseA1(S, rangeRaw);
+      if (!tab) return json(400, { error: { message: `Unable to parse range: ${rangeRaw}` } });
+      if (method === 'GET') {
+        const formulas = u.searchParams.get('valueRenderOption') === 'FORMULA';
+        const box = r || usedBox(tab) || { col: 0, row: 0, endCol: -1, endRow: -1 };
+        const values = [];
+        for (let i = box.row; i <= box.endRow; i++) { const row = []; for (let j = box.col; j <= box.endCol; j++) { const v = tab.cells.get(`${i},${j}`); row.push(v === undefined ? '' : formulas ? v : show(tab, v)); } values.push(row); }
+        while (values.length && values.at(-1).every(v => v === '')) values.pop();
+        for (const row of values) while (row.length && row.at(-1) === '') row.pop();
+        return json(200, { range: rangeRaw, majorDimension: 'ROWS', ...(values.length ? { values } : {}) });
+      }
+      if (method === 'PUT' && !verb) { let n = 0; body.values.forEach((row, i) => row.forEach((v, j) => { put(tab, r.row + i, r.col + j, v); n++; })); return json(200, { updatedCells: n, updatedRange: rangeRaw }); }
+      if (method === 'POST' && verb === 'append') {
+        const at = (usedBox(tab)?.endRow ?? -1) + 1;
+        body.values.forEach((row, i) => row.forEach((v, j) => put(tab, at + i, j, v)));
+        return json(200, { updates: { updatedRange: `${tab.title}!A${at + 1}:${String.fromCharCode(64 + Math.max(...body.values.map(x => x.length)))}${at + body.values.length}` } });
+      }
+    }
+    return json(405, { error: { message: 'no' } });
+  }
+
   fake.fetchImpl = (u, o) => fake.fetch(u, o);
   return fake;
+}
+
+const SHEET = 'application/vnd.google-apps.spreadsheet';
+function newSheet() { return { tabs: [{ sheetId: 0, title: 'Sheet1', cells: new Map(), charts: [], bold: new Set(), frozen: 0 }], next: 1 }; }
+function cloneSheet(S) { return { next: S.next, tabs: S.tabs.map(t => ({ ...t, cells: new Map(t.cells), charts: [...t.charts], bold: new Set(t.bold) })) }; }
+const ci = s => [...s].reduce((a, c) => a * 26 + c.charCodeAt(0) - 64, 0) - 1;
+function parseA1(S, raw) {
+  const m = /^(?:'((?:[^']|'')+)'|([^!]+?))(?:!([A-Z]+)(\d+)(?::([A-Z]+)(\d+))?)?$/.exec(raw);
+  if (!m) return {};
+  const title = m[1] !== undefined ? m[1].replace(/''/g, "'") : m[2];
+  const tab = S.tabs.find(t => t.title === title);
+  if (!m[3]) return { tab };
+  const r = { col: ci(m[3]), row: Number(m[4]) - 1 }; r.endCol = m[5] ? ci(m[5]) : r.col; r.endRow = m[6] ? Number(m[6]) - 1 : r.row;
+  return { tab, r };
+}
+function usedBox(tab) {
+  let b = null;
+  for (const k of tab.cells.keys()) { const [i, j] = k.split(',').map(Number); b = b ? { col: Math.min(b.col, j), row: Math.min(b.row, i), endCol: Math.max(b.endCol, j), endRow: Math.max(b.endRow, i) } : { col: j, row: i, endCol: j, endRow: i }; }
+  return b && { ...b, col: 0, row: 0 };
+}
+// as typed: numbers stay numbers, text that looks like a number becomes one
+function put(tab, i, j, v) { const k = `${i},${j}`; if (v === '' || v === null) { tab.cells.delete(k); return; } tab.cells.set(k, typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v); }
+// the fake only knows =SUM(A1:B2); anything else shows #NAME?
+function show(tab, v) {
+  if (typeof v === 'string' && v.startsWith('=')) {
+    const m = /^=SUM\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)$/i.exec(v);
+    if (!m) return '#NAME?';
+    let sum = 0;
+    for (let i = Number(m[2]) - 1; i <= Number(m[4]) - 1; i++) for (let j = ci(m[1].toUpperCase()); j <= ci(m[3].toUpperCase()); j++) { const x = tab.cells.get(`${i},${j}`); if (typeof x === 'number') sum += x; }
+    return String(sum);
+  }
+  return typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v);
+}
+function sheetRequest(S, r) {
+  const tabOf = id => { const t = S.tabs.find(x => x.sheetId === id); if (!t) throw new Error(`No grid with id: ${id}`); return t; };
+  if (r.addSheet) {
+    const title = r.addSheet.properties.title;
+    if (S.tabs.some(t => t.title.toLowerCase() === title.toLowerCase())) throw new Error(`A sheet with the name "${title}" already exists.`);
+    const t = { sheetId: S.next++ * 1000, title, cells: new Map(), charts: [], bold: new Set(), frozen: 0 }; S.tabs.push(t);
+    return { addSheet: { properties: { sheetId: t.sheetId, title } } };
+  }
+  if (r.updateSheetProperties) {
+    const p = r.updateSheetProperties.properties, t = tabOf(p.sheetId);
+    if (p.title !== undefined) t.title = p.title;
+    if (p.gridProperties?.frozenRowCount !== undefined) t.frozen = p.gridProperties.frozenRowCount;
+    return {};
+  }
+  if (r.repeatCell) { const g = r.repeatCell.range, t = tabOf(g.sheetId); for (let i = g.startRowIndex; i < g.endRowIndex; i++) t.bold.add(i); return {}; }
+  if (r.addChart) {
+    const spec = r.addChart.chart.spec, anchor = r.addChart.chart.position.overlayPosition.anchorCell, t = tabOf(anchor.sheetId);
+    const src = (spec.basicChart?.domains[0].domain || spec.pieChart.domain).sourceRange.sources[0];
+    tabOf(src.sheetId);
+    const chartId = 5000 + t.charts.length; t.charts.push({ chartId, spec, anchor }); return { addChart: { chart: { chartId } } };
+  }
+  throw new Error(`The fake doesn't know ${Object.keys(r)[0]}`);
 }
 
 const DOC = 'application/vnd.google-apps.document';

@@ -17,7 +17,7 @@ A capuchin crew member who works in Google Docs, Sheets and Slides through Googl
 2. **`feature/clerk-docs`:** create a document; write and revise it (headings, lists, tables, exact edits). A backup copy is made in Drive before editing any file the user already had.
    - **Picker (decided 2026-11-06, user chose it):** a "Let the Clerk open a file" button opens Google's own file picker. Each file the user picks is shared with MonkeyCraft, one at a time (still `drive.file`). This needs an API key: one more setup step (enable the Picker API, then create an API key). The app id is the number at the start of the client id.
    - Edits to a document not made in the same job: a backup copy goes in Drive first, once per document per job. Revert can't undo a Docs edit itself (the APIs have no version restore), so it points to the backup instead.
-3. **`feature/clerk-sheets`:** create a sheet; read and write ranges, formulas and charts.
+3. **`feature/clerk-sheets`:** create a sheet; read and write ranges, formulas and charts. DONE 2026-11-06, live-checked.
 4. **`feature/clerk-slides`:** turn an outline into a deck with speaker notes.
 5. **`feature/clerk-crew`: the Clerk in the roster and the village.**
    - Sprite, poses, the ink-green glow, the counting house on Canopy 1, and chatter (*"Chirr-chirr."*).
@@ -49,3 +49,15 @@ Before Phase 1's live check, the user does the guided Google Cloud setup: create
   - The first edit in a job of a document the job didn't make saves a backup copy first, named "<name> (backup before MonkeyCraft, <date>)". Revert names that backup and never bins it.
 - **The file picker:** the picker API key is kept in `data/google/picker.json`. The app id is the project number at the start of the client id. `GET /api/google/picker` is the picker page (`ui/google-picker.js`). It gets its token from `POST /api/google/picker-session`, which needs the X-MonkeyCraft header.
 - **Live-checked 2026-11-06** on the user's Drive: create, append, replace and read. The PDF export showed real formatting. The test documents were binned afterwards.
+- **Picker live-checked 2026-11-06:** the user saved a picker key and picked a folder, and MonkeyCraft could then see it (and nothing else of theirs).
+
+## Phase 3 notes (what was built)
+- `src/google/sheets.js` has the A1 helpers (column letters, cells, ranges, quoted tab names) and a row checker. It reads and writes values, entering them as if typed, so text starting with `=` is a formula. It also appends, adds and renames tabs, sets a bold frozen header, and adds charts.
+  - A chart's first column is the labels and each other column is one series. Pie uses one series.
+  - Each new chart goes to the right of its data, 20 rows below the charts already on that tab.
+- `src/tools/google-sheets.js` has six tools: `sheets.read`, `sheets.create`, `sheets.write`, `sheets.append`, `sheets.tab` and `sheets.chart`.
+  - A write's range is always worked out from the start cell and the size of the rows, so it can't spill past what was previewed.
+  - The preview counts the filled cells that would be overwritten.
+- `src/google/backup.js` is the backup rule, shared with Docs (and Slides next).
+- **Live-checked 2026-11-06:** create (with formulas), overwrite, append, tab, column and pie charts, read (values and formulas). In the PDF export the charts were correct and didn't overlap. The test sheets were binned.
+- `sheets.append` adds under the last filled row, which can be below a Total row. The Clerk's persona should mention this (phase 5).

@@ -10,12 +10,12 @@
 
 import { describe, kindOf, FILE_ID, MIME } from '../google/drive.js';
 import { parseMarkdown, countOccurrences } from '../google/docs.js';
+import { makeBackups } from '../google/backup.js';
 
 const NOT_CONNECTED = "Google isn't connected, so nothing was done. Tell the user to open Settings and press Connect Google.";
 const idProp = { type: 'string', maxLength: 200 };
 const mdProp = { type: 'string', maxLength: 200_000 };
 const clip = (s, n = 400) => s.length > n ? s.slice(0, n) + '…' : s;
-const stamp = ms => new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
 const shape = md => {
   const b = parseMarkdown(md), h = b.filter(x => x.style?.startsWith('HEADING')).length, t = b.filter(x => x.kind === 'table').length;
   return [`${b.length} block${b.length === 1 ? '' : 's'}`, h && `${h} heading${h === 1 ? '' : 's'}`, t && `${t} table${t === 1 ? '' : 's'}`].filter(Boolean).join(', ');
@@ -31,18 +31,7 @@ export function makeDocsTools({ auth, drive, docs, undo, clock }) {
     if (file.trashed) return { error: `${describe(file)} is in the bin. Nothing was done.` };
     return { file };
   };
-  const madeOrBackedUp = async (runId, fileId) => (await undo.list(runId)).some(r => r.op === 'remote' && r.done && r.remote?.fileId === fileId && (r.remote.kind === 'create' || r.remote.kind === 'edit'));
-  /** Before the first edit in this job of a document the job didn't make: copy it, and remember where the copy is. */
-  async function backupFirst(ctx, file) {
-    if (await madeOrBackedUp(ctx.runId, file.id)) return null;
-    const backupName = `${file.name} (backup before MonkeyCraft, ${stamp(clock.now())})`;
-    const label = `Google Drive: edited "${file.name}"`;
-    const s = await undo.saveRemote({ runId: ctx.runId, label, remote: { kind: 'edit', fileId: file.id } });
-    ctx.emit('undo.saved', { undoId: s.undoId, path: label, op: 'write' });
-    const copy = await drive.copy(file.id, backupName, ctx.signal);
-    await undo.settleRemote(ctx.runId, s.undoId, { kind: 'edit', fileId: file.id, backupId: copy.id, backupName });
-    return backupName;
-  }
+  const backups = makeBackups({ drive, undo, clock });
 
   return [
     {
@@ -72,11 +61,10 @@ export function makeDocsTools({ auth, drive, docs, undo, clock }) {
         return { summary: `make a Google Doc "${args.title.trim()}" ${where} (${shape(args.content)})\n\n${clip(args.content)}` };
       },
       async run(args, ctx) {
-        const title = args.title.trim(), label = `Google Drive: new Doc "${title}"`;
-        const s = await undo.saveRemote({ runId: ctx.runId, label, remote: { kind: 'create' } });
-        ctx.emit('undo.saved', { undoId: s.undoId, path: label, op: 'write' });
+        const title = args.title.trim();
+        const made = await backups.creating(ctx, `new Doc "${title}"`);
         const f = await drive.create({ name: title, kind: 'doc', parentId: args.folderId }, ctx.signal);
-        await undo.settleRemote(ctx.runId, s.undoId, { kind: 'create', fileId: f.id });
+        await made(f.id);
         try {
           const r = await docs.appendMarkdown(f.id, args.content, ctx.signal);
           return { content: `Made the Google Doc "${title}" (id ${f.id}) with ${r.paragraphs} paragraph(s) and ${r.tables} table(s).\n${f.webViewLink || ''}\n"Revert this job" would bin it.`, summary: `made Doc "${title}"` };
@@ -92,11 +80,11 @@ export function makeDocsTools({ auth, drive, docs, undo, clock }) {
       async assess(args, ctx) {
         if (!args.content.trim()) return { error: 'There is nothing to add. Nothing was done.' };
         const l = await lookupDoc(args.fileId, ctx.signal); if (l.error) return l;
-        const backup = (await madeOrBackedUp(ctx.runId, l.file.id)) ? '' : '\n  (a backup copy is saved in Drive first)';
+        const backup = await backups.note(ctx.runId, l.file.id);
         return { summary: `add to ${describe(l.file)} (${shape(args.content)})${backup}\n\n${clip(args.content)}`, facts: { file: l.file } };
       },
       async run(args, ctx, { file }) {
-        const backup = await backupFirst(ctx, file);
+        const backup = await backups.first(ctx, file);
         const r = await docs.appendMarkdown(file.id, args.content, ctx.signal);
         return { content: `Added ${r.paragraphs} paragraph(s) and ${r.tables} table(s) to "${file.name}".${backup ? ` A backup from before is in Drive: "${backup}".` : ''}`, summary: `added to "${file.name}"` };
       }
@@ -113,11 +101,11 @@ export function makeDocsTools({ auth, drive, docs, undo, clock }) {
         const n = countOccurrences(docs.plainText(await docs.get(l.file.id, ctx.signal)), args.find), want = args.count || 1;
         if (n === 0) return { error: `"${clip(args.find, 120)}" isn't in ${describe(l.file)} (the match is exact and case-sensitive). Read it with docs.read and copy the text exactly. Nothing was done.` };
         if (n !== want) return { error: `"${clip(args.find, 120)}" is in ${describe(l.file)} ${n} times, not ${want}. Use a longer, unique piece of text, or set count to ${n} to change them all. Nothing was done.` };
-        const backup = (await madeOrBackedUp(ctx.runId, l.file.id)) ? '' : '\n  (a backup copy is saved in Drive first)';
+        const backup = await backups.note(ctx.runId, l.file.id);
         return { summary: `in ${describe(l.file)}, replace${n > 1 ? ` (${n} places)` : ''}\n  "${clip(args.find, 300)}"\n  → "${clip(args.replaceWith, 300)}"${backup}`, facts: { file: l.file, n } };
       },
       async run(args, ctx, { file, n }) {
-        const backup = await backupFirst(ctx, file);
+        const backup = await backups.first(ctx, file);
         const changed = await docs.replaceAll(file.id, args.find, args.replaceWith, ctx.signal);
         const note = changed === n ? '' : ` (Google changed ${changed}, not ${n}: the document changed in the meantime)`;
         return { content: `Replaced ${changed} place(s) in "${file.name}"${note}.${backup ? ` A backup from before is in Drive: "${backup}".` : ''}`, summary: `replaced ${changed} in "${file.name}"`, isError: changed === 0 };
