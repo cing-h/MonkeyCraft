@@ -7,7 +7,7 @@ The user directs and never writes code; Claude writes all of it. Explain changes
 - **Background:** the vault notes "Building my own StarNet" and "StarNet build reference" (design source; fresh code only, no StarNet code copied).
 - **Node:** Node 22 lives in WSL via nvm and is not on the default PATH. Prefix commands with `. ~/.nvm/nvm.sh &&`. Never use the Windows node at `/mnt/c/Program Files/nodejs`.
 - **Checks:** run `npm test` (node:test) and `npm run check` (syntax gate) before calling anything done.
-- **Zettelkasten:** the project has its own folder in the user's vault, `wiki/MonkeyCraft/` (hub note "MonkeyCraft"). After each milestone (and any big design change), add or update notes there in one reviewed claude-obsidian transaction: what was built, decisions made, and what's next.
+- **Zettelkasten:** the project has its own folder in the user's vault, `wiki/MonkeyCraft/` (hub note "MonkeyCraft"). Read the hub note at the start of every session. After EVERY prompt (not just milestones), add or update notes there in one reviewed claude-obsidian transaction: what was asked, what was built or decided, and what's next (see ~/.claude/CLAUDE.md).
 
 ## Rules
 - `src/events.js` is a FROZEN, additive-only contract. You may add types or optional fields and extend the snapshot in `test/events.test.js`. Never rename, remove or retype anything.
