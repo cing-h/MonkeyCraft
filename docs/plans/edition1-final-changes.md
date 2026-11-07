@@ -39,7 +39,7 @@ Added 2026-11-06.
   5. The Clerk in the roster and the village, and a live test.
 
   Everything is tested against a simulated Google before it touches the real account.
-- **Open when building:** whether to add the `googleapis` package (pinned) or call the REST APIs with fetch (no new dependency). The Clerk's colour, and where its house goes in the village.
+- **Settled 2026-11-06:** plain REST with fetch (no new dependency); colour ink green; house on the reserved Canopy 1 plot. Build plan: `docs/plans/the-clerk.md`.
 
 ---
 
