@@ -38,17 +38,18 @@ export const VINE_STYLE = {
 export const ridesVines = key => !!VINE_STYLE[key];
 
 /** The floor a vine story's apes stand on: the ground, or the top of a canopy walkway. */
-export const floorY = (lane, x) => lane === 'ground' ? groundY(x) : walkY(lane === 'c1' ? 1 : 2, x);
+export const floorY = (lane, x) => lane === 'ground' || lane === 'river' ? groundY(x) : walkY(lane === 'c1' ? 1 : 2, x);
 
 // the vines: anchor x, and length. Ground vines hang from the low branch; canopy vines from the leaves
 // about 88 px above the walkway, ending a little above it.
 const LAYOUT = {
   ground: { xs: [256, 300, 344, 388, 640, 684, 728, 772], len: 34 },
+  river: { xs: [34], len: 34 },   // the playground's swing out over the water (play.js)
   c1: { xs: [110, 172, 234, 296, 358, 420, 560, 622, 684, 746, 808], len: 70, over: 90 },
   c2: { xs: [90, 154, 218, 282, 346, 410, 560, 624, 688, 752, 816, 880], len: 72, over: 92 }
 };
 export const VINES = Object.entries(LAYOUT).flatMap(([lane, L]) => L.xs.map(x => ({
-  lane, x, len: L.len, ay: lane === 'ground' ? branchY(x) + 1 : floorY(lane, x) - L.over
+  lane, x, len: L.len, ay: lane === 'ground' || lane === 'river' ? branchY(x) + 1 : floorY(lane, x) - L.over
 }))).map((v, id) => ({ ...v, id }));
 export const vinesOn = lane => VINES.filter(v => v.lane === lane);
 
@@ -90,10 +91,10 @@ function predictCatch(P, V, w, ang, d) {
   return { t, x, y, r };
 }
 /** Predict a flight down onto the floor: when the feet touch. */
-function predictLand(P, V, lane, d) {
+function predictLand(P, V, landY, d) {
   let t = 0.3;
   for (let i = 0; i < 4; i++) {   // the floor's height depends a little on where it lands
-    const Y = floorY(lane, P[0] + V[0] * t) - d.foot - d.tl * 0.5, D = V[1] * V[1] - 2 * VINE_G * (P[1] - Y);
+    const Y = landY(P[0] + V[0] * t) - d.foot - d.tl * 0.5, D = V[1] * V[1] - 2 * VINE_G * (P[1] - Y);
     if (D < 0) return null; t = (-V[1] + Math.sqrt(D)) / VINE_G;
   }
   return { t, x: P[0] + V[0] * t, y: P[1] + V[1] * t + 0.5 * VINE_G * t * t };
@@ -134,10 +135,10 @@ export function vineChain(key, s, lane, x0, x1, busy = new Set()) {
 /**
  * One trip on the vines. o: { key, s, chain (vine ids), x (where it stands), dir, sway (makeVineSway),
  *   rnd, flips (bool), hurry (bool) }. step(dt) → null | 'grab' | 'release' | 'catch' | 'land' | 'done'.
- * pose() → { q, px, py } (pelvis), and x/y of the body for the camera.
+ * landY(x): where the feet come down at the end (default: the floor). pose() → { q, px, py } (pelvis).
  */
 export function makeVineRider(o) {
-  const d = dims(o.key, o.s), style = VINE_STYLE[o.key], dir = o.dir, lane = VINES[o.chain[0]].lane, g = VINE_G;
+  const d = dims(o.key, o.s), style = VINE_STYLE[o.key], dir = o.dir, lane = VINES[o.chain[0]].lane, g = VINE_G, landAt = o.landY || (x => floorY(lane, x));   // landY: land somewhere else (the river)
   const r = {
     key: o.key, dir, chain: o.chain.slice(), i: 0, phase: 'crouch', t: 0,
     phi: 0, w: 0, len: 0, dip: 0, dipV: 0,                 // hanging: angle, angular speed, grip distance, arm stretch
@@ -211,7 +212,7 @@ export function makeVineRider(o) {
       }
       if (r.ft >= r.T) {
         const V = [r.V[0], r.V[1] + g * r.T];
-        if (r.phase === 'fly' && r.landing) { r.P[1] = floorY(lane, r.P[0]) - d.foot - d.tl * 0.5; r.spin = 0; lift('done'); r.events.push('land'); r.vland = V; }
+        if (r.phase === 'fly' && r.landing) { r.P[1] = landAt(r.P[0]) - d.foot - d.tl * 0.5; r.spin = 0; lift('done'); r.events.push('land'); r.vland = V; }
         else grab(r.phase === 'jump' ? 0 : r.i + 1, r.P, V);
       }
     } else if (r.phase === 'swing') {
@@ -228,7 +229,7 @@ export function makeVineRider(o) {
         const C = chest(), P = [C[0] - dir * Math.sin(-r.phi) * d.tl * 0.5, C[1] + Math.cos(r.phi) * d.tl * 0.5], V = [dir * L * r.w * Math.cos(r.phi), -L * r.w * Math.sin(r.phi)];
         if (!last()) { const w = VINES[r.chain[r.i + 1]], c = predictCatch(P, V, w, o.sway.st[w.id].ang, d); if (c) { letGo(c); break; } }
         else if ((e > eWant * 0.9 || r.t > 3) && r.phi >= 0.8 * Math.acos(Math.max(-1, 1 - e / (g * L)))) {   // the last vine: wait for a full swing, let go at the best angle for big air, land ahead
-          const l = predictLand(P, V, lane, d); if (l && l.x > 26 && l.x < 934) { letGo({ ...l, land: true }); break; }
+          const l = predictLand(P, V, landAt, d); if (l && l.x > (o.landY ? 2 : 26) && l.x < (o.landY ? 958 : 934)) { letGo({ ...l, land: true }); break; }
         }
       }
       if (r.phase === 'swing') { const s = hold(); s.ang = r.phi * dir; s.w = r.w * dir; }
@@ -260,22 +261,38 @@ export function makeVineRider(o) {
     // in the air: jumping up to a vine, or flying (maybe somersaulting) to the next vine or the floor
     const t = r.ft / Math.max(0.01, r.T), late = smoothstep((t - 0.6) / 0.4), tk = r.phase === 'fly' ? Math.max(r.tuck, 0) : 0.3 * (1 - t);
     const base = r.phase === 'jump' ? 0.1 : r.tor, R = r.spin, torso = base + R;
-    let sh, el, hip, kn;
-    if (r.phase === 'jump' || (!r.landing && r.phase === 'fly')) {   // reaching up and ahead for the vine
-      const reach = r.phase === 'jump' ? 2.9 : lerp(2.4, 2.75, late);
-      sh = [lerp(1.0, reach, Math.max(late, r.phase === 'jump' ? 1 : 0)), lerp(0.9, reach - 0.3, late)]; el = [-0.2, -0.3];
-      hip = [lerp(0.3, 0.15, late), lerp(0.1, -0.1, late)]; kn = [-0.4, -0.3];
-    } else {                                                           // feet forward to land, arms out for balance
-      sh = [lerp(2.6, 1.6, late), lerp(2.2, 1.1, late)]; el = [-0.3, -0.4];
-      hip = [lerp(0.4, 1.1, late), lerp(0.2, 0.9, late)]; kn = [lerp(-0.5, -0.9, late), lerp(-0.4, -0.7, late)];
-    }
-    // the tuck: knees to the chest and arms hugging the shins, strongest while spinning fastest
-    sh = sh.map((a, i) => lerp(a, 0.9 + i * 0.2, tk)); el = el.map(a => lerp(a, -1.7, tk));
-    hip = hip.map((a, i) => lerp(a, 2.3 - i * 0.2, tk)); kn = kn.map(a => lerp(a, -2.4, tk));
-    const q = { torso, head: -0.2 + R * 0.15, sh: sh.map(a => a + R + base), el, hip: hip.map(a => a + R + base * 0.5), kn, plant: 'none', tail: 0.4, roll: R, lift: 0 };
-    const mx = r.P[0], my = r.P[1], ux = Math.sin(torso), uy = -Math.cos(torso);   // rotate about the body's middle
-    return { q, px: mx - dir * ux * d.tl * 0.5, py: my - uy * d.tl * 0.5 };
+    return airPose({ reach: r.phase === 'jump' ? 'jump' : r.landing ? 'land' : 'vine', late, tuck: tk, base, spin: R, mid: r.P, dir, tl: d.tl });
   };
   return r;
 }
 const lerp = (a, b, t) => a + (b - a) * t;
+
+/**
+ * The body in the air (shared with the playground's net): reach 'jump' | 'vine' (arms up and ahead for a
+ * hold) or 'land' (feet forward, arms out); late 0→1 as the end nears; tuck 0→1 (knees to the chest,
+ * arms hugging the shins); the whole body turned by `spin` about its middle `mid` ([x, y]); tl: torso length.
+ */
+export function airPose({ reach, late, tuck: tk, base, spin: R, mid, dir, tl }) {
+  const torso = base + R;
+  let sh, el, hip, kn;
+  if (reach !== 'land') {
+    const top = reach === 'jump' ? 2.9 : lerp(2.4, 2.75, late);
+    sh = [lerp(1.0, top, Math.max(late, reach === 'jump' ? 1 : 0)), lerp(0.9, top - 0.3, late)]; el = [-0.2, -0.3];
+    hip = [lerp(0.3, 0.15, late), lerp(0.1, -0.1, late)]; kn = [-0.4, -0.3];
+  } else {
+    sh = [lerp(2.6, 1.6, late), lerp(2.2, 1.1, late)]; el = [-0.3, -0.4];
+    hip = [lerp(0.4, 1.1, late), lerp(0.2, 0.9, late)]; kn = [lerp(-0.5, -0.9, late), lerp(-0.4, -0.7, late)];
+  }
+  sh = sh.map((a, i) => lerp(a, 0.9 + i * 0.2, tk)); el = el.map(a => lerp(a, -1.7, tk));
+  hip = hip.map((a, i) => lerp(a, 2.3 - i * 0.2, tk)); kn = kn.map(a => lerp(a, -2.4, tk));
+  const q = { torso, head: -0.2 + R * 0.15, sh: sh.map(a => a + R + base), el, hip: hip.map(a => a + R + base * 0.5), kn, plant: 'none', tail: 0.4, roll: R, lift: 0 };
+  const ux = Math.sin(torso), uy = -Math.cos(torso);   // rotate about the body's middle
+  return { q, px: mid[0] - dir * ux * tl * 0.5, py: mid[1] - uy * tl * 0.5 };
+}
+/** Whole backward or forward turns that fit a flight of T seconds at no more than `max` rad/s (0 = none). */
+export function turnsThatFit(T, max, rnd, double = 0) {
+  const win = T - 0.06 - 0.14, fits = k => max > 0 && win > 0 && 1.5 * TAU * k / win <= max;
+  return fits(2) && double && rnd() < double ? 2 : fits(1) && rnd() < 0.7 ? 1 : 0;
+}
+/** The spin (rad, not yet signed) at time t of a T-second flight with n turns: fastest mid-air, done ~0.14 s before the end. */
+export const spinAt = (t, T, n) => TAU * n * smoothstep((t - 0.06) / Math.max(0.01, T - 0.2));

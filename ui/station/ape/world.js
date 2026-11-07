@@ -125,12 +125,12 @@ export function buildLayers() {
   const lamp = (x, y, foot = GROUND) => { mid.rect(x, y, x + 1, foot, mat(C.wood).s); mid.rect(x - 1, y - 3, x + 2, y, [255, 200, 110]); lamps.push([x, y - 2]); };
   const spots = paintHouses(mid, { PERCH_Y, branchY, PLOTS, HOMES, lights, lamps });
   // lush planting: palms, bananas, ferns, flowering bushes, lanterns along the path
-  for (const [x, h, b] of [[112, 52, 0.8], [248, 60, -0.6], [352, 48, 0.5], [556, 58, -0.8], [690, 50, 0.6], [796, 62, -0.5], [940, 54, 0.7]]) palm(mid, x, GROUND, h, b, x);
-  for (const x of [128, 214, 342, 432, 572, 652, 704, 812, 884]) banana(mid, x, GROUND, x, 1);
-  for (const x of [20, 104, 222, 262, 366, 430, 540, 584, 648, 678, 772, 804, 878, 932]) bush(mid, x, GROUND, 10 + hash(x, 90) * 8, x);
-  for (const x of [8, 96, 236, 344, 528, 566, 668, 790, 900, 950]) fern(mid, x, GROUND, x);
+  for (const [x, h, b] of [[10, 52, 0.8], [248, 60, -0.6], [352, 48, 0.5], [556, 58, -0.8], [690, 50, 0.6], [796, 62, -0.5], [940, 54, 0.7]]) palm(mid, x, GROUND, h, b, x);
+  for (const x of [214, 342, 432, 572, 652, 704, 812, 884]) banana(mid, x, GROUND, x, 1);
+  for (const x of [20, 222, 262, 366, 430, 540, 584, 648, 678, 772, 804, 878, 932]) bush(mid, x, GROUND, 10 + hash(x, 90) * 8, x);
+  for (const x of [8, 236, 344, 528, 566, 668, 790, 900, 950]) fern(mid, x, GROUND, x);
   for (let i = 0; i < 70; i++) { const x = hash(i, 91) * WORLD, kinds = ['hibiscus', 'plumeria', 'orchid', 'heliconia', 'bird']; flower(mid, x, groundY(x) - 1 - hash(i, 92) * 3, kinds[i % 5]); }
-  for (const x of [120, 226, 362, 582, 700, 818]) lamp(x, GROUND - 12);
+  for (const x of [146, 226, 362, 582, 700, 818]) lamp(x, GROUND - 12);
   for (const g of paintCulture(mid)) lamps.push(g);   // the villagers' culture: totems, bunting, glyphs, the market, art and the Council Ring
   // foreground (parallax 1.3): reeds and lily pads in the water
   const fore = layer(1.3);

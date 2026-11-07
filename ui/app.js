@@ -336,7 +336,7 @@ for (const c of crew) { names[c.id] = c.name; wakes[c.id] = c.wakes; }
 state = initialState(crew);
 
 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), councilOf: id => inCouncil(state.creatures[id]), reduced });
+station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), councilOf: id => inCouncil(state.creatures[id]), jobsActive: () => Object.values(state.creatures).some(c => c.active || c.asks.length), reduced });   // the crew only play when no job is running or waiting
 syncCouncil();
 if (mailOpen.size) station.mail(true, false);   // requests opened before the village was built
 // scrolling the village: buttons, arrow keys and drag; a click without a drag picks a crew member

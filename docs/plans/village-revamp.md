@@ -1,6 +1,6 @@
 # Village revamp (final-changes item 7)
 
-Status: APPROVED 2026-11-06; building.
+Status: APPROVED 2026-11-06; all six phases DONE 2026-11-07 (on stacked branches, waiting for the user's look and merge).
 
 ## Decisions (2026-11-06)
 - **Playground:** both. A ground playground by the river (vine swing over the water with flips into the river, springy net, fruit-toss ring, slide), plus a vine-swing course on Canopy 2.
@@ -40,7 +40,7 @@ Status: APPROVED 2026-11-06; building.
    - **Lookout:** a telescope and a flag.
    - **Counting house:** small polish.
    - **The Chief's lodge** becomes a multi-level great house in the great tree. It has a main hall, an upper chamber with a balcony and a high seat, carved posts and masks, banners and lanterns, a gong, a lookout cupola and rope walks to the platforms around it. It's lit in the Chief's colour while he works.
-6. **`feature/playground`: the recreation area and play.**
+6. **`feature/playground`: the recreation area and play.** DONE 2026-11-07. Item 7 (the village revamp) is COMPLETE.
    - Play spots: a vine swing over the river (flips into the water), a springy net for bounces and flips, a fruit-toss ring, a climbing frame and a bark slide.
    - Play behaviour: villagers go and play there often, in turns, with chase-and-tag, swings, net flips and catching fruit.
    - **Crew rule (the user's):** a crew member plays only when *no job is running or waiting anywhere in MonkeyCraft*. As soon as any job starts, crew members stop playing and go back to their stations. Busy crew never play (truthful station).
@@ -122,3 +122,17 @@ Status: APPROVED 2026-11-06; building.
   - Seven windows light in his colour while he works.
   - The council banner moved to `LODGE.bannerX`.
 - `test/houses.test.js`: every crew member has windows; the lodge has at least six, one in the cupola; the stations haven't moved; the Chief's rest spots stay clear of the gong; and the forge glows only while the Smith works.
+
+## Phase 6 notes (what was built)
+- `play.js`: the playground at the village's west end, by the river, plus the fruit-toss ring at the east end.
+  - **River swing:** a vine of its own (lane `river` in `vines.js`). The ape swings east, lets go (somersaulting if the flight allows) and lands in the water (`landY` option on the vine rider). Then a splash with droplets and ripples, a swim back, a climb up the bank, and a shake that sends off drops.
+  - **Springy net:** 4–6 bounces getting higher. Backward or forward somersaults happen only when whole turns fit (`turnsThatFit`, shared with the vines; the orangutan and the Chief never flip). The net sags under each landing (drawn live).
+  - **Climbing frame and bark slide:** climb the ladder (the research climb), sit at the top, slide down speeding up, and land.
+  - **Fruit-toss ring:** throw the fruit so it peaks through the hoop (a little flare when it does), watch it bounce, fetch it and throw it back, 2–3 rounds.
+  - **Chase-and-tag** (villagers only): starts when two players arrive. Whoever is "it" chases the nearest player, and a tag passes it on with a little freeze and a wave.
+  - **Canopy 2 vine course** (swingers): a trip out along the Canopy 2 vines and back (plan's `vines: true` forces vine travel).
+- One ape at a time on each game; the others queue beside it and take turns. The Chief only plays the fruit toss.
+- **The crew's rule:** `jobsNow` is true when any crew member has a job or is waiting for the user's OK (the app passes `jobsActive`), or a Chief's-mailbox request is open. While it's true, no crew member starts to play. A crew member already playing is told to stop (each game ends safely: the swimmer swims faster to the bank, the net throws them off at the next bounce) and goes back to its station. Villagers play any time.
+- Gatherings: a villager at play finishes its go before taking a seat, and the free villager nearest the Ring drums.
+- Room was made at the west end (a palm, a banana, a bush, a fern and a lamp moved).
+- `test/play.test.js`: every game finishes for every ape allowed to play it; the river swing goes splash, swim and out; net flips are whole turns and never happen with reduced motion; the hoop and tag work; stopped games end safely; and in the scene the crew never play during a job while villagers do.
