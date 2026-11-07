@@ -21,7 +21,7 @@ Status: APPROVED 2026-11-06; building.
 2. **`feature/ape-detail`: the sprites.** DONE 2026-11-06.
    - Each ape gets more shading bands, fur tufts on the outline, ears, a brow ridge and nostrils, finger and toe hints, and fuller species markings, such as the Chief's silver saddle, the mandrill's ridged muzzle and the capuchin's cap.
    - The soft toon style stays. The apes are about 25% bigger (the user's choice); hold heights, door sizes and swing lengths are checked against the new size.
-3. **`feature/ape-climb`: climbing.** A new climbing gait for trunks and ladders, built from the research.
+3. **`feature/ape-climb`: climbing.** DONE 2026-11-06. A new climbing gait for trunks and ladders, built from the research.
    - Going up: three limbs gripping, a diagonal rhythm, high reach-and-pull with flexed elbows, feet pushing flat with a bent ankle, and the body close to the trunk.
    - Going down: rump-first, slower, with a lateral rhythm.
    - Each species climbs in its own way. The gibbon goes hand over hand with its legs tucked. The gorilla is slow and heavy. The orangutan uses all four hands. The capuchin is quick and springy, with its tail braced.
@@ -79,3 +79,17 @@ Status: APPROVED 2026-11-06; building.
   - a brow ridge on the great apes (gorilla, chimp, bonobo, orangutan) and grey in the Chief's crest;
   - the gibbon's white hands and feet, and the bonobo's parted hair;
   - the mandrill's blue muzzle ridges, the snow monkey's fluffy ruff and the orangutan's beard.
+
+## Phase 3 notes (what was built)
+- `cast.js P.climb(sp, p, down)` is the four-beat climb.
+  - Each hand and foot grips for most of the cycle and lifts off for the rest.
+  - A gripping hand or foot is pinned to the trunk's face. Relative to the body it slides back by exactly the body's rise, so in the world it stays still. The joints are solved with a two-link IK (`ik()`): elbows point down, knees point up and in.
+  - Going up uses a diagonal sequence (hand with the opposite foot, a quarter-cycle apart) with one limb moving at a time, so three always grip. Going down uses a lateral sequence led by the foot, with the head turned to look down.
+- `CLIMB_STYLE` per species:
+  - the gorilla is slow, heavy and leans out;
+  - the gibbon goes hand over hand with its legs tucked;
+  - the orangutan climbs with four hands, its feet gripping high;
+  - the monkeys (mandrill, capuchin, snow monkey, howler) are quick, with the tail hanging down the bark;
+  - the chimp and bonobo use the default ape climb.
+- `climbSpeed()` is the rise per cycle × the cycle rate. The scene climbs at that speed (down is 0.8×, and hurrying home quickens the cycle), so grips never slide. Hand props are put away while climbing.
+- `test/climb.test.js`: no grip slides more than about a pixel for any species, up or down; three limbs always grip on the way up; the foot leads on the way down; the gibbon is the fastest climber.

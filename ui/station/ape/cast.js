@@ -21,6 +21,30 @@ export const SPECIES = {
   ringer:    { name: 'THE BELL-RINGER', species: 'Howler monkey', role: 'Timekeeper · runs scheduled jobs', posture: 'quad', canopy: 'branchwalk', tl: 6, tr: 3, pr: 2.8, hr: 2.5, neck: 2, ua: 4, la: 3.8, ar: 1.05, ul: 3.8, ll: 3.6, lr: 1.1, fur: [98, 40, 26], face: [26, 22, 22], tail: 11, walk: 15, run: 34 }
 };
 export const CREW = Object.keys(SPECIES);
+// how each species climbs: cycle rate, how long each limb grips, limb ranges and the footfall order up and down
+const DIAG = [0, 0.5, 0.75, 0.25], LAT = [0.25, 0.75, 0, 0.5];      // near hand, far hand, near foot, far foot
+export const CLIMB_STYLE = {
+  // freq: cycles in rad/s; duty: share of the cycle each limb grips; rise: body rise per cycle × arm length; reach: how high the top hand grips × arm length
+  ape:    { freq: 7, duty: 0.75, rise: 0.75, reach: 0.82, footHi: 0.05, lean: 0.08, tail: -0.4, up: DIAG, down: LAT },
+  heavy:  { freq: 4.6, duty: 0.78, rise: 0.6, reach: 0.72, footHi: 0.12, lean: 0.18, tail: 0, up: DIAG, down: LAT },                 // the gorilla: slow, heavy, leaning out
+  gibbon: { freq: 9, duty: 0.7, rise: 0.8, reach: 0.9, footHi: 0, lean: 0.05, tail: 0, tuck: true, up: [0, 0.5, 0.8, 0.3], down: LAT },   // hand over hand, legs tucked
+  four:   { freq: 5, duty: 0.75, rise: 0.7, reach: 0.85, footHi: -0.15, lean: 0.1, tail: 0, up: DIAG, down: LAT },                   // the orangutan: four hands, feet gripping high
+  monkey: { freq: 10, duty: 0.65, rise: 0.75, reach: 0.8, footHi: 0.05, lean: 0.12, tail: -0.15, up: [0, 0.5, 0.6, 0.1], down: [0.15, 0.65, 0, 0.5] }   // quick and springy, tail braced
+};
+const CLIMB_OF = { chief: 'heavy', scout: 'gibbon', archivist: 'four', inspector: 'monkey', clerk: 'monkey', sage: 'monkey', ringer: 'monkey' };
+for (const [k, sp] of Object.entries(SPECIES)) sp.cl = CLIMB_STYLE[CLIMB_OF[k] || 'ape'];
+/** Climbing speed in px/s: the body rises about as far per cycle as a gripping hand travels, so hands never slide. */
+/** How far the body rises in one climbing cycle (px). */
+export const climbRise = sp => sp.cl.rise * Math.min(sp.ua + sp.la, (sp.ul + sp.ll) * 1.6);
+/** Climbing speed in px/s: one rise per cycle, so a gripping hand or foot never slides on the bark. */
+export const climbSpeed = sp => climbRise(sp) * sp.cl.freq / TAU;
+/** Two-link reach in the pose convention (radians from straight down, + forward): the angles that put the end at (dx, dy). bend −1: the elbow points down/back; +1: the knee points up/forward. */
+export function ik(l1, l2, dx, dy, bend) {
+  const d = Math.max(0.01, Math.min(Math.hypot(dx, dy), (l1 + l2) * 0.999)), base = Math.atan2(dx, dy);
+  const al = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))));
+  const a = base + bend * al, ex = Math.sin(a) * l1, ey = Math.cos(a) * l1;
+  return [a, Math.atan2(dx - ex, dy - ey) - a];
+}
 /** Village revamp: every ape is drawn about 25% bigger, to make room for detail. All body lengths scale together, so poses, swings and climbs follow. */
 export const SIZE = 1.25;
 for (const sp of Object.values(SPECIES)) for (const k of ['tl', 'tr', 'pr', 'hr', 'neck', 'ua', 'la', 'ar', 'ul', 'll', 'lr', 'tail']) sp[k] *= SIZE;
@@ -91,11 +115,31 @@ export const P = {
       lift: 1.9 * pos(Math.sin(2 * p)), tail: 0.3
     };
   },
-  // climbing: reach, grip, pull — the body surges up on the pull (see climbRate in the scene)
-  climb(sp, p) {
-    const s = Math.sin(p), s2 = Math.sin(p + Math.PI);
-    return { torso: -0.05 + 0.06 * s, plant: 'none', head: 0.3 - 0.1 * s, sh: [2.75 + 0.45 * s, 2.75 + 0.45 * s2], el: [-0.35 - 0.55 * pos(-s), -0.35 - 0.55 * pos(-s2)],
-      hip: [1.15 + 0.55 * s2, 1.15 + 0.55 * s], kn: [-1.55 - 0.45 * s2, -1.55 - 0.45 * s], tail: -0.4, lift: 0 };
+  // climbing (village revamp), from how primates really climb: going UP, a diagonal sequence (a hand moves
+  // with the opposite foot) with one limb moving at a time, so three keep gripping; elbows bent and pointing
+  // down on the pull, the body close to the trunk. Going DOWN: rump-first, a lateral sequence led by the foot.
+  // Every gripping hand and foot is pinned to a point on the bark (x = the trunk's face, in front of the body):
+  // relative to the body it slides back by exactly the body's rise, so in the world it stays still. The joint
+  // angles are then solved from where each hand and foot must be (two-link IK). p: 2π per cycle.
+  climb(sp, p, down = false) {
+    const cl = sp.cl || CLIMB_STYLE.ape, D = cl.duty, cyc = p / TAU, R = climbRise(sp), torso = cl.lean + 0.04 * Math.sin(2 * p);
+    const order = down ? cl.down : cl.up;                       // [near hand, far hand, near foot, far foot] phase offsets
+    const at = off => {                                         // where in its stroke a limb is: w 0 = top of the stroke, 1 = bottom; sw = lifted off
+      let u = ((cyc + off) % 1 + 1) % 1; if (down) u = 1 - u;
+      if (u < D) return { w: u / D, sw: 0 };
+      const k = (u - D) / (1 - D); return { w: 1 - k * k * (3 - 2 * k), sw: Math.sin(Math.PI * k) };
+    };
+    const [h0, h1, f0, f1] = order.map(at), Tx = sp.pr + 0.8, L = sp.ua + sp.la, LL = sp.ul + sp.ll;
+    const ch = [Math.sin(torso) * sp.tl, -Math.cos(torso) * sp.tl];
+    const handTop = ch[1] - L * cl.reach, footTop = -sp.pr * 0.4 + cl.footHi * LL;
+    const arm = h => { const y = handTop + h.w * R * D, x = Tx - 1.6 * h.sw * sp.ar; return ik(sp.ua, sp.la, x - ch[0], y - ch[1], -1); };
+    const leg = f => {
+      if (cl.tuck) return [1.55 + 0.25 * f.w, -1.9 + 0.2 * f.sw];          // the gibbon: legs tucked up, barely touching
+      const y = footTop + f.w * R * D, x = Tx - 1.4 * f.sw * sp.lr; return ik(sp.ul, sp.ll, x, y, 1);
+    };
+    const a0 = arm(h0), a1 = arm(h1), l0 = leg(f0), l1 = leg(f1);
+    return { torso, plant: 'none', climb: true, head: down ? 0.45 : -0.35, sh: [a0[0], a1[0]], el: [a0[1], a1[1]],
+      hip: [l0[0], l1[0]], kn: [l0[1], l1[1]], tail: cl.tail, lift: 0 };
   },
   // pendulum swing under a branch. theta = body angle (− behind the grip, + ahead), u = 0..1 through this swing.
   hang(sp, theta, u, fast) {
@@ -265,12 +309,12 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   // near side
   leg(0, false); limb(0, false);
   const hand = k.arms[0][1], hX = X(hand), hY = Y(hand);
-  if (key === 'chief' && q.plant !== 'all') fb.cap(hX, hY - 9 * s, hX, hY + 3 * s, 0.8 * s, 0.8 * s, mat(C.wood));
-  if (key === 'smith' && q.plant !== 'hand') { fb.cap(hX, hY, hX + 3 * s * f, hY - 2 * s, 0.6 * s, 0.6 * s, mat(C.wood)); fb.ell(hX + 3.5 * s * f, hY - 2.4 * s, 1.5 * s, 1.1 * s, mat([120, 126, 136])); }
-  if (key === 'inspector' && q.plant !== 'all') { fb.cap(hX, hY, hX + 2 * s * f, hY - 2.5 * s, 0.5 * s, 0.5 * s, mat(C.wood)); fb.ell(hX + 2.6 * s * f, hY - 3.6 * s, 1.5 * s, 1.5 * s, mat([180, 220, 230], { rim: 0.8 })); }
-  if (key === 'ringer' && q.plant !== 'all') fb.ell(hX, hY + 1.6 * s, 1.5 * s, 1.8 * s, mat(C.gold));
+  if (key === 'chief' && q.plant !== 'all' && !q.climb) fb.cap(hX, hY - 9 * s, hX, hY + 3 * s, 0.8 * s, 0.8 * s, mat(C.wood));
+  if (key === 'smith' && q.plant !== 'hand' && !q.climb) { fb.cap(hX, hY, hX + 3 * s * f, hY - 2 * s, 0.6 * s, 0.6 * s, mat(C.wood)); fb.ell(hX + 3.5 * s * f, hY - 2.4 * s, 1.5 * s, 1.1 * s, mat([120, 126, 136])); }
+  if (key === 'inspector' && q.plant !== 'all' && !q.climb) { fb.cap(hX, hY, hX + 2 * s * f, hY - 2.5 * s, 0.5 * s, 0.5 * s, mat(C.wood)); fb.ell(hX + 2.6 * s * f, hY - 3.6 * s, 1.5 * s, 1.5 * s, mat([180, 220, 230], { rim: 0.8 })); }
+  if (key === 'ringer' && q.plant !== 'all' && !q.climb) fb.ell(hX, hY + 1.6 * s, 1.5 * s, 1.8 * s, mat(C.gold));
   if (key === 'clerk' && q.plant === 'all' && !q.sitting) { const b = [-sp.tl * 0.1, -sp.tr * 0.9]; fb.cap(X(b) - 2 * s * f, Y(b), X(b) + 2 * s * f, Y(b) - 0.4 * s, 1.1 * s, 1.1 * s, mat(C.paper)); }   // a roll of papers carried on its back
-  if (key === 'clerk' && q.plant !== 'all') { fb.rect(hX - 1.6 * s, hY - 1.2 * s, hX + 1.6 * s, hY + 1.6 * s, C.paper); fb.put(hX - fb.ox, hY, [60, 150, 84]); }   // a ledger page in hand
+  if (key === 'clerk' && q.plant !== 'all' && !q.climb) { fb.rect(hX - 1.6 * s, hY - 1.2 * s, hX + 1.6 * s, hY + 1.6 * s, C.paper); fb.put(hX - fb.ox, hY, [60, 150, 84]); }   // a ledger page in hand
   if (key === 'scout' && q.plant === 'feet' && !q.sitting) fb.ell(X([0, 0]) - 1.5 * s * f, Y([0, 0]) + 0.5 * s, 1.8 * s, 1.4 * s, mat([120, 90, 50])); // satchel
   return { headX: hx, headY: hy - hr };
 }

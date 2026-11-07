@@ -15,7 +15,7 @@
 
 import { makeToucan, drawToucan } from './toucan.js';
 import { FB, GROUND, H, STORIES, SUN, TOP, W, WORLD, hash, mat, mixc } from './fb.js';
-import { AGILE, CREW, LIGHT, P, SPECIES, TAU, blendPose, bodyLen, drawApe, placeApe, pos } from './cast.js';
+import { AGILE, CREW, LIGHT, P, SPECIES, TAU, blendPose, bodyLen, climbSpeed, drawApe, placeApe, pos } from './cast.js';
 import { noise1 } from './scenery.js';
 import { DOORS, PERCH_Y, TRUNKS, WATER, branchY, buildLayers, groundY } from './world.js';
 import { makeVillagers, stepVillager, villagerPose } from './villagers.js';
@@ -201,8 +201,11 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
         a.br = null; a.x = leg.x - (leg.dx || 0); a.facing = 1; setAnim(a, 'climb');
         const y0 = leg.y0 ?? climbLevel(leg.from || 'ground', leg.x, sp), y1 = leg.y1 ?? climbLevel(leg.to || 'canopy', leg.x, sp), dir = Math.sign(y1 - y0) || -1;
         a.climbY = a.climbY ?? y0;
-        const surge = 0.3 + 0.7 * pos(Math.sin(a.phase + Math.PI)), step = (home ? 30 : 14) * (dir > 0 ? 1.25 : 1) * surge * dt;   // a little quicker going down, and hurrying home
-        a.phase += dt * (home ? 7 : 5);
+        // the research-based climb (cast.js P.climb): the body rises as far as a gripping hand travels, so the cycle
+        // rate sets the speed; coming down is slower (0.8×); hurrying home quickens the cycle, not the slide
+        const hurry = home ? 1.6 : 1, down = dir > 0, rate = sp.cl.freq * hurry * (down ? 0.8 : 1);
+        const surge = 0.8 + 0.2 * Math.sin(2 * a.phase), step = climbSpeed(sp) * hurry * (down ? 0.8 : 1) * surge * dt;
+        a.phase += dt * rate; a.climbDown = down;
         if ((y1 - a.climbY) * dir <= step) { a.lane = leg.to || 'canopy'; a.top = !!leg.top; a.climbY = undefined; a.legs.shift(); a.spd = 0; if (leg.council) a.atSeat = true; } else a.climbY += dir * step;
       } else {
         // standing still: hold a hang, or idle on the ground / branch
@@ -252,7 +255,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     switch (a.anim) {
       case 'walk': return P.walk(sp, a.phase);
       case 'run': return P.run(sp, a.phase);
-      case 'climb': return P.climb(sp, a.phase);
+      case 'climb': return P.climb(sp, a.phase, !!a.climbDown);
       case 'brach': return brachiatePose(sp, a.br, a.s, { fast: sp.canopy === 'brachiate-fast' }).q;
       case 'leap': return P.leap(sp, a.air ? a.air.vy : 0);
       case 'land': return P.land(sp, Math.max(0, a.land / 0.28));
