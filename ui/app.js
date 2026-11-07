@@ -421,6 +421,7 @@ async function openSettings() {
   for (const k of LIMIT_KEYS) { const i = $(`lim-${k}`), r = options.ranges[k]; i.min = r[0]; i.max = r[1]; i.value = effective.limits[k]; }
   $('chatter-on').checked = chatterOn;
   $('settings-error').hidden = true;
+  await loadGoogle();
   $('settings').showModal();
 }
 $('open-settings').onclick = () => openSettings().catch(e => alert('Could not load settings: ' + e.message));
@@ -435,6 +436,31 @@ $('settings-form').addEventListener('submit', async e => {
   if (!res.ok) { const er = $('settings-error'); er.textContent = res.data.error || 'Could not save.'; er.hidden = false; return; }
   $('settings').close(); loadSpend();
 });
+
+// ---------- Google (the Clerk) ----------
+async function loadGoogle(note) {
+  const g = await fetch('/api/google').then(r => r.json());
+  $('google-status').textContent = note || (g.connected ? `Google is connected${g.connectedAt ? ` (since ${new Date(g.connectedAt).toLocaleDateString()})` : ''}.`
+    : g.lastError || (g.hasKey ? 'Your key is saved. Press Connect Google to sign in.' : 'Not set up yet: follow the one-time setup below.'));
+  $('google-setup').open = !g.hasKey;
+  $('google-key').hidden = $('google-save-key').hidden = g.connected;
+  $('google-connect').hidden = g.connected; $('google-connect').disabled = !g.hasKey;
+  $('google-disconnect').hidden = !g.connected;
+}
+const googleErr = msg => { const er = $('settings-error'); er.textContent = msg; er.hidden = false; };
+$('google-save-key').onclick = async () => {
+  const res = await post('/api/google/key', { key: $('google-key').value });
+  if (!res.ok) return googleErr(res.data.error || 'Could not save the key.');
+  $('google-key').value = ''; $('settings-error').hidden = true; loadGoogle();
+};
+$('google-connect').onclick = async () => {
+  const res = await post('/api/google/connect', {});
+  if (!res.ok) return googleErr(res.data.error || 'Could not start the sign-in.');
+  window.open(res.data.url, '_blank', 'noopener');
+  loadGoogle('Finish signing in on the Google tab. This updates when you come back.');
+};
+$('google-disconnect').onclick = async () => { if (confirm('Disconnect Google? The Clerk will stop working in Drive until you connect again.')) { await post('/api/google/disconnect', {}); loadGoogle(); } };
+window.addEventListener('focus', () => { if ($('settings').open) loadGoogle().catch(() => {}); });
 
 loadSpend(); loadGrants();
 if (location.hash === '#settings') openSettings().catch(() => {});

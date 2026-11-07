@@ -53,7 +53,8 @@ src/bus.js             per-run emitter → NDJSON; SSE hub
 src/loop.js            runAgentLoop (API provider path)
 src/providers/claude-code.js   headless CLI adapter
 src/providers/anthropic.js     API-key adapter (@anthropic-ai/sdk)
-src/tools/registry.js  dispatch pipeline; tools/*.js (fs, shell, web, verify, write)
+src/tools/registry.js  dispatch pipeline; tools/*.js (fs, shell, web, verify, write, google-drive)
+src/google/{auth,api,drive}.js  the Clerk's Google link: sign-in (loopback + PKCE, drive.file), REST caller, Drive + revert
 src/mcp/server.js      exposes registry tools to Claude Code over MCP (stdio)
 src/safety/{grants,consent,taint,breaker,halt}.js
 src/money/{ledger,pool,budget}.js

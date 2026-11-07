@@ -184,3 +184,11 @@ textarea::placeholder { color: #7f8a74; }
 .run .from { font-size: 10px; letter-spacing: .08em; font-family: var(--label); color: var(--muted); margin-bottom: 2px; }
 .run .mail { margin: 6px 0; padding: 6px 8px; border-left: 3px solid var(--sun); background: rgba(233,198,107,.08); white-space: pre-wrap; }
 .run .mail .q { font-family: var(--label); font-size: 10px; letter-spacing: .08em; color: var(--sun); margin-bottom: 3px; }
+
+/* Google (the Clerk) in Settings */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.settings .steps { margin: 6px 0 10px; padding-left: 1.4em; line-height: 1.5; }
+.settings .steps a { color: inherit; }
+.settings textarea#google-key { width: 100%; box-sizing: border-box; font: 12px var(--body); color: var(--fg); background: #0a120c; border: 2px solid var(--bark); padding: 4px 6px; resize: vertical; }
+.google-btns { display: flex; gap: 8px; margin: 6px 0; }
+.google-btns [hidden], #google-key[hidden] { display: none; }

@@ -99,6 +99,25 @@
       <p class="hint">Token limits count cache reads at one tenth. Subscription jobs show an estimate in dollars, so their token limit is the one that really caps them.</p>
     </fieldset>
     <fieldset>
+      <legend>Google (for the Clerk)</legend>
+      <p class="hint" id="google-status" role="status"></p>
+      <details id="google-setup">
+        <summary>One-time setup (about 10 minutes)</summary>
+        <ol class="steps">
+          <li>Open <a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud: new project</a>, name it <b>MonkeyCraft</b>, and press Create.</li>
+          <li>Turn on the four APIs (press Enable on each): <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noopener">Drive</a>, <a href="https://console.cloud.google.com/apis/library/docs.googleapis.com" target="_blank" rel="noopener">Docs</a>, <a href="https://console.cloud.google.com/apis/library/sheets.googleapis.com" target="_blank" rel="noopener">Sheets</a>, <a href="https://console.cloud.google.com/apis/library/slides.googleapis.com" target="_blank" rel="noopener">Slides</a>.</li>
+          <li>Open <a href="https://console.cloud.google.com/auth/overview" target="_blank" rel="noopener">Google Auth Platform</a> and press Get started. App name <b>MonkeyCraft</b>, your email for both email boxes, audience <b>External</b>.</li>
+          <li>Under <b>Audience</b>, add yourself as a test user. (Optional: press <b>Publish app</b> so you don't have to reconnect every 7 days. MonkeyCraft only asks for its own files, so Google doesn't need to review it.)</li>
+          <li>Under <b>Clients</b>, press Create client, choose <b>Desktop app</b>, name it MonkeyCraft, then <b>Download JSON</b>.</li>
+          <li>Open that file in Notepad, copy everything, paste it below and press Save key. Then press Connect Google.</li>
+        </ol>
+      </details>
+      <label for="google-key" class="sr-only">Sign-in key (the JSON file)</label>
+      <textarea id="google-key" rows="3" placeholder='Paste the downloaded key here: {"installed":{"client_id":…}}' spellcheck="false" autocomplete="off"></textarea>
+      <div class="google-btns"><button type="button" id="google-save-key">Save key</button><button type="button" id="google-connect" class="primary">Connect Google</button><button type="button" id="google-disconnect">Disconnect</button></div>
+      <p class="hint">MonkeyCraft only asks for access to the files it makes itself. It can never share files or delete them outright, and every change asks you first.</p>
+    </fieldset>
+    <fieldset>
       <legend>Village</legend>
       <label class="check"><input type="checkbox" id="chatter-on"> Village chatter: the monkeys chat in monkey sounds, with the meaning in brackets</label>
       <p class="hint">Only free crew members chat, and anything they say about work comes from real events. It's off by default if your computer asks apps to reduce motion. Saved in this browser.</p>
