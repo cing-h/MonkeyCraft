@@ -18,7 +18,7 @@ A capuchin crew member who works in Google Docs, Sheets and Slides through Googl
    - **Picker (decided 2026-11-06, user chose it):** a "Let the Clerk open a file" button opens Google's own file picker. Each file the user picks is shared with MonkeyCraft, one at a time (still `drive.file`). This needs an API key: one more setup step (enable the Picker API, then create an API key). The app id is the number at the start of the client id.
    - Edits to a document not made in the same job: a backup copy goes in Drive first, once per document per job. Revert can't undo a Docs edit itself (the APIs have no version restore), so it points to the backup instead.
 3. **`feature/clerk-sheets`:** create a sheet; read and write ranges, formulas and charts. DONE 2026-11-06, live-checked.
-4. **`feature/clerk-slides`:** turn an outline into a deck with speaker notes.
+4. **`feature/clerk-slides`:** turn an outline into a deck with speaker notes. DONE 2026-11-06, live-checked.
 5. **`feature/clerk-crew`: the Clerk in the roster and the village.**
    - Sprite, poses, the ink-green glow, the counting house on Canopy 1, and chatter (*"Chirr-chirr."*).
    - The Chief can hand it work (Scout → Writer → Clerk).
@@ -61,3 +61,11 @@ Before Phase 1's live check, the user does the guided Google Cloud setup: create
 - `src/google/backup.js` is the backup rule, shared with Docs (and Slides next).
 - **Live-checked 2026-11-06:** create (with formulas), overwrite, append, tab, column and pie charts, read (values and formulas). In the PDF export the charts were correct and didn't overlap. The test sheets were binned.
 - `sheets.append` adds under the last filled row, which can be below a Total row. The Clerk's persona should mention this (phase 5).
+
+## Phase 4 notes (what was built)
+- `src/google/slides.js` covers the outline format: `# Deck title`, subtitle lines, `## Slide`, `- bullets` (two spaces per level), plain lines, and `Notes:` / `> ` for speaker notes, with inline bold, italic, code and links. It also reads a deck back as the same outline, with slide numbers.
+  - Content slides use the TITLE_AND_BODY layout (TITLE_ONLY when a slide has no body), with MonkeyCraft's own object ids.
+  - Bullets are made last and the newest run first, because making them removes the indent tabs.
+  - An unused subtitle box on the title slide is removed.
+- `src/tools/google-slides.js` has five tools: `slides.read`, `slides.create`, `slides.add`, `slides.notes` and `slides.replace`. Replace covers the slides only, not the speaker notes.
+- **Live-checked 2026-11-06** with create, add, notes, replace and read. The PDF export showed real bullets with an indent level, bold, italic, a centred title slide and the subtitle. The test deck was binned.

@@ -29,6 +29,8 @@ import { makeDocs } from './google/docs.js';
 import { makeDocsTools } from './tools/google-docs.js';
 import { makeSheets } from './google/sheets.js';
 import { makeSheetsTools } from './tools/google-sheets.js';
+import { makeSlides } from './google/slides.js';
+import { makeSlidesTools } from './tools/google-slides.js';
 import { googleRoutes } from './routes/google.js';
 import { makeCrewTools } from './crew/orchestrate.js';
 import { makeCouncil, makeCouncilTools } from './crew/council.js';
@@ -127,6 +129,7 @@ async function main() {
   if (!ga.ok) console.warn(`The Google sign-in couldn't be read (${ga.error}); Google is not connected.`);
   const googleApi = makeGoogleApi({ auth: googleAuth, fetchImpl: fetch });
   const drive = makeDrive({ api: googleApi }), docs = makeDocs({ api: googleApi }), sheets = makeSheets({ api: googleApi });
+  const slides = makeSlides({ api: googleApi, newObjectId: () => `mc${randomBytes(9).toString('hex')}` });
   const shell = makeShellExec({ spawn: trackedSpawn('shell'), pathEnv, baseEnv: process.env, killProcessGroup });
   let council = null;   // made once the run host exists (below); the council tools look it up when they run
   const registry = makeRegistry([
@@ -140,6 +143,7 @@ async function main() {
     ...makeDriveTools({ auth: googleAuth, drive, undo }),
     ...makeDocsTools({ auth: googleAuth, drive, docs, undo, clock }),
     ...makeSheetsTools({ auth: googleAuth, drive, sheets, undo, clock }),
+    ...makeSlidesTools({ auth: googleAuth, drive, slides, undo, clock }),
     ...makeCrewTools({ roster }),
     ...makeAskClaudeTools({ mailbox }),
     ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } })
