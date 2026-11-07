@@ -67,7 +67,7 @@ test('a job given from Claude Code runs through the normal pipeline, marked "fro
   const s = await w.session.mcp.callTool('monkeycraft_job_status', { job: runId });
   assert.match(s.content, /finished: done[\s\S]*Writer finished\./);
   assert.equal((await w.session.mcp.callTool('monkeycraft_job_status', { job: 'run_nope' })).isError, true);
-  assert.equal((await w.session.mcp.callTool('monkeycraft_give_job', { job: 'x', to: 'sage' })).isError, true, 'asleep crew can\'t take jobs');
+  assert.equal((await w.session.mcp.callTool('monkeycraft_give_job', { job: 'x', to: 'ringer' })).isError, true, 'asleep crew can\'t take jobs');
 });
 
 test('the outside session can\'t answer MonkeyCraft\'s permission questions: the user still must', async () => {

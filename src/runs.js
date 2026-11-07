@@ -95,7 +95,8 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
 
   // agentOverride: run this crew member in a different shape (the council: no tools, its own instructions and model).
   // preamble: what a worker is told before its task. trigger: 'user' or 'schedule'. poolUsd: a smaller spending pool.
-  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null, source = null, agentOverride = null, preamble = null, trigger = null, poolUsd = null }) {
+  // private: the job's words (agent.token, agent.reasoning) are never emitted or journaled (the Sage's interview).
+  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null, source = null, agentOverride = null, preamble = null, trigger = null, poolUsd = null, private: isPrivate = false }) {
     const agent = agentOverride && agentOverride.id === agentId ? agentOverride : roster.get(agentId);
     if (!agent) return { error: `No crew member "${agentId}".` };
     if (!agent.awake) return { error: `${agent.name} is asleep until ${agent.wakes}.` };
@@ -122,6 +123,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     // every event counts as progress; open tool calls lengthen the allowed quiet time
     run.emit = (type, payload) => {
       run.lastProgress = clock.now();
+      if (isPrivate && (type === 'agent.token' || type === 'agent.reasoning')) return null;
       if (type === 'agent.tool_call') run.toolsRunning++;
       else if (type === 'agent.tool_result') run.toolsRunning = Math.max(0, run.toolsRunning - 1);
       return raw(type, payload);
@@ -231,6 +233,14 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
       for (const r of results) if (['restored', 'removed', 'moved back', 'binned'].includes(r.result)) emit('undo.reverted', { undoId: r.undoId, path: r.path });
       await journal.flush();
       return { results };
+    },
+
+    /** Emit an event on a job, even one that has ended (after the journal's last event). */
+    async emitAfter(runId, type, payload) {
+      const r = active.get(runId); if (r) return !!r.emit(type, payload);
+      const evs = await journal.read(runId); if (!evs.length) return false;
+      const ok = !!bus.emitFor(runId, evs[0].agentId, Math.max(...evs.map(e => e.seq)) + 1)(type, payload);
+      await journal.flush(); return ok;
     },
 
     /** Emit an event on a job that is still running. Returns false if it has ended. */

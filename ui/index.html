@@ -82,6 +82,7 @@
 <dialog id="brain-dialog" class="settings brain-dialog" aria-labelledby="brain-title">
   <div class="brain-head">
     <h2 id="brain-title">The Brain</h2>
+    <button type="button" id="open-interview" class="primary" title="A ten-minute interview, so the village understands you better">Interview with the Sage</button>
     <div class="brain-tabs" role="tablist" aria-label="Brain views"><button type="button" role="tab" data-tab="notes" aria-selected="true">Notes</button><button type="button" role="tab" data-tab="history" aria-selected="false">History</button></div>
     <button type="button" id="brain-close">Close</button>
   </div>
@@ -99,6 +100,31 @@
     <p class="hint">Every change to the Brain, newest first. Undo puts a note back as it was before that change.</p>
     <ol id="brain-changes"></ol>
   </section>
+</dialog>
+<dialog id="interview-dialog" class="settings interview-dialog" aria-labelledby="interview-title">
+  <div class="brain-head">
+    <h2 id="interview-title">Interview with the Sage</h2>
+    <span class="iv-clock" id="interview-clock" aria-live="off"></span>
+    <button type="button" id="interview-close">Close</button>
+  </div>
+  <p class="hint">The Sage learns who you are and how you like to work, so the whole village serves you better. Your answers stay private: they're kept only in MonkeyCraft's memory until you save the draft to the Brain, and never written to the job log. While you talk, they go to Claude for thinking, like every job.</p>
+  <p class="error" id="interview-error" role="alert" hidden></p>
+  <div class="iv-chat" id="interview-chat" aria-live="polite"></div>
+  <button type="button" id="interview-start" class="primary">Start the interview (about 10 minutes)</button>
+  <form id="interview-form" class="iv-answer">
+    <div id="interview-answer" class="iv-row" hidden>
+      <label for="interview-text" class="sr-only">Your answer</label>
+      <textarea id="interview-text" rows="2" maxlength="4000" placeholder="Your answer… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <div class="iv-btns"><button type="submit" id="interview-send" class="primary">Send</button><button type="button" id="interview-skip">Skip</button><button type="button" id="interview-finish">Finish now</button></div>
+    </div>
+  </form>
+  <section id="interview-draft" hidden>
+    <h3 class="iv-h">The Sage's draft of your profile</h3>
+    <p class="hint">Edit anything, leave out what you don't want kept, then save. These become notes in the Brain's You folder. You can lock or undo them in the Brain panel.</p>
+    <div id="interview-notes" class="iv-notes"></div>
+    <div class="settings-btns"><button type="button" id="interview-discard">Throw away</button><button type="button" id="interview-save" class="primary">Save to the Brain</button></div>
+  </section>
+  <p class="hint" id="interview-done" hidden>Saved. The crew will use it from their next job. You can run the interview again any time to add more.</p>
 </dialog>
 <dialog id="settings" class="settings" aria-labelledby="settings-title">
   <form method="dialog" id="settings-form">

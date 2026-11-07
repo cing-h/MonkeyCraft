@@ -229,3 +229,22 @@ textarea::placeholder { color: #7f8a74; }
 .settings input#brain-path { width: 100%; box-sizing: border-box; }
 @media (max-width: 760px) { .brain-browse { grid-template-columns: 1fr; } }
 .run .brain-note-line { color: #9fc3ff; }
+
+/* the interview with the Sage */
+.interview-dialog { width: min(760px, calc(100vw - 32px)); }
+.iv-clock { font: 12px var(--label); color: var(--sun); }
+.iv-chat { display: grid; gap: 8px; align-content: start; max-height: 46vh; min-height: 120px; overflow: auto; padding: 10px; border: 2px solid var(--bark); background: #0e1810; margin: 8px 0; }
+.iv-q, .iv-a, .iv-think { padding: 6px 10px; max-width: 85%; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; }
+.iv-q { background: #17233a; border-left: 3px solid #9fc3ff; }
+.iv-a { justify-self: end; background: var(--moss-hi); border-right: 3px solid var(--leaf); }
+.iv-a.skipped { color: var(--muted); font-style: italic; }
+.iv-think { color: var(--muted); font-style: italic; }
+.iv-row { display: grid; gap: 6px; }
+.iv-row textarea, .iv-note textarea, .iv-note input { width: 100%; box-sizing: border-box; font: 14px var(--body); color: var(--fg); background: #0a120c; border: 2px solid var(--bark); padding: 5px 7px; resize: vertical; }
+.iv-btns { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.iv-h { font: 700 16px var(--display); margin: 8px 0 4px; }
+.iv-notes { display: grid; gap: 10px; margin: 8px 0; }
+.iv-note { display: grid; gap: 4px; border: 2px solid var(--bark); padding: 8px; }
+.iv-note input { font-weight: 700; }
+.iv-note button { justify-self: end; padding: 3px 8px; font-size: 10px; }
+.interview-dialog [hidden], .brain-dialog [hidden] { display: none !important; }

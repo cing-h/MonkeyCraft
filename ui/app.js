@@ -7,6 +7,7 @@ import { makeStation, CREW_IDS } from './station/ape/scene.js';
 import { HOMES } from './station/ape/world.js';
 import { PLOTS } from './station/ape/canopy.js';
 import { initBrain } from './brain.js';
+import { initInterview } from './interview.js';
 
 const $ = id => document.getElementById(id);
 const H = { 'content-type': 'application/json', 'x-monkeycraft': '1' };
@@ -60,7 +61,7 @@ function saying(r, ev) {
 }
 const REASONS = { done: 'DONE', cancelled: 'CANCELLED', error: 'FAILED', max_iters: 'STOPPED: TOO MANY STEPS', budget: 'STOPPED: SPENDING LIMIT', halted: 'STOPPED BY STOP BUTTON', stale: 'STOPPED: NO PROGRESS' };
 const argText = a => {
-  const s = !a ? '' : a.command || a.path || (a.worker && a.task ? `${a.worker}: ${a.task}` : '') || a.url || a.query || (a.title && a.text ? `"${a.title}"` : '') || (a.from && a.to ? `${a.from} → ${a.to}` : '') || (Array.isArray(a.jobs) ? a.jobs.join(', ') : '') || JSON.stringify(a);
+  const s = !a ? '' : a.command || a.path || (a.worker && a.task ? `${a.worker}: ${a.task}` : '') || (a.private ? '(private)' : '') || a.url || a.query || (a.title && a.text ? `"${a.title}"` : '') || (a.from && a.to ? `${a.from} → ${a.to}` : '') || (Array.isArray(a.jobs) ? a.jobs.join(', ') : '') || JSON.stringify(a);
   return s.length > 140 ? s.slice(0, 137) + '…' : s;
 };
 
@@ -69,6 +70,7 @@ function logRun(ev) {
   switch (ev.type) {
     case 'run.start':
       if (ev.source === 'council') { r.council = true; r.box.append(el('div', 'from', ev.trigger === 'schedule' ? 'THE DAILY COUNCIL AT THE RING' : 'COUNCIL AT THE RING · YOU CALLED IT'), el('div', 'you', 'The crew gather at the Ring to look back on recent work. The Chief will tell you only if something is significant.')); break; }
+      if (ev.source === 'interview') { r.quiet = true; const d = el('div', 'from', 'THE SAGE IS INTERVIEWING YOU · THE CONVERSATION IS PRIVATE AND STAYS IN THE INTERVIEW PANEL'); const b = el('button', 'chip', 'Open the interview'); b.type = 'button'; b.onclick = () => interviewPanel.open(); r.box.append(d, b); break; }
       if (r.parent?.council) { r.quiet = true; r.box.append(el('div', 'who', `${(names[ev.agentId] || ev.agentId).toUpperCase()} · SPEAKS AT THE COUNCIL`)); break; }   // its points arrive as council.say
       if (r.parent) r.box.append(el('div', 'who', `${(names[ev.agentId] || ev.agentId).toUpperCase()} · TASK FROM ${(names[r.parent.agentId] || r.parent.agentId).toUpperCase()}`), el('div', 'task', ev.task || '(task)'));
       else {
@@ -124,6 +126,10 @@ function logRun(ev) {
       m.textContent = `REMEMBERED FROM THE BRAIN${ev.profile ? ' (INCLUDING WHAT IT KNOWS ABOUT YOU)' : ''}: ${titles.join(' · ')}`;
       r.box.append(m); break;
     }
+    case 'sage.interview': {
+      const say = { drafted: 'THE SAGE HAS DRAFTED YOUR PROFILE. READ IT IN THE INTERVIEW PANEL.', approved: 'YOU SAVED THE PROFILE TO THE BRAIN.', discarded: 'YOU THREW THE DRAFT AWAY. NOTHING WAS KEPT.' }[ev.state];
+      if (say) r.box.append(el('div', 'note brain-note-line', say)); break;
+    }
     case 'brain.write': r.say = null; r.box.append(el('div', 'note brain-note-line', `${ev.op === 'create' ? 'SAVED TO' : 'UPDATED IN'} THE BRAIN: ${ev.path.split('/').pop().replace(/\.md$/, '')} (UNDO IT IN THE BRAIN PANEL)`)); break;
     case 'run.error': r.box.append(el('div', 'error', ev.message)); break;
     case 'taint.set': r.box.append(el('div', 'lock', `READ WEB CONTENT (${ev.source}). FOR SAFETY, COMMANDS AND FILE CHANGES ARE LOCKED FOR THE REST OF THIS JOB.`)); break;
@@ -178,6 +184,7 @@ function onEvent(ev) {
   logEvent(ev);
   logRun(ev);
   syncMail(ev);
+  interviewPanel.onEvent(ev);
   if (station) { syncStrip(Date.now()); syncBubbles(); } // show questions at once, not on the next tick
   // the villagers may remark on fresh, real events (never on replayed history)
   if (station && Date.now() - ev.ts < 5000) {
@@ -487,8 +494,11 @@ $('google-disconnect').onclick = async () => { if (confirm('Disconnect Google? T
 window.addEventListener('focus', () => { if ($('settings').open) loadGoogle().catch(() => {}); });
 
 const brainPanel = initBrain({ $, el, post });
+const interviewPanel = initInterview({ $, el, post });
+$('open-interview').onclick = () => interviewPanel.open();
 loadSpend(); loadGrants();
 if (location.hash === '#settings') openSettings().catch(() => {});
+if (location.hash === '#interview') interviewPanel.open().catch(() => {});
 if (location.hash.startsWith('#brain')) brainPanel.open(decodeURIComponent(location.hash.slice(7)) || null).catch(() => {});   // #brain or #brain:<note path>
 const es = new EventSource('/api/events');
 es.onmessage = m => { try { onEvent(JSON.parse(m.data)); } catch (e) { console.error(e); } };

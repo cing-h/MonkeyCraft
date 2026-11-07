@@ -57,6 +57,8 @@ import { makeBrain } from './brain/vault.js';
 import { brainRoutes } from './routes/brain.js';
 import { makeRecall } from './brain/recall.js';
 import { makeBrainTools } from './tools/brain.js';
+import { makeInterview } from './crew/interview.js';
+import { sageRoutes } from './routes/sage.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.MONKEYCRAFT_PORT || 8787);
@@ -183,6 +185,8 @@ async function main() {
   const slides = makeSlides({ api: googleApi, newObjectId: () => `mc${randomBytes(9).toString('hex')}` });
   const shell = makeShellExec({ spawn: trackedSpawn('shell'), pathEnv, baseEnv: process.env, killProcessGroup });
   let council = null;   // made once the run host exists (below); the council tools look it up when they run
+  let runs = null;
+  const interview = makeInterview({ runs: () => runs, brain, clock, newId });   // the Sage's interview (tools need the run host, made below)
   const registry = makeRegistry([
     makeFsRead({ fsp, pathEnv }),
     makeFsWrite({ fsp, pathEnv, undo }),
@@ -198,7 +202,8 @@ async function main() {
     ...makeCrewTools({ roster }),
     ...makeAskClaudeTools({ mailbox }),
     ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } }),
-    ...makeBrainTools({ brain, roster })
+    ...makeBrainTools({ brain, roster }),
+    ...interview.tools
   ]);
   const claudePath = await findClaude();
   const ENV_LIMITS = { ...LIMITS };
@@ -206,7 +211,7 @@ async function main() {
   applySettings(settings.get());
   const apiKey = process.env.MONKEYCRAFT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
   const providers = { 'anthropic-api': makeAnthropicProvider({ apiKey }), 'claude-code': makeClaudeCodeProvider({ spawn: trackedSpawn('claude'), claudePath, baseEnv: process.env, killProcessGroup, cwd: realWorkspace }) };
-  const runs = makeRunHost({
+  runs = makeRunHost({
     bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken,
     mcpUrl: runId => `http://127.0.0.1:${PORT}/mcp/${runId}`,
     limits: LIMITS, undo, guardPath,
@@ -232,7 +237,7 @@ async function main() {
 
   const server = makeServer({
     port: PORT,
-    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings, brain, workspace: realWorkspace, dataDir }), ...brainRoutes({ brain }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken }), ...councilRoutes({ council }), ...googleRoutes({ auth: googleAuth })]
+    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings, brain, workspace: realWorkspace, dataDir }), ...brainRoutes({ brain }), ...sageRoutes({ interview }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken }), ...councilRoutes({ council }), ...googleRoutes({ auth: googleAuth })]
   });
   await server.listen();
   console.log(`MonkeyCraft is running: http://127.0.0.1:${PORT}/`);

@@ -1,6 +1,6 @@
 # Edition 2: the Brain and the Demi-God Sage
 
-Status: APPROVED 2026-11-07. Phases 1–2 done; phase 3 (the Sage's interview) next.
+Status: APPROVED 2026-11-07. Phases 1–3 done; phase 4 (learning after every job) next.
 Scope (the user's decision): Edition 2 is only the Brain and the Demi-God Sage. Schedules (Bell-ringer), chat apps, connectors and the desktop app wait until this is built and fleshed out.
 
 ---
@@ -80,6 +80,7 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - Roster: the Sage is `awake: true`, gets a persona as keeper of the Brain, and the tools `brain.*` plus `sage.*`.
    - **The interview:** a Sage job with a chat panel and a 10-minute timer. Most important questions first, no restricted topics (the user's decision): anything that makes the village more efficient, effective, accurate or better at communicating. Questions adapt to your answers: goals (life, work, projects), who you are, how you like updates, what to never do, what frustrates you. Any question can be skipped. When the time is up he wraps up, drafts the `You/` notes, and you approve that first draft once. After that he learns quietly.
    - *Check:* the timer ends the interview cleanly, nothing is written before you approve, and you can re-run the interview later.
+   - **DONE 2026-11-07** (`feature/sage-interview`). As built: the Sage is awake (golden coat and blue face already; robes and flight in phase 6) with `sage.ask` and `sage.draft_profile`. You start the interview from the Brain panel and can answer, skip or finish early. After that you can edit the draft, leave notes out, then save or throw it away. The conversation is private: it stays in memory until you save, the job's words and these tools' arguments never reach the job journal (only counts and states, `sage.interview`), and Claude Code keeps no session transcript. A backstop stops the job 3 minutes after time is up. Live check with a made-up user: 4 questions (one left waiting 75 s), an accurate 3-note draft, no personal words in the journal, about $0.03.
 4. **`feature/brain-learning`: learning after every job.**
    - After a job ends, a **reflection pass** (cheap model, its own budget) proposes lessons for each ape that worked and quiet profile notes.
      - Untainted, unlocked, and passes the lesson checks: written straight away (fast speed).

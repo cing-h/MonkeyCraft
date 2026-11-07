@@ -11,7 +11,7 @@
 //
 // Tool shape:
 //   { name: 'fs.read', description, inputSchema, capability, scope: 'read'|'write'|'execute'|'delegate'|'memory',
-//     taints?: true (its results are untrusted, e.g. web pages),
+//     taints?: true (its results are untrusted, e.g. web pages), privateArgs?: true (arguments are not shown in events),
 //     timeoutMs?, assess?(args, ctx) -> { deny?, error?, summary, outsideWorkspace?, cacheKey?, facts? },
 //     run(args, ctx, facts) -> { content, summary?, isError? } }
 // `deny` is a safety rule (can't be approved); `error` is a plain mistake in the request.
@@ -51,7 +51,7 @@ export function makeRegistry(tools) {
     const tool = byName.get(call.tool) || byWire.get(call.tool);
     const toolName = tool ? tool.name : String(call.tool);
     const args = (call.args && typeof call.args === 'object' && !Array.isArray(call.args)) ? call.args : {};
-    emit('agent.tool_call', { callId, tool: toolName, args });
+    emit('agent.tool_call', { callId, tool: toolName, args: tool?.privateArgs ? { private: true } : args });   // private tools (the interview) never put their words in the journal
     const finish = (isError, content, summary, counts = true) => {
       if (counts && ctx.breaker) {
         const trip = ctx.breaker.record(isError);

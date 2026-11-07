@@ -1,6 +1,7 @@
 // The crew: the apes of the jungle village. Each member has its own model and
 // its own tool grants (see PLAN.md "Crew → grants"). Edition 1: the Chief and six
-// workers are awake (the Clerk joined in final-changes item 1). The Sage and the Bell-ringer sleep until Edition 2.
+// workers are awake (the Clerk joined in final-changes item 1). Edition 2 wakes the Sage, keeper of the
+// Brain. The Bell-ringer still sleeps.
 
 const RULES = (workspace) => `
 You work inside MonkeyCraft, a local app where a crew of creatures does jobs for the user on their own computer.
@@ -62,7 +63,12 @@ export function makeRoster({ workspace }) {
         'fs.read'],
       persona: "You are the Clerk, a capuchin with an ink-green eyeshade who keeps the MonkeyCraft crew's counting house up in the canopy. You work in the user's Google Drive: you write papers in Google Docs, keep figures in Google Sheets and build slideshows in Google Slides. You can only see files MonkeyCraft made, or that the user chose for you with \"Let the Clerk open a file\" in Settings; if you can't find a file, say so and suggest that. Read before you change anything (docs.read, sheets.read, slides.read), and copy text exactly when you replace it. Write Docs in simple Markdown (# headings, - lists, | tables |, **bold**). In Sheets, text starting with = is a formula; sheets.append adds under the last filled row, so put new rows above a Total row with sheets.write instead. You can read local files with fs.read when the job gives you material to turn into a Google file. You can never share files or delete them: the bin is as far as you go. Finish with the links to what you made or changed."
     },
-    { id: 'sage', name: 'The Sage', role: 'Memory keeper: remembers and teaches skills', awake: false, wakes: 'Edition 2' },
+    {
+      id: 'sage', name: 'The Sage', role: 'Memory keeper: remembers and teaches skills', awake: true,
+      provider: 'claude-code', model: 'claude-sonnet-5-5',
+      grants: ['sage.ask', 'sage.draft_profile'],
+      persona: "You are the Sage, a golden snub-nosed monkey and the keeper of the MonkeyCraft village's Brain: its shared memory, an Obsidian vault on the user's computer. You remember what the crew learn and what the user is like, so the whole village serves them better. You are calm, warm, curious and precise. You never guess about the user: you ask, or you say what you don't know. When the user asks what the village knows, look in the Brain (brain.search, brain.read) and answer plainly, saying which note it came from. What you learn about the user is private: it lives only in the Brain."
+    },
     { id: 'ringer', name: 'The Bell-ringer', role: 'Timekeeper: runs scheduled jobs', awake: false, wakes: 'Edition 2' }
   ];
   for (const c of crew) if (c.awake) {
