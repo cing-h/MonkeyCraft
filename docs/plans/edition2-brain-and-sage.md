@@ -100,6 +100,8 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - *Check:* the aura brightens only from events, and a screenshot review with the user.
 
 ### The user's answers (2026-11-07)
+- **Web proposals:** when the user approves (Keep) a proposal that came from a job that read the web, it becomes a normal trusted note: the tainted mark is cleared, so it can go in the apes' summaries. Until then, reading one during a job locks that job the way reading a web page does (phase 4).
+- **The Zettelkasten and the Brain stay separate** (settled: no merging).
 - **The Zettelkasten:** the crew may *read* the user's personal Zettelkasten for information, but never change it (a read-only folder setting, enforced like the hardline; built on `feature/brain-recall`). The Brain stays the crew's own notebook; the Zettelkasten is the user's library.
 - **The Sage's look:** he becomes a **golden snub-nosed monkey** (golden fur, blue face). Robes are **blue with gold trim**; the aura stays in his blue light.
 - **The interview:** no restricted topics. Gather as much as is useful for making the village more efficient, effective and accurate, and for communicating with the user better. Ask the most important questions first. In the user's words: "ask whatever you need to become better at your jobs, skills, become smarter, or communicate with me better." The user can still skip any question, and the profile is still stored only in the local Brain.
