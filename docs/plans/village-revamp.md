@@ -26,7 +26,7 @@ Status: APPROVED 2026-11-06; building.
    - Going down: rump-first, slower, with a lateral rhythm.
    - Each species climbs in its own way. The gibbon goes hand over hand with its legs tucked. The gorilla is slow and heavy. The orangutan uses all four hands. The capuchin is quick and springy, with its tail braced.
    - The speed is matched to the distance the hands travel, so no hand slides.
-4. **`feature/vine-swings`: vines, air time and flips.**
+4. **`feature/vine-swings`: vines, air time and flips.** DONE 2026-11-06.
    - Long lianas hang from the high canopy across the village, a few on each story. An ape grabs one, pumps the swing, lets go near the top of the forward swing and flies on a real ballistic arc to the next vine, a platform or the ground.
    - **Flips:** in a long flight the ape tucks to spin, does one (sometimes two) somersaults, then opens out and brings its feet or hands forward to land. A spin only starts when the flight time allows a full turn, so there's never a half-flip into a landing.
    - The vines sway and swing back after a release. Swingers (gibbon, chimps, bonobo, orangutan, capuchin) use vines for long trips on one story. The heavy Chief never does.
@@ -93,3 +93,13 @@ Status: APPROVED 2026-11-06; building.
   - the chimp and bonobo use the default ape climb.
 - `climbSpeed()` is the rise per cycle × the cycle rate. The scene climbs at that speed (down is 0.8×, and hurrying home quickens the cycle), so grips never slide. Hand props are put away while climbing.
 - `test/climb.test.js`: no grip slides more than about a pixel for any species, up or down; three limbs always grip on the way up; the foot leads on the way down; the gibbon is the fastest climber.
+
+## Phase 4 notes (what was built)
+- `vines.js`: long lianas on every story. On the ground they hang from the low branch, in two runs of four. On Canopy 1 and 2 they hang from the leaves about 90 px above the walkway, in two runs each. They're drawn live (`drawLianas` in `scene.js`), so they swing.
+- The ride: the ape stands under the first vine, crouches and jumps up to grab it. It then pumps a real pendulum and, on a forward rising swing, lets go at the first moment the predicted arc meets the next vine. A vine caught high is slid down to a full-length grip. The grip is always high enough that the hanging feet clear the floor. On the last vine it waits for a full swing, lets go near the top for big air and lands on the floor. The rest of the trip is planned from wherever it lands. Swingers who hang under walkways first climb up onto the walkway to ride.
+- One gravity (`VINE_G` = 240 px/s², about real at the apes' scale). Each flight is followed in closed form, so the catch happens exactly where it was predicted.
+- **Flips:** the flight time is known at release. Whole backward turns are taken only if they fit, at no more than the species' top spin rate. The ape spins fastest mid-air while tucked and opens out about 0.14 s before the catch or landing, so there are never half-flips. The gibbon sometimes does a double. The orangutan never flips, and nobody flips in reduced motion. `q.roll` turns the tail with the body.
+- A released vine swings back on its own and settles. A ride that can't make the next vine after about 4 s drops off and lands. A job arriving mid-ride ends it at the current vine, then the ape goes home.
+- Who rides: gibbon, chimpanzee, bonobo and capuchin (all stories) and the orangutan (shorter runs, no flips), crew and villagers alike. The Chief and the other monkeys walk. Roughly 3 in 4 long trips go by vine (1 in 5 with reduced motion).
+- `test/vines.test.js`: every swinger finishes a run on every story, with no jumps and feet clear; a flip only starts when it fits and always finishes; a released vine settles; and a job brings the crew home even mid-ride.
+- `scripts/render-station.js` takes an optional world height to look at a canopy story.

@@ -27,6 +27,7 @@ import { climbLevel, hangs, holdY, pickWander, route, surfaceY } from './lanes.j
 import { FOLK } from './villagers.js';
 import { AUDIENCE, COUNCIL_SEATS, DELIVERIES, RING, TRADES, glyph, gourd, makeGatherings } from './culture.js';
 import { walkY } from './canopy.js';
+import { VINES, floorY, makeVineRider, makeVineSway, ridesVines, vineChain } from './vines.js';
 
 
 // ---------- 5×5 plate glyphs ----------
@@ -58,6 +59,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
   // a swing along the low branch or under a canopy walkway (see swing.js)
   const crewBrachiator = (a, sp) => { const g = AGILE[sp.canopy], lane = a.lane; return makeBrachiator({ R: (sp.ua + sp.la) * 0.9 * a.s, halfPeriod: g.T * Math.sqrt(a.s), amp: g.amp, ricochet: sp.canopy === 'brachiate-fast', branchY: x => holdY(lane, x), x0: a.x, lo: 30, hi: WORLD - 30, dir: a.facing || 1 }); };
   const toucan = makeToucan();
+  const sway = makeVineSway();   // the long lianas (vines.js)
   const flies = Array.from({ length: 5 }, (_, i) => ({ x: 100 + i * 180, y: 90, c: [[255, 170, 40], [90, 160, 255], [255, 110, 200], [250, 230, 80], [120, 220, 160]][i], ph: i * 1.7 }));
   const ID = Object.fromEntries(CREW.map((k, i) => [k, i + 1]));
   const actors = {};
@@ -73,6 +75,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
   const topY = (lane, x) => walkY(lane === 'c1' ? 1 : 2, x) - 5;
   const mount = (a, lane, x, up) => { const sp = SPECIES[a.key], hang = climbLevel(lane, x, sp), top = topY(lane, x); return { k: 'climb', x, dx: 0, from: lane, to: lane, y0: up ? hang : top, y1: up ? top : hang, top: up }; };
   function plan(a, lane, x, { top = false } = {}) {
+    if (a.vr) { a.vr.finish(); a.legs = [{ k: 'vine', dest: { lane, x, top } }]; return; }   // on a vine: finish there, then go on
     const cl = a.climbY !== undefined && a.legs[0] && a.legs[0].k === 'climb' ? a.legs[0] : null;
     const legs = [], sp = SPECIES[a.key];
     let from = a.lane, at = a.x;
@@ -84,7 +87,27 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     const trip = route(from, at, lane, x);
     if (top && hangs(lane, sp)) trip.push(mount(a, lane, x, true));
     a.legs = [...legs, ...trip];
+    addVines(a, lane, x, top);
   }
+  // A long trip along one story may go by vine (vines.js): stand under the first vine, jump, swing from vine
+  // to vine and land on the floor; the rest of the trip is planned from wherever it lands.
+  function addVines(a, lane, x, top) {
+    if (!ridesVines(a.key) || !['ground', 'c1', 'c2'].includes(lane) || rnd() > (reduced ? 0.2 : 0.75)) return;
+    const L = a.legs, prev = L[L.length - 2];
+    if (prev && prev.k === 'drop') return;
+    const x0 = !prev ? a.x : prev.k === 'climb' ? prev.x - (prev.dx || 0) : prev.x;
+    if (!prev && a.lane !== lane) return;
+    const busy = new Set(sway.st.flatMap((v, i) => v.held ? [i] : []));
+    const chain = vineChain(a.key, a.s, lane, x0, x, busy); if (!chain.length) return;
+    const dir = Math.sign(x - x0), stand = VINES[chain[0]].x - dir * 14, sp = SPECIES[a.key];
+    const legs = L.slice(0, -1), onTop = legs.length === 1 && legs[0].k === 'climb' && legs[0].y0 !== undefined && !legs[0].top;   // was about to climb down off the walkway: stay up
+    if (onTop) legs.length = 0;
+    legs.push({ k: 'move', x: stand });
+    if (hangs(lane, sp) && !onTop && !(a.top && !prev)) legs.push(mount(a, lane, stand, true));   // swingers climb up onto the walkway first
+    legs.push({ k: 'vine', chain, dir, dest: { lane, x, top } });
+    a.legs = legs;
+  }
+  function dropVine(a) { if (!a.vr) return; for (const v of sway.st) if (v.held === a.vr) v.held = null; a.vr = null; }
   function setAnim(a, anim, blendT = 0.22) { if (a.anim !== anim) { a.prev = a.q; a.blend = 0; a.anim = anim; a.blendT = blendT; } }
 
   // The Chief's free time (chief.js): rest poses on the lodge platform, and now and then a stroll through the village.
@@ -143,7 +166,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       const sp = SPECIES[a.key], mode = a.folk ? 'idle' : modeOf(a.key, now), d = a.folk ? a.home : DOORS[a.key];
       a.mode = mode; a.blend = Math.min(1, a.blend + dt / (a.blendT || 0.22));
       if (mode !== 'working') a.inside = false;
-      if (mode === 'asleep') { Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true, climbY: undefined, rest: null, top: false, tasks: null }); setAnim(a, 'sleep'); continue; }
+      if (mode === 'asleep') { dropVine(a); Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true, climbY: undefined, rest: null, top: false, tasks: null }); setAnim(a, 'sleep'); continue; }
       const home = mode !== 'idle';
       if (a.key === 'chief' && home && !a.called) { a.called = true; a.rest = null; chiefIdle.interrupt(); }   // a job sends him straight back to his station
       if (!home) a.called = false; else if (a.tasks) a.tasks = null;   // a job comes before any gathering
@@ -154,9 +177,9 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       if (home && !council && !goingHome && !(a.atDoor && a.lane === d.lane)) { plan(a, d.lane, d.x); a.legs[a.legs.length - 1].home = true; }
       if (council && !goingCouncil && !a.atSeat) { plan(a, 'c1', seatX, { top: true }); a.legs[a.legs.length - 1].council = true; a.atDoor = false; }
       if (!home && (goingHome || goingCouncil) && !a.air && !(a.br && a.br.mode === 'flight') && a.anim !== 'climb') a.legs = [];
-      if (!home && !a.legs.length && !a.air && a.tasks?.length) doTask(a, dt);
-      else if (!home && !a.legs.length && !a.air && a.key === 'chief' && !a.folk) chiefFree(a, dt);
-      else if (!home && !a.legs.length && !a.air) {
+      if (!home && !a.legs.length && !a.air && !a.vr && a.tasks?.length) doTask(a, dt);
+      else if (!home && !a.legs.length && !a.air && !a.vr && a.key === 'chief' && !a.folk) chiefFree(a, dt);
+      else if (!home && !a.legs.length && !a.air && !a.vr) {
         a.wait -= dt;
         if (a.wait <= 0) {
           if (a.folk && rnd() < 0.5) a.tasks = tradeTasks(a);   // villagers ply their trades
@@ -169,6 +192,17 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       else if (a.air) {                                     // a leap down from the canopy
         const r = a.air; r.vy += 170 * dt; r.x += r.vx * dt; r.y += r.vy * dt; a.x = r.x; setAnim(a, 'leap');
         if (r.y >= groundY(a.x)) { a.lane = 'ground'; a.air = null; a.land = 0.28; a.spd *= 0.4; a.legs.shift(); }
+      } else if (a.vr || (leg && leg.k === 'vine' && leg.chain)) {   // riding the vines (vines.js)
+        if (!a.vr) { a.br = null; a.spd = 0; a.vr = makeVineRider({ key: a.key, s: a.s, chain: leg.chain, x: a.x, dir: leg.dir, sway, rnd, flips: !reduced, hurry: home, reduced }); }
+        const ev = a.vr.step(dt);
+        if (ev === 'catch') { const v = VINES[a.vr.chain[a.vr.i]]; shake(v.x, v.ay + 2, 1, a.vr.lane === 'ground' ? 2 : 4); }
+        a.x = a.vr.mid()[0]; a.facing = a.vr.dir; setAnim(a, 'vine', 0.12);
+        if (a.vr.done()) {
+          const lane = a.vr.lane; dropVine(a);
+          a.lane = lane; a.top = lane !== 'ground'; a.land = 0.28; a.atDoor = false;
+          const v = a.legs[0]?.k === 'vine' ? a.legs.shift() : null;
+          if (v && v.dest) { plan(a, v.dest.lane, v.dest.x, { top: v.dest.top }); const end = a.legs[a.legs.length - 1]; if (end) { if (v.home) end.home = true; if (v.council) end.council = true; } }
+        }
       } else if (leg && leg.k === 'drop') {
         if (a.br) {                                        // let go of the branch: the swing's own speed carries into the fall
           const [cx, cy] = a.br.chest(), [vx, vy] = a.br.velocity();
@@ -245,6 +279,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     for (const v of villagers) if (stepVillager(v, dt, rnd) === 'catch') shake(v.b.hx, v.b.branchY(v.b.hx), 0.55, v.fast ? 3 : 1);
     for (let i = leaves.length - 1; i >= 0; i--) { const l = leaves[i]; l.life -= dt; l.ph += dt * 5; l.vy = Math.min(9, l.vy + 18 * dt); l.vx *= 0.97; l.x += (l.vx + Math.sin(l.ph) * 6) * dt; l.y += l.vy * dt; if (l.life <= 0 || l.y > WATER) leaves.splice(i, 1); }
     toucan.update(dt);
+    sway.step(dt, t);
     for (const f of flies) { f.ph += dt; f.x += Math.sin(f.ph * 0.7) * 10 * dt + 4 * dt; f.y = 92 + Math.sin(f.ph * 1.3) * 8 + Math.sin(f.ph * 5) * 1.5; if (f.x > WORLD) f.x = 0; }
     for (let i = flares.length - 1; i >= 0; i--) if ((flares[i].life -= dt) <= 0) flares.splice(i, 1);
     for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.life -= dt; s.vy += s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; if (s.life <= 0) sparks.splice(i, 1); }
@@ -258,6 +293,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       case 'climb': return P.climb(sp, a.phase, !!a.climbDown);
       case 'brach': return brachiatePose(sp, a.br, a.s, { fast: sp.canopy === 'brachiate-fast' }).q;
       case 'leap': return P.leap(sp, a.air ? a.air.vy : 0);
+      case 'vine': return a.vr ? a.vr.pose().q : P.stand(sp, t);
       case 'land': return P.land(sp, Math.max(0, a.land / 0.28));
       default: return (P[a.anim] || P.stand)(sp, t);
     }
@@ -308,6 +344,28 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       }
     }
   };
+  // the long lianas: from the anchor down to the hand of whoever holds one (the rest hangs on below it),
+  // or swinging free with a little lag along their length
+  const VINE_M = { ground: mat([86, 92, 50], { rim: 0.7 }), c1: mat([88, 96, 52], { rim: 0.7 }), c2: mat([98, 106, 58], { rim: 0.8 }) };
+  const LEAF = [[64, 116, 52], [104, 156, 70]], LEAFM = mat([66, 112, 54], { rim: 0.6 });
+  function drawLianas() {
+    VINES.forEach((v, i) => {
+      if (!onScreen(v.ay - 4, v.ay + v.len + 2) || v.x < cam - 40 || v.x > cam + VW + 40) return;
+      const st = sway.st[i], held = st.held && st.held.hand && st.held.hand();
+      const grip = held ? Math.hypot(held[0] - v.x, held[1] - v.ay) : v.len;
+      let x = v.x, y = v.ay, px = x, py = y;
+      for (let l = 1; l <= v.len; l++) {
+        const a = l < grip ? st.ang : st.ang * Math.max(0, 1 - (l - grip) / 10), bend = held ? 0 : -st.w * 0.05 * (l / v.len);
+        const curl = held && l < grip ? 0 : Math.sin(l * 0.13 + i * 1.7) * 0.22;   // a free liana hangs in a gentle S
+        x += Math.sin(a + bend) + curl; y += Math.cos(a + bend);
+        if (l % 3 === 0 || l === v.len) { fb.cap(px, py, x, y, 0.75, 0.75, VINE_M[v.lane]); px = x; py = y; }   // a woody liana, about two pixels thick
+        if (l % 5 === 3) { const sd = (l / 5) & 1 ? 1 : -1; fb.put(x + sd * 1.5 - cam, y, LEAF[1]); fb.put(x + sd * 2.5 - cam, y + 1, LEAF[0]); }   // a leaf now and then
+      }
+      fb.put(x - cam, y + 1, LEAF[1]); fb.put(x - 1 - cam, y, LEAF[0]); fb.put(x + 1 - cam, y, LEAF[0]);   // a leafy tip
+      fb.ell(v.x - 1, v.ay, v.lane === 'ground' ? 1.6 : 4, v.lane === 'ground' ? 1.2 : 2.6, LEAFM);   // where it hangs from: a knot on the branch, or a clump of leaves
+      if (v.lane !== 'ground') fb.ell(v.x + 3, v.ay - 1, 3, 2, LEAFM);
+    });
+  }
   const onScreen = (y0, y1) => y1 > fb.oy && y0 < fb.oy + VH;   // is any of world rows y0..y1 on screen?
   function draw(now) {
     fb.id.fill(-1); fb.pid = -1; fb.oy = Math.round(camY);
@@ -370,11 +428,13 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       fb.rect(l.x0, l.y0, l.x1, l.y1, c);
       if (lit) for (let y = l.y0 - 3; y < l.y1 + 3; y++) for (let x = l.x0 - 3; x < l.x1 + 3; x++) { const dx = Math.max(l.x0 - x, 0, x - l.x1 + 1), dy = Math.max(l.y0 - y, 0, y - l.y1 + 1), dd = Math.hypot(dx, dy); if (dd > 0 && dd < 3.5) fb.add(x - cam, y, c, 0.14 / dd); }
     }
+    drawLianas();
     const drawActor = a => {
       const sp = SPECIES[a.key], target = poseFor(a), q = blendPose(a.prev, target, a.blend * a.blend * (3 - 2 * a.blend)); q.tail = a.tailA; a.q = q;
       let at;
       if (a.anim === 'climb') at = { mode: 'pelvis', x: a.x, y: a.climbY };
       else if (a.anim === 'brach' && a.br) { const p = brachiatePose(sp, a.br, a.s, { fast: sp.canopy === 'brachiate-fast' }); at = { mode: 'pelvis', x: p.px, y: p.py }; if (a.blend >= 1) { Object.assign(q, p.q); q.tail = a.tailA; } }
+      else if (a.anim === 'vine' && a.vr) { const p = a.vr.pose(); at = p.ground ? { mode: 'ground', x: a.x, y: floorY(a.vr.lane, a.x) } : { mode: 'pelvis', x: p.px, y: p.py }; if (a.blend >= 1) { Object.assign(q, p.q); q.tail = p.q.roll ? p.q.tail : a.tailA; } }
       else if (a.anim === 'leap') at = { mode: 'pelvis', x: a.x, y: a.air ? a.air.y - 4 : groundY(a.x) - 6 };
       else at = { mode: 'ground', x: a.x, y: surfaceY(a.lane, a.x) - (a.lane === 'canopy' ? 1.5 : 0) };
       // When the way the body rests changes (stand up from lying down, start a climb, land), ease the
@@ -435,7 +495,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
 
   const clampCam = x => Math.max(0, Math.min(WORLD - VW, x)), clampY = y => Math.max(TOP, Math.min(H - VH, y));   // H: the bottom of the world
   const storyOf = y => STORIES.reduce((b, s, i) => Math.abs(s.camY - y) < Math.abs(STORIES[b].camY - y) ? i : b, 0);
-  const worldYOf = a => a.anim === 'climb' && a.climbY !== undefined ? a.climbY : a.air ? a.air.y : surfaceY(a.lane, a.x);
+  const worldYOf = a => a.vr ? a.vr.mid()[1] : a.anim === 'climb' && a.climbY !== undefined ? a.climbY : a.air ? a.air.y : surfaceY(a.lane, a.x);
   return {
     _actors: actors, _villagers: villagers, _folk: folk, _gatherings: gatherings, _lanterns: () => lanternsLit, _council: () => councilOn, _heads: () => ({ ...heads, ...Object.fromEntries(fheads.map((h, i) => [`f:${i}`, h])) }), _chiefIdle: chiefIdle,
     step(now, dt = 0.05) {

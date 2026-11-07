@@ -250,7 +250,8 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   };
   // far side
   leg(1, true); limb(1, true);
-  if (sp.tail) { const a = (q.tail ?? 0.5), base = [-sp.pr * 0.6, -sp.pr * 0.2]; let p0 = base, ang = -Math.PI / 2 - a; const segs = Math.max(2, Math.round(sp.tail / 2.5));
+  // q.roll: a somersault turns the tail's root with the body
+  if (sp.tail) { const a = (q.tail ?? 0.5), rl = q.roll || 0, base = [-sp.pr * 0.6 * Math.cos(rl) + sp.pr * 0.2 * Math.sin(rl), -sp.pr * 0.6 * Math.sin(rl) - sp.pr * 0.2 * Math.cos(rl)]; let p0 = base, ang = -Math.PI / 2 - a - rl; const segs = Math.max(2, Math.round(sp.tail / 2.5));
     for (let i = 0; i < segs; i++) { ang += (key === 'ringer' ? 0.32 : 0.1) * (1 + Math.sin(t * 1.5 + i) * 0.2); const p1 = [p0[0] + Math.cos(ang) * sp.tail / segs, p0[1] - Math.sin(ang) * sp.tail / segs]; fb.cap(X(p0), Y(p0), X(p1), Y(p1), sp.lr * 0.8 * s, sp.lr * 0.55 * s, sp.mf); p0 = p1; } }
   // body
   fb.cap(X([0, 0]), Y([0, 0]), X(k.ch), Y(k.ch), sp.pr * s, sp.tr * s, sp.m);
