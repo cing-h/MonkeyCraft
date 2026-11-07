@@ -38,3 +38,14 @@ Before Phase 1's live check, the user does the guided Google Cloud setup: create
 - The tools are registered but nobody is granted them yet. The Clerk gets them in phase 5.
 - **Live check passed:** Google accepts the loopback redirect with a path (`/api/google/callback`).
 - **Later:** files the user already had are invisible under `drive.file` until opened with MonkeyCraft. That needs the Google Picker, which is to be decided in phase 2. `drive.read` doesn't mark a job as tainted (the user's rule: only the Scout's web reads do).
+
+## Phase 2 notes (what was built)
+- `src/google/docs.js` turns Markdown into real Docs formatting: headings, bullets, numbered lists, tables (with a bold header row), bold, italic, code and links. It reads a Doc back as the same Markdown.
+  - The document is read back before each piece is added, so positions are never guessed.
+  - Added text has its style reset, so it never inherits the heading or list it follows.
+  - A table starts on a plain line, because it would otherwise take a list's indent.
+- `src/tools/google-docs.js` has four tools: `docs.read`, `docs.create`, `docs.append` and `docs.replace`.
+  - Replace is exact and case-sensitive. The expected count is checked before anything is sent, and it can't cross a line break.
+  - The first edit in a job of a document the job didn't make saves a backup copy first, named "<name> (backup before MonkeyCraft, <date>)". Revert names that backup and never bins it.
+- **The file picker:** the picker API key is kept in `data/google/picker.json`. The app id is the project number at the start of the client id. `GET /api/google/picker` is the picker page (`ui/google-picker.js`). It gets its token from `POST /api/google/picker-session`, which needs the X-MonkeyCraft header.
+- **Live-checked 2026-11-06** on the user's Drive: create, append, replace and read. The PDF export showed real formatting. The test documents were binned afterwards.

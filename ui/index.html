@@ -112,9 +112,19 @@
           <li>Open that file in Notepad, copy everything, paste it below and press Save key. Then press Connect Google.</li>
         </ol>
       </details>
+      <details id="picker-setup">
+        <summary>So the Clerk can open your existing files (2 more minutes)</summary>
+        <ol class="steps">
+          <li>Turn on the <a href="https://console.cloud.google.com/apis/library/picker.googleapis.com" target="_blank" rel="noopener">Google Picker API</a> (press Enable).</li>
+          <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Credentials</a>, press <b>Create credentials → API key</b>. Under API restrictions choose <b>Restrict key</b> and tick only <b>Google Picker API</b>, then save.</li>
+          <li>Copy the key (it starts with <b>AIza</b>), paste it below and press Save picker key.</li>
+        </ol>
+        <label for="picker-key" class="sr-only">Picker API key</label>
+        <div class="google-btns"><input id="picker-key" type="text" placeholder="AIza…" spellcheck="false" autocomplete="off"><button type="button" id="picker-save-key">Save picker key</button></div>
+      </details>
       <label for="google-key" class="sr-only">Sign-in key (the JSON file)</label>
       <textarea id="google-key" rows="3" placeholder='Paste the downloaded key here: {"installed":{"client_id":…}}' spellcheck="false" autocomplete="off"></textarea>
-      <div class="google-btns"><button type="button" id="google-save-key">Save key</button><button type="button" id="google-connect" class="primary">Connect Google</button><button type="button" id="google-disconnect">Disconnect</button></div>
+      <div class="google-btns"><button type="button" id="google-save-key">Save key</button><button type="button" id="google-connect" class="primary">Connect Google</button><button type="button" id="google-pick" class="primary">Let the Clerk open a file…</button><button type="button" id="google-disconnect">Disconnect</button></div>
       <p class="hint">MonkeyCraft only asks for access to the files it makes itself. It can never share files or delete them outright, and every change asks you first.</p>
     </fieldset>
     <fieldset>

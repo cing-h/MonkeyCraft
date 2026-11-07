@@ -25,6 +25,8 @@ import { makeGoogleAuth } from './google/auth.js';
 import { makeGoogleApi } from './google/api.js';
 import { makeDrive } from './google/drive.js';
 import { makeDriveTools } from './tools/google-drive.js';
+import { makeDocs } from './google/docs.js';
+import { makeDocsTools } from './tools/google-docs.js';
 import { googleRoutes } from './routes/google.js';
 import { makeCrewTools } from './crew/orchestrate.js';
 import { makeCouncil, makeCouncilTools } from './crew/council.js';
@@ -121,7 +123,8 @@ async function main() {
   const googleAuth = makeGoogleAuth({ fsp, dir: path.join(dataDir, 'google'), fetchImpl: fetch, clock, randomBytes, redirectUri: `http://127.0.0.1:${PORT}/api/google/callback` });
   const ga = await googleAuth.load();
   if (!ga.ok) console.warn(`The Google sign-in couldn't be read (${ga.error}); Google is not connected.`);
-  const drive = makeDrive({ api: makeGoogleApi({ auth: googleAuth, fetchImpl: fetch }) });
+  const googleApi = makeGoogleApi({ auth: googleAuth, fetchImpl: fetch });
+  const drive = makeDrive({ api: googleApi }), docs = makeDocs({ api: googleApi });
   const shell = makeShellExec({ spawn: trackedSpawn('shell'), pathEnv, baseEnv: process.env, killProcessGroup });
   let council = null;   // made once the run host exists (below); the council tools look it up when they run
   const registry = makeRegistry([
@@ -133,6 +136,7 @@ async function main() {
     makeVerifyRun({ shell }),
     makeWebFetch({ fetchImpl: fetch, lookup: host => dns.lookup(host, { all: true }) }),
     ...makeDriveTools({ auth: googleAuth, drive, undo }),
+    ...makeDocsTools({ auth: googleAuth, drive, docs, undo, clock }),
     ...makeCrewTools({ roster }),
     ...makeAskClaudeTools({ mailbox }),
     ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } })

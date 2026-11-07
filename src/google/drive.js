@@ -43,7 +43,9 @@ export function makeDrive({ api }) {
       if (!fmt) return null;
       return api.call('GET', `${DRIVE}/${encodeURIComponent(file.id)}/export`, { query: { mimeType: fmt }, raw: true, signal });
     },
-    createFolder: (name, parentId, signal) => api.call('POST', DRIVE, { query: { fields: FIELDS }, body: { name, mimeType: MIME.folder, ...(parentId ? { parents: [parentId] } : {}) }, signal }),
+    createFolder: (name, parentId, signal) => drive.create({ name, kind: 'folder', parentId }, signal),
+    /** A new, empty Google file of this kind (doc, sheet, slides or folder). */
+    create: ({ name, kind, parentId }, signal) => api.call('POST', DRIVE, { query: { fields: FIELDS }, body: { name, mimeType: MIME[kind], ...(parentId ? { parents: [parentId] } : {}) }, signal }),
     rename: (id, name, signal) => patch(id, { name }, {}, signal),
     async move(id, toFolderId, signal) {
       const f = await get(id, signal);
@@ -78,6 +80,8 @@ export function makeDrive({ api }) {
           await patch(x.fileId, {}, { addParents: (x.fromParents || []).join(','), removeParents: x.toParent });
           return 'moved back';
         }
+        case 'edit':
+          return `skipped: Google can't undo edits to ${describe(f)} automatically. A backup copy from before the job is in your Drive: "${x.backupName}"`;
         case 'bin':
           if (!f.trashed) return 'skipped: it is no longer in the bin';
           await drive.unbin(x.fileId); return 'restored';

@@ -37,10 +37,13 @@ export function parseClientJson(input) {
 }
 
 export class GoogleAuthError extends Error {}
+const API_KEY = /^AIza[0-9A-Za-z_-]{35}$/;
 
 export function makeGoogleAuth({ fsp, dir, fetchImpl, clock, randomBytes, redirectUri }) {
-  const clientFile = path.join(dir, 'client.json'), tokenFile = path.join(dir, 'token.json');
-  let client = null, token = null, refreshing = null, lastError = null;
+  const clientFile = path.join(dir, 'client.json'), tokenFile = path.join(dir, 'token.json'), pickerFile = path.join(dir, 'picker.json');
+  let client = null, token = null, refreshing = null, lastError = null, pickerKey = null;
+  // the Google Cloud project number starts the client id; the file picker needs it as the "app id"
+  const appId = () => (client?.client_id.match(/^(\d+)-/) || [])[1] || null;
   const pending = new Map();   // state -> { verifier, at }
 
   const writeOwner = async (file, obj) => {
@@ -77,10 +80,24 @@ export function makeGoogleAuth({ fsp, dir, fetchImpl, clock, randomBytes, redire
 
   return {
     async load() {
-      try { const c = await readJson(clientFile); if (c) { const p = parseClientJson(c); client = p.value || null; } token = await readJson(tokenFile); return { ok: true }; }
+      try { const c = await readJson(clientFile); if (c) { const p = parseClientJson(c); client = p.value || null; } token = await readJson(tokenFile); const pk = await readJson(pickerFile); pickerKey = pk && API_KEY.test(pk.apiKey || '') ? pk.apiKey : null; return { ok: true }; }
       catch (e) { return { ok: false, error: e.message }; }
     },
-    status: () => ({ hasKey: !!client, connected: !!(client && token?.refresh_token), connectedAt: token?.connectedAt || null, lastError, redirectUri, scope: SCOPE }),
+    status: () => ({ hasKey: !!client, connected: !!(client && token?.refresh_token), connectedAt: token?.connectedAt || null, lastError, redirectUri, scope: SCOPE, hasPickerKey: !!pickerKey && !!appId() }),
+    /** The file picker's API key (Google Cloud → Credentials → API key). */
+    async savePickerKey(key) {
+      const k = String(key || '').trim();
+      if (!API_KEY.test(k)) return { error: "That doesn't look like a Google API key (it starts with AIza and is 39 characters)." };
+      if (!appId()) return { error: 'Save the sign-in key first: the picker needs the project number in it.' };
+      pickerKey = k; await writeOwner(pickerFile, { apiKey: k });
+      return { ok: true };
+    },
+    /** What the picker page needs: a fresh access token (drive.file only), the API key and the app id. */
+    async pickerSession() {
+      if (!pickerKey || !appId()) return { error: 'The file picker isn\'t set up: add the API key in Settings.' };
+      try { return { token: await this.accessToken(), apiKey: pickerKey, appId: appId() }; }
+      catch (e) { return { error: e.message }; }
+    },
     async saveClient(input) {
       const p = parseClientJson(input);
       if (p.error) return p;

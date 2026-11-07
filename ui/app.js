@@ -446,6 +446,8 @@ async function loadGoogle(note) {
   $('google-key').hidden = $('google-save-key').hidden = g.connected;
   $('google-connect').hidden = g.connected; $('google-connect').disabled = !g.hasKey;
   $('google-disconnect').hidden = !g.connected;
+  $('picker-setup').hidden = !g.connected; $('picker-setup').open = g.connected && !g.hasPickerKey;
+  $('google-pick').hidden = !(g.connected && g.hasPickerKey);
 }
 const googleErr = msg => { const er = $('settings-error'); er.textContent = msg; er.hidden = false; };
 $('google-save-key').onclick = async () => {
@@ -459,6 +461,12 @@ $('google-connect').onclick = async () => {
   window.open(res.data.url, '_blank', 'noopener');
   loadGoogle('Finish signing in on the Google tab. This updates when you come back.');
 };
+$('picker-save-key').onclick = async () => {
+  const res = await post('/api/google/picker-key', { key: $('picker-key').value });
+  if (!res.ok) return googleErr(res.data.error || 'Could not save the picker key.');
+  $('picker-key').value = ''; $('settings-error').hidden = true; loadGoogle('The picker key is saved. Press "Let the Clerk open a file…" to choose files.');
+};
+$('google-pick').onclick = () => window.open('/api/google/picker', '_blank', 'noopener');
 $('google-disconnect').onclick = async () => { if (confirm('Disconnect Google? The Clerk will stop working in Drive until you connect again.')) { await post('/api/google/disconnect', {}); loadGoogle(); } };
 window.addEventListener('focus', () => { if ($('settings').open) loadGoogle().catch(() => {}); });
 
