@@ -222,6 +222,8 @@ Added 2026-11-06. The user asked for it to be built right after item 4. **DONE**
 
 Added 2026-11-06, while the Clerk was being finished. Build plan: `docs/plans/village-revamp.md`.
 
+**Status: BUILT 2026-11-07.** All six steps are on stacked, pushed branches: `feature/darker-trees` → `feature/ape-detail` → `feature/ape-climb` → `feature/vine-swings` → `feature/houses` → `feature/playground`. They're waiting for the user's look and merge.
+
 **What the user wants:**
 - A slight revamp of the monkey sprites, making them a little more detailed.
 - Trees reskinned to be a little more detailed and darker.
