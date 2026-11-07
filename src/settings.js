@@ -53,6 +53,11 @@ export function validateSettings(input, { crewIds, workspace = null, dataDir = n
     if (typeof v !== 'number' || !Number.isFinite(v) || v < r[0] || v > r[1]) { errors.push(`${k} must be a number from ${r[0]} to ${r[1]}`); continue; }
     value.limits[k] = k.endsWith('Tokens') ? Math.round(v) : Math.round(v * 100) / 100;
   }
+  if (s.readOnly !== undefined) {   // folders the crew may read but never change (the user's Zettelkasten)
+    const list = Array.isArray(s.readOnly) ? s.readOnly : null;
+    if (!list || list.length > 10 || list.some(p => typeof p !== 'string' || !path.isAbsolute(p) || p.includes('\0') || path.resolve(p) === '/' || p.length > 1000)) errors.push('read-only folders must be a list of up to 10 full paths (starting with /)');
+    else value.readOnly = [...new Set(list.map(p => path.resolve(p)))];
+  }
   if (s.brain?.path !== undefined) {
     const why = brainPathProblem(s.brain.path, { workspace, dataDir });
     if (why) errors.push(why); else value.brain = { path: path.resolve(s.brain.path) };

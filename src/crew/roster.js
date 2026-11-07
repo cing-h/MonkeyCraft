@@ -11,6 +11,7 @@ You work inside MonkeyCraft, a local app where a crew of creatures does jobs for
 - Be brief and concrete. The user isn't a programmer: explain results in plain language and show only the output that matters.
 - The Brain is the village's shared memory. Look things up with brain.search and brain.read when earlier knowledge would help. Save something with brain.note only when a future job would clearly need it again; most jobs save nothing.`.trim();
 const BRAIN_TOOLS = ['brain.search', 'brain.read', 'brain.note'];
+const REFERENCE = dirs => `\n- The user's own notes (their Zettelkasten, an Obsidian vault) are at ${dirs.join(' and ')}. Read them with fs.read when they would help; you can never change them. They're the user's knowledge, separate from the Brain.`;
 
 export function makeRoster({ workspace }) {
   const crew = [
@@ -70,6 +71,10 @@ export function makeRoster({ workspace }) {
     c.network = c.grants.includes('web.fetch') || (c.builtinTools || []).some(b => /^Web/.test(b));
     c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}`; c.grantSet = new Set(c.grants); c.defaults = { provider: c.provider, model: c.model };
   }
+  /** Tell the apes that can read files where the user's read-only notes are. */
+  function setReference(dirs = []) {
+    for (const c of crew) if (c.awake) c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}${dirs.length && c.grantSet.has('fs.read') ? REFERENCE(dirs) : ''}`;
+  }
   const byId = new Map(crew.map(c => [c.id, c]));
   return {
     get: id => byId.get(id),
@@ -78,6 +83,7 @@ export function makeRoster({ workspace }) {
       for (const c of crew) if (c.awake) { const o = crewSettings[c.id] || {}; c.provider = o.provider || c.defaults.provider; c.model = o.model || c.defaults.model; }
     },
     ids: () => crew.map(c => c.id),
+    setReference,
     /** What the UI may show: no prompts, no internals. */
     public: () => crew.map(({ id, name, role, awake, wakes, model, provider, grants, builtinTools }) => ({ id, name, role, awake, wakes: wakes || null, model: model || null, provider: provider || null, grants: [...(grants || []), ...(builtinTools || []).map(b => `builtin:${b}`)] }))
   };

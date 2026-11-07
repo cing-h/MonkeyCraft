@@ -189,7 +189,7 @@ textarea::placeholder { color: #7f8a74; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .settings .steps { margin: 6px 0 10px; padding-left: 1.4em; line-height: 1.5; }
 .settings .steps a { color: inherit; }
-.settings textarea#google-key { width: 100%; box-sizing: border-box; font: 12px var(--body); color: var(--fg); background: #0a120c; border: 2px solid var(--bark); padding: 4px 6px; resize: vertical; }
+.settings textarea#read-only, .settings textarea#google-key { width: 100%; box-sizing: border-box; font: 12px var(--body); color: var(--fg); background: #0a120c; border: 2px solid var(--bark); padding: 4px 6px; resize: vertical; }
 .google-btns { display: flex; gap: 8px; margin: 6px 0; }
 .google-btns [hidden], #google-key[hidden], #picker-setup[hidden] { display: none; }
 .google-btns input { flex: 1; min-width: 0; }

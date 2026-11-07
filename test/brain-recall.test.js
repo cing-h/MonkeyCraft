@@ -158,3 +158,47 @@ test('run host: the dossier is added to the ape\'s instructions and shown as bra
   await runs.start({ agentId: 'smith', prompt: 'speak', agentOverride: councilMember(roster.get('smith')) }).done;
   assert.doesNotMatch(prompts.at(-1), /MEMORY/);
 });
+
+// ---------- the user's Zettelkasten: read-only for the crew ----------
+import { hardlineRules, checkPath } from '../src/safety/paths.js';
+import { checkCommand } from '../src/safety/shell-guard.js';
+import { validateSettings } from '../src/settings.js';
+import { makeFsWrite } from '../src/tools/fs-write.js';
+import { makeFsRead } from '../src/tools/fs-read.js';
+import { makeFsMove } from '../src/tools/fs-move.js';
+
+test('read-only folders: the crew can read the Zettelkasten but never change it', async () => {
+  const root = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), 'mc-ro-')));
+  const zk = path.join(root, 'Zettelkasten'), ws = path.join(root, 'ws');
+  await fsp.mkdir(path.join(zk, 'wiki'), { recursive: true }); await fsp.mkdir(ws);
+  await fsp.writeFile(path.join(zk, 'wiki', 'Idea.md'), 'a thought\n');
+  const pathEnv = { home: '/nonexistent', workspace: ws, dataDir: path.join(root, 'data'), rules: hardlineRules({ home: '/nonexistent', dataDir: path.join(root, 'data'), readOnlyDirs: [zk] }), realpath: p => fsp.realpath(p) };
+  const file = path.join(zk, 'wiki', 'Idea.md');
+  assert.equal((await checkPath(file, pathEnv)).hardline, null, 'reading is fine');
+  assert.match((await checkPath(file, pathEnv, { write: true })).hardline, /read-only for the crew/);
+  assert.equal((await makeFsRead({ fsp, pathEnv }).assess({ path: file })).deny, undefined);
+  assert.match((await makeFsWrite({ fsp, pathEnv, undo: null }).assess({ path: file, content: 'x', chars: 1, mode: 'replace' })).deny, /read-only/);
+  assert.match((await makeFsWrite({ fsp, pathEnv, undo: null }).assess({ path: path.join(zk, 'new.md'), content: 'x', chars: 1, mode: 'create' })).deny, /read-only/);
+  assert.match((await makeFsMove({ fsp, pathEnv, undo: null }).assess({ from: file, to: path.join(ws, 'Idea.md') })).deny, /read-only/);
+  // Windows drives compare without case
+  const win = hardlineRules({ home: '/h', dataDir: '/h/d', readOnlyDirs: ['/mnt/c/Users/H/OneDrive/Desktop/Zettelkasten/Zettelkasten'] });
+  const env = { home: '/h', workspace: '/h/ws', rules: win, realpath: async p => p };
+  assert.match((await checkPath('/mnt/c/users/h/onedrive/desktop/zettelkasten/zettelkasten/wiki/x.md', env, { write: true })).hardline, /read-only/);
+  assert.equal((await checkPath('/mnt/c/Users/H/OneDrive/Desktop/Other/x.md', env, { write: true })).hardline, null);
+  // shell commands naming it are refused, in either spelling
+  const readOnly = ['/mnt/c/Users/H/OneDrive/Desktop/Zettelkasten/Zettelkasten', 'c:\\Users\\H\\OneDrive\\Desktop\\Zettelkasten\\Zettelkasten'];
+  assert.match(checkCommand('rm /mnt/c/Users/H/OneDrive/Desktop/Zettelkasten/Zettelkasten/wiki/x.md', { readOnly }).reason, /read-only/);
+  assert.equal(checkCommand('del C:\\Users\\H\\OneDrive\\Desktop\\Zettelkasten\\Zettelkasten\\x.md', { readOnly }).ok, false);
+  assert.equal(checkCommand('ls ~/Documents', { readOnly }).ok, true);
+});
+
+test('read-only folders: a setting, and the apes that read files are told where the notes are', () => {
+  assert.deepEqual(validateSettings({ readOnly: ['/mnt/c/Z/', '/mnt/c/Z'] }, { crewIds: [] }).value.readOnly, ['/mnt/c/Z']);
+  for (const bad of [['relative'], ['/'], 'not a list', Array(11).fill('/a')]) assert.equal(validateSettings({ readOnly: bad }, { crewIds: [] }).ok, false, String(bad));
+  const r = makeRoster({ workspace: '/ws' });
+  r.setReference(['/mnt/c/Z']);
+  assert.match(r.get('smith').systemPrompt, /Zettelkasten[\s\S]*\/mnt\/c\/Z[\s\S]*never change them/);
+  assert.doesNotMatch(r.get('scout').systemPrompt, /Zettelkasten/, 'the Scout has no fs.read');
+  r.setReference([]);
+  assert.doesNotMatch(r.get('smith').systemPrompt, /Zettelkasten/);
+});

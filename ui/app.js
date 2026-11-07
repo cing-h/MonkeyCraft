@@ -429,6 +429,7 @@ async function openSettings() {
   }
   for (const k of LIMIT_KEYS) { const i = $(`lim-${k}`), r = options.ranges[k]; i.min = r[0]; i.max = r[1]; i.value = effective.limits[k]; }
   $('chatter-on').checked = chatterOn;
+  $('read-only').value = (settingsView.readOnly || []).join('\n');
   if (settingsView.brain) {
     $('brain-path').value = settingsView.brain.saved || settingsView.brain.path;
     $('brain-path-note').textContent = settingsView.brain.restartNeeded ? `Restart MonkeyCraft to move to this folder. The Brain in use now: ${settingsView.brain.path}.` : 'The Brain stays on this computer only, so it can\'t be in OneDrive or another cloud-synced folder. A new folder takes effect when MonkeyCraft restarts.';
@@ -446,7 +447,8 @@ $('settings-form').addEventListener('submit', async e => {
   for (const k of LIMIT_KEYS) limits[k] = Number($(`lim-${k}`).value);
   chatterOn = $('chatter-on').checked; try { localStorage.setItem('mc-chatter', chatterOn ? '1' : '0'); } catch {}
   const brainPath = $('brain-path').value.trim(), was = settingsView.brain && (settingsView.brain.saved || settingsView.brain.path);
-  const res = await post('/api/settings', { crew: crewS, limits, ...(brainPath && brainPath !== was ? { brain: { path: brainPath } } : {}) });
+  const readOnly = $('read-only').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const res = await post('/api/settings', { crew: crewS, limits, readOnly, ...(brainPath && brainPath !== was ? { brain: { path: brainPath } } : {}) });
   if (!res.ok) { const er = $('settings-error'); er.textContent = res.data.error || 'Could not save.'; er.hidden = false; return; }
   $('settings').close(); loadSpend();
 });

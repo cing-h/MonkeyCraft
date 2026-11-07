@@ -33,7 +33,7 @@ export function makeFsWrite({ fsp, pathEnv, undo }) {
     },
     async assess(args) {
       if (args.content.length !== args.chars) return { error: `"content" has ${args.content.length} characters but "chars" says ${args.chars}, so your arguments were probably cut off. Nothing was written. Send the whole content again.` };
-      const c = await checkPath(args.path, pathEnv);
+      const c = await checkPath(args.path, pathEnv, { write: true });
       if (c.error) return { deny: c.error };
       if (c.hardline) return { deny: c.hardline };
       let exists = false;
@@ -42,7 +42,7 @@ export function makeFsWrite({ fsp, pathEnv, undo }) {
       if (args.mode === 'create' && exists) return { error: `${c.real} already exists. Use mode "replace" to overwrite it or "append" to add to it. Nothing was written.` };
       if (args.mode !== 'create' && !exists) return { error: `${c.real} doesn't exist yet. Use mode "create". Nothing was written.` };
       if (!exists) {
-        const parent = await checkPath(path.dirname(c.real), pathEnv);
+        const parent = await checkPath(path.dirname(c.real), pathEnv, { write: true });
         if (parent.outsideWorkspace) { try { await fsp.stat(path.dirname(c.real)); } catch { return { error: `The folder ${path.dirname(c.real)} doesn't exist. Outside the workspace, MonkeyCraft only writes into folders that already exist. Nothing was written.` }; } }
       }
       const verb = { create: 'create', replace: 'replace', append: 'append to' }[args.mode];

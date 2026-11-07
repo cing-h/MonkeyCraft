@@ -5,6 +5,7 @@ import { validateSettings, MODELS, LIMIT_RANGES } from '../settings.js';
 export function settingsRoutes({ store, roster, providers, limits, apply, brain = null, workspace = null, dataDir = null }) {
   const view = () => ({
     settings: store.get(),
+    readOnly: store.get().readOnly || [],
     brain: brain ? { path: brain.root, saved: store.get().brain?.path || null, restartNeeded: !!store.get().brain?.path && store.get().brain.path !== brain.root } : null,
     effective: {
       crew: roster.public().filter(c => c.awake).map(({ id, name, role, provider, model }) => ({ id, name, role, provider, model })),
@@ -25,6 +26,7 @@ export function settingsRoutes({ store, roster, providers, limits, apply, brain 
       const r = validateSettings(body, { crewIds: roster.ids(), workspace, dataDir });
       if (!r.ok) return send(res, 400, { error: r.errors.join('; ') });
       if (!r.value.brain && store.get().brain) r.value.brain = store.get().brain;   // a save that doesn't mention the Brain keeps its folder
+      if (!r.value.readOnly && store.get().readOnly) r.value.readOnly = store.get().readOnly;
       const wantsApi = Object.values(r.value.crew).some(c => c.provider === 'anthropic-api');
       if (wantsApi && !providers['anthropic-api']?.available) return send(res, 400, { error: 'No Anthropic API key is set, so nobody can use the API yet. Set ANTHROPIC_API_KEY and restart MonkeyCraft.' });
       await store.save(r.value); apply(r.value);

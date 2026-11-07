@@ -96,6 +96,12 @@ async function defaultBrainDir() {
   if (/^[A-Za-z]:\\Users\\[^%\\]+$/.test(win)) { const unix = await run('wslpath', ['-u', win]); if (unix.startsWith('/mnt/')) return path.join(unix, 'MonkeyCraftBrain'); }
   return path.join(home, 'MonkeyCraftBrain');
 }
+// A folder's WSL and Windows spellings, for the shell guard.
+function spellings(dir) {
+  const out = [dir], m = dir.match(/^\/mnt\/([a-z])\/(.*)$/i);
+  if (m) out.push(`${m[1]}:\\${m[2].replace(/\//g, '\\')}`, `${m[1]}:/${m[2]}`);
+  return out;
+}
 // What a shell command must never mention: the Brain in its WSL and Windows spellings, and its folder name.
 function brainNames(dir) {
   const out = [dir], m = dir.match(/^\/mnt\/([a-z])\/(.*)$/i);
@@ -124,6 +130,13 @@ async function main() {
   }
   const brain = makeBrain({ fsp, root: brainDir, clock, newId });
   const pathEnv = { home, workspace: realWorkspace, dataDir, brainNames: brainNames(brainDir), rules: hardlineRules({ home, dataDir, brainDir }), realpath: p => fsp.realpath(p) };
+  // read-only folders (the user's Zettelkasten): the crew may read them, never change them. Applies at once when changed in Settings.
+  const setReadOnly = (dirs = []) => {
+    pathEnv.rules.readOnly = hardlineRules({ home, dataDir, readOnlyDirs: dirs }).readOnly;
+    pathEnv.readOnlyNames = dirs.flatMap(spellings);
+    roster.setReference(dirs);
+  };
+  setReadOnly(settings.get().readOnly || []);
   const bi = await brain.init();
   if (!bi.ok) console.warn(`The Brain couldn't be opened at ${brainDir} (${bi.error}); the crew will work without it.`);
   else if (bi.created) console.log(`Made the Brain at ${brainDir}. Open that folder as a vault in Obsidian to read it.`);
@@ -154,7 +167,7 @@ async function main() {
   const mb = await mailbox.load();
   if (!mb.ok) console.warn(`The Chief's mailbox couldn't be read (${mb.error}); starting empty.`);
   const undo = makeUndoStore({ fsp, dir: path.join(dataDir, 'undo'), newId, clock });
-  const guardPath = async p => { const c = await checkPath(p, pathEnv); return c.error || c.hardline || null; };
+  const guardPath = async p => { const c = await checkPath(p, pathEnv, { write: true }); return c.error || c.hardline || null; };   // undo writes
 
   const journal = makeJournal({ fsp, dir: path.join(dataDir, 'runs') });
   await journal.init();
@@ -189,7 +202,7 @@ async function main() {
   ]);
   const claudePath = await findClaude();
   const ENV_LIMITS = { ...LIMITS };
-  const applySettings = s => { roster.configure(s.crew); for (const k of Object.keys(LIMIT_RANGES)) LIMITS[k] = s.limits[k] ?? ENV_LIMITS[k]; };
+  const applySettings = s => { roster.configure(s.crew); setReadOnly(s.readOnly || []); for (const k of Object.keys(LIMIT_RANGES)) LIMITS[k] = s.limits[k] ?? ENV_LIMITS[k]; };
   applySettings(settings.get());
   const apiKey = process.env.MONKEYCRAFT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
   const providers = { 'anthropic-api': makeAnthropicProvider({ apiKey }), 'claude-code': makeClaudeCodeProvider({ spawn: trackedSpawn('claude'), claudePath, baseEnv: process.env, killProcessGroup, cwd: realWorkspace }) };
