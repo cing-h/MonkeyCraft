@@ -2,6 +2,10 @@
 
 Status: PLAN, waiting for the user's approval.
 
+## Decisions (2026-11-06)
+- **Playground:** both. A ground playground by the river (vine swing over the water with flips into the river, springy net, fruit-toss ring, slide), plus a vine-swing course on Canopy 2.
+- **Ape size:** about 25% bigger on screen, to make room for the extra detail.
+
 ## Research: how monkeys and apes really climb (for the climbing animation)
 - **Going up a trunk or pole:** primates slow down, keep more limbs on the support at once (three limbs gripping most of the time), and move in a steady alternating rhythm. Most use a *diagonal* sequence on the way up (a hand and the opposite foot move close together) and a *lateral* one on the way down (Granatosky, Schmitt & Hanna 2019, *J. Exp. Biol.*; eLife preprint 2025). Gorillas mostly climb with diagonal sequences, and chimpanzees more often with lateral ones (Neufuss et al. 2018, *J. Zool.*).
 - **Apes:** they climb with flexed elbows, reach high and pull. The feet push with a strongly bent ankle that presses the sole flat against the trunk (studies of wild chimpanzee ankles). The body hugs the trunk.
@@ -16,7 +20,7 @@ Status: PLAN, waiting for the user's approval.
    - The same tree positions, so nothing else moves.
 2. **`feature/ape-detail`: the sprites.**
    - Each ape gets more shading bands, fur tufts on the outline, ears, a brow ridge and nostrils, finger and toe hints, and fuller species markings, such as the Chief's silver saddle, the mandrill's ridged muzzle and the capuchin's cap.
-   - The soft toon style and the size stay the same, unless the user wants the apes a little larger to make room for the detail (see the question below).
+   - The soft toon style stays. The apes are about 25% bigger (the user's choice); hold heights, door sizes and swing lengths are checked against the new size.
 3. **`feature/ape-climb`: climbing.** A new climbing gait for trunks and ladders, built from the research.
    - Going up: three limbs gripping, a diagonal rhythm, high reach-and-pull with flexed elbows, feet pushing flat with a bent ankle, and the body close to the trunk.
    - Going down: rump-first, slower, with a lateral rhythm.
