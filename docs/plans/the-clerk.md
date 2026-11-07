@@ -9,7 +9,7 @@ A capuchin crew member who works in Google Docs, Sheets and Slides through Googl
 - **Permission:** `drive.file` only.
 
 ## Phases (one branch each, check in with the user after each)
-1. **`feature/clerk-google`: connection and Drive basics.** DONE 2026-11-06 (tested against the simulated Google; not yet live).
+1. **`feature/clerk-google`: connection and Drive basics.** DONE 2026-11-06. Live-checked on the user's real Drive the same day: connect, make a folder, find, rename, read, then revert (named back and binned).
    - A Connect Google button in Settings, using the local browser sign-in (loopback + PKCE). The key and sign-in are stored in `data/google/` (the hardlined folder) and is refreshed automatically.
    - A guided setup page for the one-time Google Cloud steps.
    - Drive: find, open, rename, move to folder, and bin. Changing sharing and deleting outright are never offered.
@@ -34,5 +34,5 @@ Before Phase 1's live check, the user does the guided Google Cloud setup: create
 - The undo store gained `saveRemote`/`settleRemote`, so "Revert this job" now bins, renames back, moves back and unbins. It skips anything that was changed again afterwards.
 - `src/routes/google.js` serves the routes, and Settings has a Google section with the guided steps.
 - The tools are registered but nobody is granted them yet. The Clerk gets them in phase 5.
-- **To check live (needs the user's Google setup):** that Google accepts the loopback redirect *with a path* (`/api/google/callback`). If it doesn't, move the callback to `/`.
+- **Live check passed:** Google accepts the loopback redirect with a path (`/api/google/callback`).
 - **Later:** files the user already had are invisible under `drive.file` until opened with MonkeyCraft. That needs the Google Picker, which is to be decided in phase 2. `drive.read` doesn't mark a job as tainted (the user's rule: only the Scout's web reads do).
