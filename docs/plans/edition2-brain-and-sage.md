@@ -1,6 +1,6 @@
 # Edition 2: the Brain and the Demi-God Sage
 
-Status: PLAN, waiting for the user's approval (written 2026-11-07).
+Status: APPROVED 2026-11-07. Building phase 1.
 Scope (the user's decision): Edition 2 is only the Brain and the Demi-God Sage. Schedules (Bell-ringer), chat apps, connectors and the desktop app wait until this is built and fleshed out.
 
 ---
@@ -76,7 +76,7 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - *Check:* the dossier stays inside the budget, the Scout never sees `You/`, and tainted runs can't call `brain.note`.
 3. **`feature/sage-interview`: the Sage wakes.**
    - Roster: the Sage is `awake: true`, gets a persona as keeper of the Brain, and the tools `brain.*` plus `sage.*`.
-   - **The interview:** a Sage job with a chat panel and a 10-minute timer. Questions adapt to your answers: goals (life, work, projects), who you are, how you like updates, what to never do, what frustrates you. When the time is up he wraps up, drafts the `You/` notes, and you approve that first draft once. After that he learns quietly.
+   - **The interview:** a Sage job with a chat panel and a 10-minute timer. Most important questions first, no restricted topics (the user's decision): anything that makes the village more efficient, effective, accurate or better at communicating. Questions adapt to your answers: goals (life, work, projects), who you are, how you like updates, what to never do, what frustrates you. Any question can be skipped. When the time is up he wraps up, drafts the `You/` notes, and you approve that first draft once. After that he learns quietly.
    - *Check:* the timer ends the interview cleanly, nothing is written before you approve, and you can re-run the interview later.
 4. **`feature/brain-learning`: learning after every job.**
    - After a job ends, a **reflection pass** (cheap model, its own budget) proposes lessons for each ape that worked and quiet profile notes.
@@ -92,11 +92,11 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - *Check:* rejected versions never load, rollback works, and mastery only changes from real records.
 6. **`feature/demigod-sage`: the Demi-God.**
    - The Sage flies: he hovers with a slow bob and glides between stories, without climbing.
-   - **Ceremonial robes:** layered and flowing, with a stole, an embroidered hem, a sash and a headpiece, in his blue light with gold trim. The robes ripple as he flies.
+   - **Ceremonial robes:** layered and flowing, with a stole, an embroidered hem, a sash and a headpiece, in blue with gold trim over his golden fur and blue face (golden snub-nosed monkey). The robes ripple as he flies.
    - **His aura:** a soft halo with drifting motes. It brightens and pulses only on `brain.*`, `sage.*` and `skill.version` events, and a thread of light goes to the ape he's teaching. His bathhouse gains a floating shrine.
    - Reduced motion is respected.
    - *Check:* the aura brightens only from events, and a screenshot review with the user.
 
-### Open questions for the user
-- The Sage's look: keep the snow monkey? Are blue with gold right for the robes?
-- The interview: anything it must ask, or never ask?
+### The user's answers (2026-11-07)
+- **The Sage's look:** he becomes a **golden snub-nosed monkey** (golden fur, blue face). Robes are **blue with gold trim**; the aura stays in his blue light.
+- **The interview:** no restricted topics. Gather as much as is useful for making the village more efficient, effective and accurate, and for communicating with the user better. Ask the most important questions first. In the user's words: "ask whatever you need to become better at your jobs, skills, become smarter, or communicate with me better." The user can still skip any question, and the profile is still stored only in the local Brain.
