@@ -55,6 +55,8 @@ import { mcpRoutes } from './routes/mcp.js';
 import { staticRoutes } from './routes/static.js';
 import { makeBrain } from './brain/vault.js';
 import { brainRoutes } from './routes/brain.js';
+import { makeRecall } from './brain/recall.js';
+import { makeBrainTools } from './tools/brain.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.MONKEYCRAFT_PORT || 8787);
@@ -182,7 +184,8 @@ async function main() {
     ...makeSlidesTools({ auth: googleAuth, drive, slides, undo, clock }),
     ...makeCrewTools({ roster }),
     ...makeAskClaudeTools({ mailbox }),
-    ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } })
+    ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } }),
+    ...makeBrainTools({ brain, roster })
   ]);
   const claudePath = await findClaude();
   const ENV_LIMITS = { ...LIMITS };
@@ -195,7 +198,8 @@ async function main() {
     mcpUrl: runId => `http://127.0.0.1:${PORT}/mcp/${runId}`,
     limits: LIMITS, undo, guardPath,
     remoteUndo: r => googleAuth.status().connected ? drive.revertChange(r) : "skipped: Google isn't connected",
-    onRunEnd: runId => mailbox.askerEnded(runId)
+    onRunEnd: runId => mailbox.askerEnded(runId),
+    recall: makeRecall({ brain })
   });
   await runs.init();
   setInterval(() => runs.checkLiveness(), 15_000).unref();

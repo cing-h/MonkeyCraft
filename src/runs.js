@@ -27,7 +27,8 @@ const WORKER_PREAMBLE = `The Chief has given you this task as part of a larger j
 const MAX_REPORT = 8000;
 const LIVENESS = { idleMs: 450_000, toolMs: 1_200_000 };
 
-export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null, remoteUndo = null, onRunEnd = () => {} }) {
+// recall({ agent, task }) → { text, notes, tokens, profile }: what the ape remembers from the Brain, added to its instructions.
+export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null, remoteUndo = null, onRunEnd = () => {}, recall = null }) {
   const active = new Map(); // runId -> run
   const dayStart = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const today = { day: -1, usd: 0 };
@@ -62,6 +63,10 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     const left = run.family.limitUsd - run.family.usd;
     let res;
     try {
+      if (recall && !run.shaped) {   // the council and other special shapes bring their own context
+        const mem = await Promise.race([recall({ agent, task: prompt }), new Promise(r => setTimeout(() => r(null), 5000))]).catch(() => null);
+        if (mem?.text) { agent = { ...agent, systemPrompt: `${agent.systemPrompt}\n\n${mem.text}` }; emit('brain.recall', { notes: mem.notes, tokens: mem.tokens, profile: !!mem.profile }); }
+      }
       res = await provider.run({
         agent, prompt: run.parent ? (run.preamble ?? WORKER_PREAMBLE) + prompt : prompt, signal: controller.signal, emit,
         maxBudgetUsd: Math.max(0.05, Math.min(limits.perRunUsd, left)),
@@ -110,7 +115,7 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     const controller = new AbortController(), raw = bus.emitFor(runId, agentId);
     const stop = reason => { if (!controller.signal.aborted) controller.abort(reason); };
     const run = {
-      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, interactive, stop, parent, source: parent ? null : source, preamble, trigger: parent ? null : trigger,
+      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, shaped: !!agentOverride, interactive, stop, parent, source: parent ? null : source, preamble, trigger: parent ? null : trigger,
       taint: makeTaint(), breaker: makeBreaker(), workers: new Map(),
       lastProgress: clock.now(), toolsRunning: 0
     };

@@ -228,3 +228,4 @@ textarea::placeholder { color: #7f8a74; }
 .brain-history button { padding: 3px 8px; font-size: 10px; }
 .settings input#brain-path { width: 100%; box-sizing: border-box; }
 @media (max-width: 760px) { .brain-browse { grid-template-columns: 1fr; } }
+.run .brain-note-line { color: #9fc3ff; }

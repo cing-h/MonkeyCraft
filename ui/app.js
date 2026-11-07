@@ -60,7 +60,7 @@ function saying(r, ev) {
 }
 const REASONS = { done: 'DONE', cancelled: 'CANCELLED', error: 'FAILED', max_iters: 'STOPPED: TOO MANY STEPS', budget: 'STOPPED: SPENDING LIMIT', halted: 'STOPPED BY STOP BUTTON', stale: 'STOPPED: NO PROGRESS' };
 const argText = a => {
-  const s = !a ? '' : a.command || a.path || (a.worker && a.task ? `${a.worker}: ${a.task}` : '') || a.url || a.query || (a.from && a.to ? `${a.from} → ${a.to}` : '') || (Array.isArray(a.jobs) ? a.jobs.join(', ') : '') || JSON.stringify(a);
+  const s = !a ? '' : a.command || a.path || (a.worker && a.task ? `${a.worker}: ${a.task}` : '') || a.url || a.query || (a.title && a.text ? `"${a.title}"` : '') || (a.from && a.to ? `${a.from} → ${a.to}` : '') || (Array.isArray(a.jobs) ? a.jobs.join(', ') : '') || JSON.stringify(a);
   return s.length > 140 ? s.slice(0, 137) + '…' : s;
 };
 
@@ -117,6 +117,14 @@ function logRun(ev) {
       if (ev.decision === 'allow_always') loadGrants();
       break;
     }
+    case 'brain.recall': {
+      if (r.quiet) break;
+      const titles = ev.notes.map(p => p.split('/').pop().replace(/\.md$/, ''));
+      const m = el('div', 'note brain-note-line'); m.title = ev.notes.join('\n');
+      m.textContent = `REMEMBERED FROM THE BRAIN${ev.profile ? ' (INCLUDING WHAT IT KNOWS ABOUT YOU)' : ''}: ${titles.join(' · ')}`;
+      r.box.append(m); break;
+    }
+    case 'brain.write': r.say = null; r.box.append(el('div', 'note brain-note-line', `${ev.op === 'create' ? 'SAVED TO' : 'UPDATED IN'} THE BRAIN: ${ev.path.split('/').pop().replace(/\.md$/, '')} (UNDO IT IN THE BRAIN PANEL)`)); break;
     case 'run.error': r.box.append(el('div', 'error', ev.message)); break;
     case 'taint.set': r.box.append(el('div', 'lock', `READ WEB CONTENT (${ev.source}). FOR SAFETY, COMMANDS AND FILE CHANGES ARE LOCKED FOR THE REST OF THIS JOB.`)); break;
     case 'breaker.trip': r.box.append(el('div', 'warn', ev.kind === 'repeat' ? `PAUSED A REPEATED STEP: ${ev.detail}` : `STOPPING: ${ev.detail}, NO PROGRESS`)); break;

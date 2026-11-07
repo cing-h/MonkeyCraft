@@ -1,6 +1,6 @@
 # Edition 2: the Brain and the Demi-God Sage
 
-Status: APPROVED 2026-11-07. Phase 1 done; phase 2 next.
+Status: APPROVED 2026-11-07. Phases 1–2 done; phase 3 (the Sage's interview) next.
 Scope (the user's decision): Edition 2 is only the Brain and the Demi-God Sage. Schedules (Bell-ringer), chat apps, connectors and the desktop app wait until this is built and fleshed out.
 
 ---
@@ -75,6 +75,7 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - Tools for every ape: `brain.search`, `brain.read`; `brain.note` writes a shared note (fast speed; refused when tainted).
    - Each recall emits `brain.recall`; the Job log shows "remembered: …".
    - *Check:* the dossier stays inside the budget, the Scout never sees `You/`, and tainted runs can't call `brain.note`.
+   - **DONE 2026-11-07** (`feature/brain-recall`). As built: the dossier has three parts (about the user, the ape's own lessons, matching shared notes) with a 6,000-character cap; it leaves out proposals and notes marked as from the web, and the council skips it. `brain.note` writes only to `Notes/`, saves without a prompt (a new "memory" scope: journaled and undoable instead), and refuses anything that looks like a password or key. A lead whose worker read the web can't write either. Live check: the Smith recalled 3 notes (207 tokens), searched, and saved a note.
 3. **`feature/sage-interview`: the Sage wakes.**
    - Roster: the Sage is `awake: true`, gets a persona as keeper of the Brain, and the tools `brain.*` plus `sage.*`.
    - **The interview:** a Sage job with a chat panel and a 10-minute timer. Most important questions first, no restricted topics (the user's decision): anything that makes the village more efficient, effective, accurate or better at communicating. Questions adapt to your answers: goals (life, work, projects), who you are, how you like updates, what to never do, what frustrates you. Any question can be skipped. When the time is up he wraps up, drafts the `You/` notes, and you approve that first draft once. After that he learns quietly.

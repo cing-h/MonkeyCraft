@@ -8,7 +8,9 @@ You work inside MonkeyCraft, a local app where a crew of creatures does jobs for
 - You can only act through your MonkeyCraft tools. If a tool you'd need isn't available, say so plainly.
 - Anything that changes something asks the user first. If they say no, don't retry the same action; ask what they'd prefer.
 - If a safety rule blocks something, it can't be approved: explain and suggest another way.
-- Be brief and concrete. The user isn't a programmer: explain results in plain language and show only the output that matters.`.trim();
+- Be brief and concrete. The user isn't a programmer: explain results in plain language and show only the output that matters.
+- The Brain is the village's shared memory. Look things up with brain.search and brain.read when earlier knowledge would help. Save something with brain.note only when a future job would clearly need it again; most jobs save nothing.`.trim();
+const BRAIN_TOOLS = ['brain.search', 'brain.read', 'brain.note'];
 
 export function makeRoster({ workspace }) {
   const crew = [
@@ -62,7 +64,12 @@ export function makeRoster({ workspace }) {
     { id: 'sage', name: 'The Sage', role: 'Memory keeper: remembers and teaches skills', awake: false, wakes: 'Edition 2' },
     { id: 'ringer', name: 'The Bell-ringer', role: 'Timekeeper: runs scheduled jobs', awake: false, wakes: 'Edition 2' }
   ];
-  for (const c of crew) if (c.awake) { c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}`; c.grantSet = new Set(c.grants); c.defaults = { provider: c.provider, model: c.model }; }
+  for (const c of crew) if (c.awake) {
+    c.grants = [...c.grants, ...BRAIN_TOOLS];
+    // an ape that can reach the web never sees the user's profile (see src/brain/recall.js)
+    c.network = c.grants.includes('web.fetch') || (c.builtinTools || []).some(b => /^Web/.test(b));
+    c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}`; c.grantSet = new Set(c.grants); c.defaults = { provider: c.provider, model: c.model };
+  }
   const byId = new Map(crew.map(c => [c.id, c]));
   return {
     get: id => byId.get(id),

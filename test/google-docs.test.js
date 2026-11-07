@@ -212,7 +212,7 @@ test('the Clerk: awake, with every Google tool plus fs.read and nothing that tou
   const { makeCrewTools } = await import('../src/crew/orchestrate.js');
   const r = makeRoster({ workspace: '/w' }), c = r.get('clerk');
   assert.equal(c.awake, true);
-  assert.deepEqual(c.grants.filter(g => !/^(drive|docs|sheets|slides)\./.test(g)), ['fs.read']);
+  assert.deepEqual(c.grants.filter(g => !/^(drive|docs|sheets|slides|brain)\./.test(g)), ['fs.read']);
   assert.equal(c.grants.filter(g => g.startsWith('docs.')).length, 4);
   assert.equal(c.grants.filter(g => g.startsWith('sheets.')).length, 6);
   assert.equal(c.grants.filter(g => g.startsWith('slides.')).length, 5);

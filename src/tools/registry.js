@@ -10,7 +10,7 @@
 // emits agent.tool_call / agent.tool_result, so the station shows exactly what ran.
 //
 // Tool shape:
-//   { name: 'fs.read', description, inputSchema, capability, scope: 'read'|'write'|'execute',
+//   { name: 'fs.read', description, inputSchema, capability, scope: 'read'|'write'|'execute'|'delegate'|'memory',
 //     taints?: true (its results are untrusted, e.g. web pages),
 //     timeoutMs?, assess?(args, ctx) -> { deny?, error?, summary, outsideWorkspace?, cacheKey?, facts? },
 //     run(args, ctx, facts) -> { content, summary?, isError? } }
@@ -80,7 +80,8 @@ export function makeRegistry(tools) {
         return finish(true, `Locked: this job has read untrusted content (${ctx.taint.source()}), so for safety it can't run commands or change files any more. Nothing ran. Finish with what you can read, and tell the user what is left to do in a new job.`, 'locked: web content was read', false);
       }
 
-      const needsConsent = tool.scope !== 'read' && tool.scope !== 'delegate';   // delegating asks nothing itself: each worker asks for its own actions
+      // delegating asks nothing itself (each worker asks for its own actions); 'memory' (brain.note) is journaled and undoable in the Brain panel instead
+      const needsConsent = tool.scope !== 'read' && tool.scope !== 'delegate' && tool.scope !== 'memory';
       if (needsConsent) {
         const allowed = await ctx.consent.request({
           emit, runId: ctx.runId, interactive: ctx.interactive, signal: ctx.signal, callId, tool: tool.name,
