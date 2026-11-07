@@ -14,6 +14,7 @@
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
     <button id="council-report" class="council-note" type="button" hidden title="A council report: the Chief thinks you should know something. Click to read it." aria-label="Read the council report">★ REPORT</button>
     <button id="call-council" type="button" title="Call the crew to the Ring to review recent work. You choose how long the meeting lasts.">Council</button>
+    <button id="open-brain" type="button" title="The village's memory: what the crew have learned, and what they know about you">Brain</button>
     <button id="open-settings" type="button">Settings</button>
     <button id="stop" class="stop" type="button" title="Stop every job right now">STOP</button>
   </header>
@@ -78,6 +79,27 @@
     <div class="settings-btns"><button type="button" id="council-cancel">Cancel</button><button type="submit" id="council-go" class="primary">Call the council</button></div>
   </form>
 </dialog>
+<dialog id="brain-dialog" class="settings brain-dialog" aria-labelledby="brain-title">
+  <div class="brain-head">
+    <h2 id="brain-title">The Brain</h2>
+    <div class="brain-tabs" role="tablist" aria-label="Brain views"><button type="button" role="tab" data-tab="notes" aria-selected="true">Notes</button><button type="button" role="tab" data-tab="history" aria-selected="false">History</button></div>
+    <button type="button" id="brain-close">Close</button>
+  </div>
+  <p class="hint" id="brain-where"></p>
+  <p class="error" id="brain-error" role="alert" hidden></p>
+  <div class="brain-browse" id="brain-browse">
+    <nav class="brain-list" aria-label="Notes in the Brain">
+      <label for="brain-search" class="sr-only">Search the Brain</label>
+      <input id="brain-search" type="search" placeholder="Search the Brain…" autocomplete="off">
+      <ul id="brain-notes"></ul>
+    </nav>
+    <article class="brain-note" id="brain-note" aria-live="polite"><p class="hint">Pick a note to read it. Lock a note or a single line, and the crew can never change it (you still can). Archiving moves a note aside; nothing is ever deleted outright.</p></article>
+  </div>
+  <section id="brain-history" class="brain-history" hidden>
+    <p class="hint">Every change to the Brain, newest first. Undo puts a note back as it was before that change.</p>
+    <ol id="brain-changes"></ol>
+  </section>
+</dialog>
 <dialog id="settings" class="settings" aria-labelledby="settings-title">
   <form method="dialog" id="settings-form">
     <h2 id="settings-title">Settings</h2>
@@ -126,6 +148,11 @@
       <textarea id="google-key" rows="3" placeholder='Paste the downloaded key here: {"installed":{"client_id":…}}' spellcheck="false" autocomplete="off"></textarea>
       <div class="google-btns"><button type="button" id="google-save-key">Save key</button><button type="button" id="google-connect" class="primary">Connect Google</button><button type="button" id="google-pick" class="primary">Let the Clerk open a file…</button><button type="button" id="google-disconnect">Disconnect</button></div>
       <p class="hint">MonkeyCraft only asks for access to the files it makes itself. It can never share files or delete them outright, and every change asks you first.</p>
+    </fieldset>
+    <fieldset>
+      <legend>The Brain</legend>
+      <label class="limits"><span>Folder (open it as a vault in Obsidian)</span><input id="brain-path" type="text" spellcheck="false" autocomplete="off"></label>
+      <p class="hint" id="brain-path-note">The Brain stays on this computer only, so it can't be in OneDrive or another cloud-synced folder. A new folder takes effect when MonkeyCraft restarts.</p>
     </fieldset>
     <fieldset>
       <legend>Village</legend>

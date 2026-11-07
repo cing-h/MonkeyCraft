@@ -4,7 +4,7 @@
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
@@ -45,7 +45,7 @@ import { makeFsRead } from './tools/fs-read.js';
 import { makeShellExec } from './tools/shell-exec.js';
 import { makeClaudeCodeProvider } from './providers/claude-code.js';
 import { makeAnthropicProvider } from './providers/anthropic.js';
-import { makeSettingsStore, LIMIT_RANGES } from './settings.js';
+import { makeSettingsStore, LIMIT_RANGES, brainPathProblem } from './settings.js';
 import { settingsRoutes } from './routes/settings.js';
 import { makeRoster } from './crew/roster.js';
 import { makeRunHost } from './runs.js';
@@ -53,6 +53,8 @@ import { makeServer } from './http/server.js';
 import { apiRoutes } from './routes/api.js';
 import { mcpRoutes } from './routes/mcp.js';
 import { staticRoutes } from './routes/static.js';
+import { makeBrain } from './brain/vault.js';
+import { brainRoutes } from './routes/brain.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.MONKEYCRAFT_PORT || 8787);
@@ -83,11 +85,46 @@ async function findClaude() {
   return 'claude';
 }
 
+// The Brain's default home: C:\Users\<you>\MonkeyCraftBrain on Windows (outside
+// OneDrive, so it stays on this computer), else ~/MonkeyCraftBrain.
+async function defaultBrainDir() {
+  if (process.env.MONKEYCRAFT_BRAIN) return path.resolve(process.env.MONKEYCRAFT_BRAIN);
+  const run = (cmd, args) => new Promise(ok => execFile(cmd, args, { timeout: 4000 }, (e, out) => ok(e ? '' : String(out).replace(/\r/g, '').trim())));
+  const win = await run('/mnt/c/Windows/System32/cmd.exe', ['/d', '/c', 'echo %USERPROFILE%']);
+  if (/^[A-Za-z]:\\Users\\[^%\\]+$/.test(win)) { const unix = await run('wslpath', ['-u', win]); if (unix.startsWith('/mnt/')) return path.join(unix, 'MonkeyCraftBrain'); }
+  return path.join(home, 'MonkeyCraftBrain');
+}
+// What a shell command must never mention: the Brain in its WSL and Windows spellings, and its folder name.
+function brainNames(dir) {
+  const out = [dir], m = dir.match(/^\/mnt\/([a-z])\/(.*)$/i);
+  if (m) { out.push(`${m[1]}:\\${m[2].replace(/\//g, '\\')}`, `${m[1]}:/${m[2]}`); }
+  const base = path.basename(dir);
+  if (base.length >= 10 && !/\s/.test(base)) out.push(base);
+  return out;
+}
+
 async function main() {
   await fsp.mkdir(workspace, { recursive: true });
   await fsp.mkdir(dataDir, { recursive: true });
   const realWorkspace = await fsp.realpath(workspace);
-  const pathEnv = { home, workspace: realWorkspace, dataDir, rules: hardlineRules({ home, dataDir }), realpath: p => fsp.realpath(p) };
+  const roster = makeRoster({ workspace: realWorkspace });
+  // settings: env vars are the defaults, saved choices override them
+  const settings = makeSettingsStore({ fsp, file: path.join(dataDir, 'settings.json'), crewIds: roster.ids(), workspace: realWorkspace, dataDir });
+  const sl = await settings.load();
+  if (!sl.ok) console.warn(`Settings couldn't be read (${sl.error}); using the defaults.`);
+  // the Brain: the village's own vault, hardlined for every ordinary tool
+  let brainDir = settings.get().brain?.path;
+  if (!brainDir) {   // first run: pick the default once and remember it, so the Brain never moves by itself
+    brainDir = await defaultBrainDir();
+    const why = brainPathProblem(brainDir, { workspace: realWorkspace, dataDir });
+    if (why) { console.warn(`The default Brain folder ${brainDir} can't be used (${why}); using ~/MonkeyCraftBrain.`); brainDir = path.join(home, 'MonkeyCraftBrain'); }
+    await settings.save({ ...settings.get(), brain: { path: brainDir } });
+  }
+  const brain = makeBrain({ fsp, root: brainDir, clock, newId });
+  const pathEnv = { home, workspace: realWorkspace, dataDir, brainNames: brainNames(brainDir), rules: hardlineRules({ home, dataDir, brainDir }), realpath: p => fsp.realpath(p) };
+  const bi = await brain.init();
+  if (!bi.ok) console.warn(`The Brain couldn't be opened at ${brainDir} (${bi.error}); the crew will work without it.`);
+  else if (bi.created) console.log(`Made the Brain at ${brainDir}. Open that folder as a vault in Obsidian to read it.`);
 
   // Leftover child processes from a crash are killed first (after checking their command lines).
   const children = makeChildTracker({ fsp, file: path.join(dataDir, 'children.json'), readCmdline, kill: killProcessGroup, log: m => console.warn(m) });
@@ -122,7 +159,6 @@ async function main() {
   const ledger = makeLedger({ fsp, file: path.join(dataDir, 'ledger.ndjson') });
   const bus = makeBus({ clock, journal, log: m => console.warn(m) });
   const consent = makeConsentBroker({ newId, grants, log: m => console.warn(m) });
-  const roster = makeRoster({ workspace: realWorkspace });
   // Google (the Clerk): sign-in kept in data/google/, which the tools can never read
   const googleAuth = makeGoogleAuth({ fsp, dir: path.join(dataDir, 'google'), fetchImpl: fetch, clock, randomBytes, redirectUri: `http://127.0.0.1:${PORT}/api/google/callback` });
   const ga = await googleAuth.load();
@@ -149,11 +185,7 @@ async function main() {
     ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } })
   ]);
   const claudePath = await findClaude();
-  // settings: env vars are the defaults, saved choices override them
   const ENV_LIMITS = { ...LIMITS };
-  const settings = makeSettingsStore({ fsp, file: path.join(dataDir, 'settings.json'), crewIds: roster.ids() });
-  const sl = await settings.load();
-  if (!sl.ok) console.warn(`Settings couldn't be read (${sl.error}); using the defaults.`);
   const applySettings = s => { roster.configure(s.crew); for (const k of Object.keys(LIMIT_RANGES)) LIMITS[k] = s.limits[k] ?? ENV_LIMITS[k]; };
   applySettings(settings.get());
   const apiKey = process.env.MONKEYCRAFT_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
@@ -183,11 +215,11 @@ async function main() {
 
   const server = makeServer({
     port: PORT,
-    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken }), ...councilRoutes({ council }), ...googleRoutes({ auth: googleAuth })]
+    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings, brain, workspace: realWorkspace, dataDir }), ...brainRoutes({ brain }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken }), ...councilRoutes({ council }), ...googleRoutes({ auth: googleAuth })]
   });
   await server.listen();
   console.log(`MonkeyCraft is running: http://127.0.0.1:${PORT}/`);
-  console.log(`Workspace: ${realWorkspace}  ·  Claude Code: ${claudePath}  ·  Anthropic API: ${apiKey ? 'key found' : 'no key'}  ·  Google: ${googleAuth.status().connected ? 'connected' : 'not connected'}`);
+  console.log(`Workspace: ${realWorkspace}  ·  Claude Code: ${claudePath}  ·  Anthropic API: ${apiKey ? 'key found' : 'no key'}  ·  Google: ${googleAuth.status().connected ? 'connected' : 'not connected'}  ·  Brain: ${brain.status().ready ? brainDir : 'not available'}`);
 
   let stopping = false;
   const shutdown = async sig => {

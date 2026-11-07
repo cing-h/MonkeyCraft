@@ -19,11 +19,12 @@ const RULES = [
   [/\/mnt\/[a-z]\/(windows|program\s*files)/i, 'touching Windows system folders']
 ];
 
-/** Returns { ok: true } or { ok: false, reason }. `extra` holds paths that must never appear (e.g. MonkeyCraft's data dir). */
+/** Returns { ok: true } or { ok: false, reason }. `extra` holds paths that must never appear (MonkeyCraft's data dir, the Brain), matched case-insensitively. */
 export function checkCommand(cmd, { extra = [] } = {}) {
   if (typeof cmd !== 'string' || !cmd.trim()) return { ok: false, reason: 'empty command' };
   if (cmd.includes('\0')) return { ok: false, reason: 'command contains a NUL byte' };
   for (const [re, reason] of RULES) if (re.test(cmd)) return { ok: false, reason };
-  for (const p of extra) if (p && cmd.includes(p)) return { ok: false, reason: `touching MonkeyCraft's own records (${p})` };
+  const low = cmd.toLowerCase();
+  for (const p of extra) if (p && low.includes(String(p).toLowerCase())) return { ok: false, reason: `touching MonkeyCraft's own records (${p})` };
   return { ok: true };
 }

@@ -1,6 +1,6 @@
 # Edition 2: the Brain and the Demi-God Sage
 
-Status: APPROVED 2026-11-07. Building phase 1.
+Status: APPROVED 2026-11-07. Phase 1 done; phase 2 next.
 Scope (the user's decision): Edition 2 is only the Brain and the Demi-God Sage. Schedules (Bell-ringer), chat apps, connectors and the desktop app wait until this is built and fleshed out.
 
 ---
@@ -69,6 +69,7 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - Settings: the Brain path (default `/mnt/c/Users/hayde/MonkeyCraftBrain`), and a hardline entry for it.
    - Routes `src/routes/brain.js` and a **Brain panel** in the UI: browse, read, undo, lock or unlock, delete (archive).
    - *Check:* tests for journal crash-safety, undo, locks, the hardline block, and search ranking.
+   - **DONE 2026-11-07** (`feature/brain-vault`). As built: locks live in the note itself (`locked: true` in the frontmatter, or a line ending in `%%locked%%`), so they show in Obsidian too; the search index is kept in memory and picks up edits made in Obsidian; the Brain folder is chosen once on first run and saved in settings; cloud-synced folders are refused. The `brain.*` events arrive with phase 2, where the crew first use the Brain.
 2. **`feature/brain-recall`: apes that remember.**
    - Before each run, a recall step builds a short **dossier** (a size budget of about 1.5k tokens): a profile summary (not for network agents), the ape's top lessons for this task, and its active skills. It's appended to the system prompt.
    - Tools for every ape: `brain.search`, `brain.read`; `brain.note` writes a shared note (fast speed; refused when tainted).

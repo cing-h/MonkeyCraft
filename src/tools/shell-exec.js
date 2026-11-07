@@ -28,7 +28,7 @@ export function makeShellExec({ spawn, pathEnv, baseEnv, killProcessGroup }) {
       additionalProperties: false
     },
     async assess(args) {
-      const g = checkCommand(args.command, { extra: [pathEnv.dataDir] });
+      const g = checkCommand(args.command, { extra: [pathEnv.dataDir, ...(pathEnv.brainNames || [])] });
       if (!g.ok) return { deny: g.reason };
       const c = await checkPath(args.cwd || pathEnv.workspace, pathEnv);
       if (c.error) return { deny: `folder: ${c.error}` };

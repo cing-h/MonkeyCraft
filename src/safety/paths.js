@@ -7,9 +7,14 @@
 
 import path from 'node:path';
 
-/** The hardline list. `home` and `dataDir` are absolute. */
-export function hardlineRules({ home, dataDir }) {
+/**
+ * The hardline list. `home`, `dataDir` and `brainDir` are absolute. The Brain is
+ * hardlined for every ordinary tool: only src/brain/* writes it, through its journal.
+ * A Brain on a Windows drive is matched case-insensitively, as Windows does.
+ */
+export function hardlineRules({ home, dataDir, brainDir = null }) {
   const h = p => path.join(home, p);
+  const brainWin = brainDir && /^\/mnt\/[a-z]\//i.test(brainDir);
   return {
     prefixes: [
       '/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/proc', '/sys', '/dev', '/root',
@@ -17,6 +22,7 @@ export function hardlineRules({ home, dataDir }) {
       h('.claude'), h('.claude.json'), h('.netrc'), h('.git-credentials'), h('.npmrc'), h('.pypirc'),
       dataDir
     ],
+    brain: brainDir ? { dir: brainWin ? brainDir.toLowerCase() : brainDir, caseless: brainWin } : null,
     // Windows drives under WSL: compared case-insensitively
     winPrefixes: ['/mnt/c/windows', '/mnt/c/program files', '/mnt/c/program files (x86)', '/mnt/c/programdata'],
     // any segment sequence matching these, case-insensitive (for every Windows user)
@@ -29,6 +35,7 @@ const under = (p, prefix) => p === prefix || p.startsWith(prefix.endsWith('/') ?
 
 /** Returns the reason a real absolute path is hardlined, or null. */
 export function hardlineReason(real, rules) {
+  if (rules.brain && under(rules.brain.caseless ? real.toLowerCase() : real, rules.brain.dir)) return 'the Brain (only the brain tools may use it, so every change is journaled)';
   for (const pre of rules.prefixes) if (under(real, pre)) return `protected location ${pre}`;
   const lower = real.toLowerCase();
   for (const pre of rules.winPrefixes) if (under(lower, pre)) return `protected Windows location ${pre}`;

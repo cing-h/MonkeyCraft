@@ -6,6 +6,7 @@ import { initialState, reduce, modeOf, inCouncil, MODE_TEXT } from './station/st
 import { makeStation, CREW_IDS } from './station/ape/scene.js';
 import { HOMES } from './station/ape/world.js';
 import { PLOTS } from './station/ape/canopy.js';
+import { initBrain } from './brain.js';
 
 const $ = id => document.getElementById(id);
 const H = { 'content-type': 'application/json', 'x-monkeycraft': '1' };
@@ -420,6 +421,10 @@ async function openSettings() {
   }
   for (const k of LIMIT_KEYS) { const i = $(`lim-${k}`), r = options.ranges[k]; i.min = r[0]; i.max = r[1]; i.value = effective.limits[k]; }
   $('chatter-on').checked = chatterOn;
+  if (settingsView.brain) {
+    $('brain-path').value = settingsView.brain.saved || settingsView.brain.path;
+    $('brain-path-note').textContent = settingsView.brain.restartNeeded ? `Restart MonkeyCraft to move to this folder. The Brain in use now: ${settingsView.brain.path}.` : 'The Brain stays on this computer only, so it can\'t be in OneDrive or another cloud-synced folder. A new folder takes effect when MonkeyCraft restarts.';
+  }
   $('settings-error').hidden = true;
   await loadGoogle();
   $('settings').showModal();
@@ -432,7 +437,8 @@ $('settings-form').addEventListener('submit', async e => {
   for (const c of settingsView.effective.crew) crewS[c.id] = { provider: $(`prov-${c.id}`).value, model: $(`model-${c.id}`).value };
   for (const k of LIMIT_KEYS) limits[k] = Number($(`lim-${k}`).value);
   chatterOn = $('chatter-on').checked; try { localStorage.setItem('mc-chatter', chatterOn ? '1' : '0'); } catch {}
-  const res = await post('/api/settings', { crew: crewS, limits });
+  const brainPath = $('brain-path').value.trim(), was = settingsView.brain && (settingsView.brain.saved || settingsView.brain.path);
+  const res = await post('/api/settings', { crew: crewS, limits, ...(brainPath && brainPath !== was ? { brain: { path: brainPath } } : {}) });
   if (!res.ok) { const er = $('settings-error'); er.textContent = res.data.error || 'Could not save.'; er.hidden = false; return; }
   $('settings').close(); loadSpend();
 });
@@ -470,8 +476,10 @@ $('google-pick').onclick = () => window.open('/api/google/picker', '_blank', 'no
 $('google-disconnect').onclick = async () => { if (confirm('Disconnect Google? The Clerk will stop working in Drive until you connect again.')) { await post('/api/google/disconnect', {}); loadGoogle(); } };
 window.addEventListener('focus', () => { if ($('settings').open) loadGoogle().catch(() => {}); });
 
+const brainPanel = initBrain({ $, el, post });
 loadSpend(); loadGrants();
 if (location.hash === '#settings') openSettings().catch(() => {});
+if (location.hash.startsWith('#brain')) brainPanel.open(decodeURIComponent(location.hash.slice(7)) || null).catch(() => {});   // #brain or #brain:<note path>
 const es = new EventSource('/api/events');
 es.onmessage = m => { try { onEvent(JSON.parse(m.data)); } catch (e) { console.error(e); } };
 
