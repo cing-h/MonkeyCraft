@@ -27,6 +27,7 @@ import { climbLevel, hangs, holdY, pickWander, route, surfaceY } from './lanes.j
 import { FOLK } from './villagers.js';
 import { AUDIENCE, COUNCIL_SEATS, DELIVERIES, RING, TRADES, glyph, gourd, makeGatherings } from './culture.js';
 import { walkY } from './canopy.js';
+import { LODGE } from './houses.js';
 import { VINES, floorY, makeVineRider, makeVineSway, ridesVines, vineChain } from './vines.js';
 
 
@@ -266,6 +267,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       }
       a.inside = mode === 'working' && a.atDoor;
       if (a.inside && a.key === 'smith' && t - (a.ls || 0) > 0.1) { a.ls = t; sparks.push({ x: 187.5 + (rnd() - 0.5) * 3, y: 57, vx: (rnd() - 0.5) * 6, vy: -10 - rnd() * 8, life: 1.2, c: [255, 150, 60], g: -2 }); }
+      if (a.inside && a.key === 'smith' && t - (a.lsm || 0) > 0.22) { a.lsm = t; const c = L.spots.chimney; sparks.push({ x: c.x + (rnd() - 0.5) * 2, y: c.y - 1, vx: 2 + rnd() * 2, vy: -5 - rnd() * 2, life: 3.2, c: [196, 190, 196], g: 0.6, smoke: true }); }   // chimney smoke
       if (a.inside && a.key === 'sage' && t - (a.ls || 0) > 0.15) { a.ls = t; sparks.push({ x: 762 + rnd() * 28, y: GROUND - 2, vx: (rnd() - 0.5) * 2, vy: -6 - rnd() * 4, life: 1.6, c: [210, 220, 230], g: 0, steam: true }); }
       // the tail follows its pose like a spring: it swings and settles on its own
       const want = a.q ? (a.q.tail ?? 0.5) : 0.5; a.tailV += ((want - a.tailA) * 60 - a.tailV * 9) * dt; a.tailA += a.tailV * dt;
@@ -366,6 +368,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       if (v.lane !== 'ground') fb.ell(v.x + 3, v.ay - 1, 3, 2, LEAFM);
     });
   }
+  const blendPut = (x, y, c, a) => { const yy = Math.floor(y - fb.oy); if (x < 0 || yy < 0 || x >= VW || yy >= VH) return; const o = (yy * VW + x) * 4; fb.d[o] += (c[0] - fb.d[o]) * a; fb.d[o + 1] += (c[1] - fb.d[o + 1]) * a; fb.d[o + 2] += (c[2] - fb.d[o + 2]) * a; };
   const onScreen = (y0, y1) => y1 > fb.oy && y0 < fb.oy + VH;   // is any of world rows y0..y1 on screen?
   function draw(now) {
     fb.id.fill(-1); fb.pid = -1; fb.oy = Math.round(camY);
@@ -416,19 +419,29 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     }
     // the council banner on the Chief's lodge, raised while a council report is waiting to be read
     if (bannerOn && onScreen(PERCH_Y - 40, PERCH_Y)) {
-      const px = 534; fb.rect(px, PERCH_Y - 38, px + 1, PERCH_Y, [96, 70, 44]);
+      const px = LODGE.bannerX; fb.rect(px, PERCH_Y - 38, px + 1, PERCH_Y, [96, 70, 44]);
       for (let y = 0; y < 16; y++) { const wave = Math.round(Math.sin(t * 3 + y * 0.5) * 0.8); fb.rect(px + 1 + wave, PERCH_Y - 37 + y, px + 11 + wave, PERCH_Y - 36 + y, y % 5 === 4 ? [214, 150, 60] : [178, 52, 42]); }
       glyph(fb, 'scroll', px + 4, PERCH_Y - 32, [232, 222, 196]);
     }
     for (const l of L.lights) {
       const a = actors[l.key], lit = a && a.inside;
       if (l.chimney) { if (lit) fb.rect(l.x0, l.y0, l.x1, l.y1, [255, 170, 80]); continue; }
+      if (l.forge) {   // the forge's mouth: banked embers, roaring and flickering while the Smith works
+        if (!lit) { for (let x = l.x0 + 1; x < l.x1 - 1; x += 2) fb.put(x - cam, l.y1 - 1, [120, 40, 24]); continue; }
+        for (let y = l.y0; y < l.y1; y++) for (let x = l.x0; x < l.x1; x++) { const h = hash(x, y, Math.floor(t * 12)); fb.put(x - cam, y, y > l.y1 - 2 || h > 0.6 ? [255, 214, 120] : h > 0.25 ? [255, 150, 50] : [220, 80, 30]); }
+        for (let y = l.y0 - 5; y < l.y1 + 4; y++) for (let x = l.x0 - 5; x < l.x1 + 5; x++) { const dx = Math.max(l.x0 - x, 0, x - l.x1 + 1), dy = Math.max(l.y0 - y, 0, y - l.y1 + 1), dd = Math.hypot(dx, dy); if (dd > 0 && dd < 5.5) fb.add(x - cam, y, [255, 150, 60], (0.2 + 0.05 * Math.sin(t * 13)) / dd); }
+        continue;
+      }
       const c = lit ? LIGHT[l.key] : [70, 52, 36];
       if (l.bell) { if (lit) for (let y = l.y0 - 3; y < l.y1 + 3; y++) for (let x = l.x0 - 3; x < l.x1 + 3; x++) if (hash(x, y, Math.floor(t * 6)) < 0.14) fb.add(x - cam, y, LIGHT.ringer, 0.28); continue; }
       fb.rect(l.x0, l.y0, l.x1, l.y1, c);
       if (lit) for (let y = l.y0 - 3; y < l.y1 + 3; y++) for (let x = l.x0 - 3; x < l.x1 + 3; x++) { const dx = Math.max(l.x0 - x, 0, x - l.x1 + 1), dy = Math.max(l.y0 - y, 0, y - l.y1 + 1), dd = Math.hypot(dx, dy); if (dd > 0 && dd < 3.5) fb.add(x - cam, y, c, 0.14 / dd); }
     }
     drawLianas();
+    { // the Scout's flag on the lookout, fluttering in the breeze (scenery)
+      const f = L.spots.flag;
+      if (onScreen(f.y - 2, f.y + 8)) for (let i = 0; i < 9; i++) for (let j = 0; j < 5; j++) { const w = Math.round(Math.sin(t * 5 - i * 0.7) * (i / 9) * 1.4); fb.put(f.x + 1 + i - cam, f.y + 1 + j + w, j === 2 && i > 1 && i < 7 ? [232, 226, 214] : i < 4 || (i + j) % 3 ? [60, 150, 170] : [44, 120, 140]); }
+    }
     const drawActor = a => {
       const sp = SPECIES[a.key], target = poseFor(a), q = blendPose(a.prev, target, a.blend * a.blend * (3 - 2 * a.blend)); q.tail = a.tailA; a.q = q;
       let at;
@@ -461,7 +474,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     glowOutline();
     drawToucan(fb, toucan.pose());
     for (const l of leaves) if (l.par === 1) { fb.put(l.x - cam, l.y, l.c); if (Math.sin(l.ph) > 0) fb.put(l.x - cam + 1, l.y, l.c); }
-    for (const s of sparks) { if (s.steam) { fb.add(Math.round(s.x - cam), Math.round(s.y), s.c, 0.35 * s.life); fb.add(Math.round(s.x - cam) + 1, Math.round(s.y), s.c, 0.2 * s.life); } else fb.put(s.x - cam, s.y, s.c); }
+    for (const s of sparks) { if (s.smoke) { const r = 1 + (3.2 - s.life) * 0.9, a = Math.min(1, s.life / 1.5) * 0.7; for (let dy = -Math.ceil(r); dy <= r; dy++) for (let dx = -Math.ceil(r); dx <= r; dx++) if (dx * dx + dy * dy <= r * r) blendPut(Math.round(s.x + dx - cam), Math.round(s.y + dy), s.c, a * (1 - Math.hypot(dx, dy) / (r + 1))); continue; } if (s.steam) { fb.add(Math.round(s.x - cam), Math.round(s.y), s.c, 0.35 * s.life); fb.add(Math.round(s.x - cam) + 1, Math.round(s.y), s.c, 0.2 * s.life); } else fb.put(s.x - cam, s.y, s.c); }
     for (const f of flies) { const x = Math.round(f.x - cam), y = Math.round(f.y), up = Math.sin(f.ph * 18) > 0; fb.put(x, y, [40, 30, 30]); fb.put(x - 1, y - (up ? 1 : 0), f.c); fb.put(x + 1, y - (up ? 1 : 0), f.c); }
     for (let i = 0; i < 14; i++) { const x = ((hash(i, 93) * WORLD + Math.sin(t * 0.3 + i) * 20) - cam), y = 70 + hash(i, 94) * 40 + Math.sin(t * 0.8 + i * 2) * 5; if (x > -2 && x < W + 2 && Math.sin(t * 2.3 + i * 1.7) > 0.3) fb.add(x, y, [200, 255, 140], 0.7); } // fireflies
     fb.ox = 0;

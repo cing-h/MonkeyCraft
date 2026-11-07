@@ -1,6 +1,7 @@
 // MonkeyCraft ape village: the world layout and its pre-painted parallax layers.
 
 import { FB, GROUND, H, TOP, W, WORLD, bayer, hash, mat, mixc } from './fb.js';
+import { paintHouses } from './houses.js';
 import { C } from './cast.js';
 import { GREENS, banana, bush, canopy, fern, flower, foliage, palm, trunk } from './scenery.js';
 import { PLOTS, TRUNKS, paintCanopy, paintCanopyBack, paintHighSky } from './canopy.js';
@@ -119,72 +120,10 @@ export function buildLayers() {
   for (let x = 24; x < WORLD - 20; x += 2) mid.cap(x, branchY(x), x + 2, branchY(x + 2), 1.8, 1.8, mat(C.bark));
   for (let i = 0; i < 34; i++) { const x = 28 + i * 27 + hash(i, 11) * 10, y = branchY(x); mid.cap(x, y, x + (hash(i, 12) - 0.5) * 6, y + 8 + hash(i, 13) * 20, 0.5, 0.5, mat([72, 106, 52])); if (hash(i, 14) < 0.5) flower(mid, x, y + 8 + hash(i, 13) * 20, 'orchid'); }
   for (let i = 0; i < 16; i++) { const x = 40 + i * 58 + hash(i, 15) * 20, y = branchY(x) - 2; foliage(mid, x, y, 3.5, 2, GREENS.jungle, 600 + i); mid.put(x - mid.ox, y - 1, [230, 60, 70]); mid.put(x + 1 - mid.ox, y - 2, [250, 120, 60]); } // bromeliads on the branch
-  // ---- buildings ----
-  const hut = (x0, x1, base, wallTop, roofTop, opts = {}) => {
-    const wall = mat(opts.wall || C.wood), roof = mat(opts.roof || C.thatch);
-    if (opts.stilts) for (const sx of [x0 + 2, x1 - 3, (x0 + x1) / 2]) mid.cap(sx, base, sx, GROUND + 1, 1, 1, mat(C.wood));
-    mid.rect(x0, wallTop, x1, base, wall.b);
-    for (let x = Math.ceil(x0); x < x1; x += 4) mid.rect(x, wallTop, x + 1, base, wall.s);
-    for (let y = wallTop + 3; y < base; y += 5) for (let x = Math.ceil(x0); x < x1; x++) if (hash(x, y, 34) < 0.25) mid.put(x, y, wall.l);
-    mid.rect(x0, base - 1, x1, base + 1, wall.s);
-    const ov = opts.overhang ?? 5;
-    mid.poly([[x0 - ov, wallTop + 2], [(x0 + x1) / 2, roofTop], [x1 + ov, wallTop + 2]], roof.b);
-    mid.poly([[(x0 + x1) / 2, roofTop], [x1 + ov, wallTop + 2], [(x0 + x1) / 2 + 2, wallTop + 2]], roof.s);
-    for (let k = 1; k < 6; k++) { const yy = roofTop + (wallTop + 2 - roofTop) * k / 6, half = (x1 - x0 + 2 * ov) / 2 * k / 6; for (let x = (x0 + x1) / 2 - half; x < (x0 + x1) / 2 + half; x++) if (hash(x | 0, k, 33) < 0.45) mid.put(x, yy, hash(x | 0, k, 35) < 0.5 ? roof.l : roof.s); }
-    for (let x = x0 - ov; x < x1 + ov; x++) if (hash(x, 31) < 0.7) mid.rect(x, wallTop + 2, x + 1, wallTop + 3 + hash(x, 32) * 3, roof.s); // fringe
-  };
-  const door = (x, base, h = 9) => { mid.rect(x - 3, base - h, x + 3, base, C.dark); mid.rect(x - 3, base - h - 1, x + 3, base - h, mat(C.wood).s); };
+  // ---- buildings (houses.js) ----
   const lights = [], lamps = [];
-  const windowAt = (key, x0, y0, x1, y1) => { mid.rect(x0, y0, x1, y1, [44, 32, 26]); lights.push({ key, x0, y0, x1, y1 }); };
   const lamp = (x, y, foot = GROUND) => { mid.rect(x, y, x + 1, foot, mat(C.wood).s); mid.rect(x - 1, y - 3, x + 2, y, [255, 200, 110]); lamps.push([x, y - 2]); };
-  // smithy (chimpanzee)
-  hut(140, 194, GROUND, 90, 70, { wall: C.stone }); door(166, GROUND); windowAt('smith', 146, 95, 154, 101); windowAt('smith', 178, 95, 186, 101);
-  mid.rect(184, 58, 191, 86, mat(C.stone).b); mid.rect(189, 58, 191, 86, mat(C.stone).s); lights.push({ key: 'smith', x0: 185, y0: 57, x1: 190, y1: 59, chimney: true });
-  mid.rect(200, GROUND - 5, 210, GROUND - 3, [100, 104, 112]); mid.rect(203, GROUND - 3, 207, GROUND, [80, 84, 92]);
-  // archive (orangutan)
-  hut(276, 328, GROUND - 4, 72, 52, { stilts: true }); mid.rect(276, 90, 328, 92, mat(C.wood).s); door(302, GROUND - 4, 10);
-  for (const [x, y] of [[282, 76], [316, 76], [282, 94], [316, 94]]) windowAt('archivist', x, y, x + 6, y + 6);
-  for (let i = 0; i < 4; i++) mid.cap(331, 82 + i * 6, 338, 82 + i * 6, 1.3, 1.3, mat(C.paper));
-  mid.rect(330, 78, 331, GROUND - 4, C.wood); mid.rect(338, 78, 339, GROUND - 4, C.wood);
-  // writer's hut (bonobo)
-  hut(380, 416, GROUND, 92, 72, { overhang: 7 }); door(398, GROUND); windowAt('writer', 384, 97, 390, 103); windowAt('writer', 406, 97, 412, 103);
-  for (let i = 0; i < 4; i++) { const x = 376 + i * 14, y = 86 + Math.sin(i) * 2; mid.ell(x, y, 2, 2.5, mat([236, 140, 160])); lamps.push([x, y]); }
-  // the Chief's lodge in the great tree
-  mid.rect(408, PERCH_Y, 532, PERCH_Y + 3, mat(C.wood).b); mid.rect(408, PERCH_Y + 3, 532, PERCH_Y + 4, mat(C.wood).s);
-  for (const x of [412, 528]) mid.cap(x, PERCH_Y + 4, 480 + (x < 480 ? -10 : 10), PERCH_Y + 22, 1.2, 1.2, mat(C.wood));
-  hut(486, 528, PERCH_Y, 12, -6, { overhang: 6 }); door(507, PERCH_Y, 10); windowAt('chief', 491, 18, 498, 25); windowAt('chief', 516, 18, 523, 25);
-  for (const [x, c] of [[418, C.red], [426, C.gold]]) { mid.rect(x, PERCH_Y - 16, x + 1, PERCH_Y, C.wood); mid.poly([[x + 1, PERCH_Y - 16], [x + 8, PERCH_Y - 13], [x + 1, PERCH_Y - 10]], c); }
-  for (let y = PERCH_Y + 4; y < GROUND; y += 4) mid.rect(462, y, 470, y + 1, mat(C.rope).b); mid.rect(462, PERCH_Y + 4, 463, GROUND, C.rope); mid.rect(469, PERCH_Y + 4, 470, GROUND, C.rope);
-  lamp(452, PERCH_Y - 6, PERCH_Y);
-  // inspector's workshop (mandrill)
-  hut(588, 626, GROUND, 88, 64, { overhang: 8 }); door(606, GROUND); windowAt('inspector', 592, 93, 598, 100); windowAt('inspector', 614, 93, 620, 100);
-  mid.ell(632, 80, 3.5, 3.5, mat([180, 210, 220], { rim: 0.8 })); mid.rect(630, 83, 631, 90, C.wood);
-  mid.rect(634, GROUND - 7, 642, GROUND, mat(C.wood).b); mid.rect(642, GROUND - 5, 648, GROUND, mat(C.wood).s);
-  // sage's bathhouse (snow monkey) and hot spring
-  hut(712, 756, GROUND, 94, 78, { roof: [120, 96, 70] }); door(734, GROUND); windowAt('sage', 716, 98, 722, 104); windowAt('sage', 746, 98, 752, 104);
-  for (let x = 760; x < 792; x++) { const d = Math.abs(x - 776) / 16; mid.rect(x, GROUND - 1, x + 1, GROUND + 2 - d, d > 0.85 ? C.stone : [80, 130, 150]); }
-  // bell tower (howler)
-  for (const x of [834, 862]) mid.cap(x, 30, x, GROUND, 1.3, 1.3, mat([150, 150, 70]));
-  for (let y = 40; y < GROUND - 14; y += 12) mid.cap(834, y, 862, y + 6, 0.8, 0.8, mat([150, 150, 70]));
-  hut(830, 866, 32, 26, 12, { overhang: 4, roof: [120, 96, 70] }); lights.push({ key: 'ringer', bell: true, x0: 844, y0: 22, x1: 852, y1: 30 });
-  mid.ell(848, 26, 4, 4.2, mat(C.gold));
-  hut(836, 860, GROUND, 96, 86, { overhang: 3 }); door(848, GROUND); windowAt('ringer', 839, 99, 843, 103);
-  // the Clerk's counting house (capuchin) on its Canopy 1 plot: a tall, narrow house with a shingle roof, paper stacked all round
-  {
-    const p = PLOTS.find(q => q.id === HOMES.clerk.plot), base = p.y, cx = p.x;
-    hut(cx - 12, cx + 12, base, base - 27, base - 41, { overhang: 3, wall: [150, 112, 72], roof: [78, 82, 100] });
-    door(cx, base, 8);
-    mid.rect(cx - 5, base - 11, cx + 5, base - 9, mat(C.wood).s); for (let x = cx - 4; x < cx + 4; x += 2) mid.put(x, base - 10, [168, 222, 84]);   // a sign over the door with a ledger rule
-    for (const [x, y] of [[cx - 9, base - 20], [cx + 5, base - 20]]) windowAt('clerk', x, y, x + 4, y + 5);
-    windowAt('clerk', cx + 7, base - 8, cx + 10, base - 3);
-    mid.rect(cx - 2, base - 36, cx + 2, base - 32, [44, 32, 26]); lights.push({ key: 'clerk', x0: cx - 2, y0: base - 36, x1: cx + 2, y1: base - 32 });   // the attic window
-    const pm = mat(C.paper);                                                                                    // stacks of paper and ledgers on the platform
-    for (const [x, n] of [[cx - 18, 5], [cx - 15, 3], [cx + 15, 4], [cx + 18, 6]]) for (let i = 0; i < n; i++) mid.rect(x - 2 + (i % 2) * 0.5, base - 1 - i, x + 2 + (i % 2) * 0.5, base - i, i % 3 === 2 ? [96, 140, 92] : i % 2 ? pm.s : pm.b);
-  }
-  // scout's lookout (gibbon) on the canopy branch
-  const by = branchY(70);
-  hut(58, 84, by - 1, by - 16, by - 30, { overhang: 4 }); door(70, by - 1, 8); windowAt('scout', 76, by - 13, 81, by - 8);
-  mid.cap(84, by - 18, 94, by - 22, 0.9, 0.7, mat(C.gold));
+  const spots = paintHouses(mid, { PERCH_Y, branchY, PLOTS, HOMES, lights, lamps });
   // lush planting: palms, bananas, ferns, flowering bushes, lanterns along the path
   for (const [x, h, b] of [[112, 52, 0.8], [248, 60, -0.6], [352, 48, 0.5], [556, 58, -0.8], [690, 50, 0.6], [796, 62, -0.5], [940, 54, 0.7]]) palm(mid, x, GROUND, h, b, x);
   for (const x of [128, 214, 342, 432, 572, 652, 704, 812, 884]) banana(mid, x, GROUND, x, 1);
@@ -200,7 +139,7 @@ export function buildLayers() {
     if (y < 150) { fore.ell(x, y, 4 + hash(i, 43) * 4, 1.2, mat([40, 86, 44], { rim: 0.6 })); if (hash(i, 44) < 0.3) flower(fore, x + 1, y - 1, 'plumeria'); continue; }  // lily pads
     for (let k = 0; k < n; k++) { const len = 14 + hash(i, k, 2) * 20; fore.cap(x + k * 1.5, H + 2, x + k * 1.5 + (hash(i, k) - 0.5) * 6, H - len, 0.9, 0.5, mat([20, 34, 24], { rim: 0.35 })); }
   }
-  return { sky, clouds, far, jungle, back, mid, fore, lights, lamps };
+  return { sky, clouds, far, jungle, back, mid, fore, lights, lamps, spots };
 }
 
 

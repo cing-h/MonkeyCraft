@@ -30,7 +30,7 @@ Status: APPROVED 2026-11-06; building.
    - Long lianas hang from the high canopy across the village, a few on each story. An ape grabs one, pumps the swing, lets go near the top of the forward swing and flies on a real ballistic arc to the next vine, a platform or the ground.
    - **Flips:** in a long flight the ape tucks to spin, does one (sometimes two) somersaults, then opens out and brings its feet or hands forward to land. A spin only starts when the flight time allows a full turn, so there's never a half-flip into a landing.
    - The vines sway and swing back after a release. Swingers (gibbon, chimps, bonobo, orangutan, capuchin) use vines for long trips on one story. The heavy Chief never does.
-5. **`feature/houses`: every house redone, and the Chief's great lodge.**
+5. **`feature/houses`: every house redone, and the Chief's great lodge.** DONE 2026-11-07.
    - **Smithy:** a forge that glows and smokes while the Smith works, an anvil, bellows and a tool rack.
    - **Archive:** scroll racks and a ladder to a loft.
    - **Writer's hut:** a lantern porch, a writing desk at the window and drying pages.
@@ -103,3 +103,22 @@ Status: APPROVED 2026-11-06; building.
 - Who rides: gibbon, chimpanzee, bonobo and capuchin (all stories) and the orangutan (shorter runs, no flips), crew and villagers alike. The Chief and the other monkeys walk. Roughly 3 in 4 long trips go by vine (1 in 5 with reduced motion).
 - `test/vines.test.js`: every swinger finishes a run on every story, with no jumps and feet clear; a flip only starts when it fits and always finishes; a released vine settles; and a job brings the crew home even mid-ride.
 - `scripts/render-station.js` takes an optional world height to look at a canopy story.
+
+## Phase 5 notes (what was built)
+- The houses moved out of `world.js` into a new `houses.js` (`paintHouses`). Every door, window and station stays where it was.
+- **Smithy:** dressed-stone walls and a coursed chimney. A lean-to on the right holds a brick forge, bellows, an anvil with a horn, a quench barrel and hanging hammers and tongs. The forge's mouth is a `forge` light: banked embers when idle, roaring and flickering with a glow while the Smith works. The chimney smokes (puffs that spread and fade) only while he works.
+- **Archive:** a loft door in the gable (it lights up too), a ladder up to it, and two pigeonhole racks of scrolls.
+- **Writer's hut:** a porch with an awning, a writing desk with paper, an inkpot, a quill and a stool, and pages drying on a line.
+- **Workshop:** a rack of four lenses, the big lens on its stand, and a test bench with a vice, coloured glassware and a balance.
+- **Bathhouse:** stepping stones across the spring, rocks round the rim, a bamboo spout and its trickle, a tub, and towels on a line.
+- **Bell tower:** carved posts with painted bands, crossed braces with medallions, upswept eaves, a gold finial and a bell rope.
+- **Lookout:** a deck with a rail, a telescope on a tripod, and a flag that flutters (drawn live).
+- **Counting house:** window boxes of flowers, a hanging coin sign and an abacus.
+- **The Chief's great lodge:**
+  - The platform is longer (to x 566), with rope walks out to the low branch on both sides.
+  - The main hall has carved and painted corner posts, a gilded lintel, three windows, long red banners and gourd lanterns.
+  - The upper chamber has two windows, a balcony on a brace and the Chief's high seat.
+  - A lookout cupola with its own window sits on the roof (it clears the Council Ring above), and a gong hangs at the platform's far end.
+  - Seven windows light in his colour while he works.
+  - The council banner moved to `LODGE.bannerX`.
+- `test/houses.test.js`: every crew member has windows; the lodge has at least six, one in the cupola; the stations haven't moved; the Chief's rest spots stay clear of the gong; and the forge glows only while the Smith works.
