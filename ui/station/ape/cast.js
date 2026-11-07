@@ -1,6 +1,6 @@
 // MonkeyCraft ape village: the cast (species, poses, forward kinematics) and how one ape is drawn.
 
-import { lerp, mat } from './fb.js';
+import { hash, lerp, mat } from './fb.js';
 
 // ---------- the cast ----------
 export const C = {
@@ -21,7 +21,10 @@ export const SPECIES = {
   ringer:    { name: 'THE BELL-RINGER', species: 'Howler monkey', role: 'Timekeeper · runs scheduled jobs', posture: 'quad', canopy: 'branchwalk', tl: 6, tr: 3, pr: 2.8, hr: 2.5, neck: 2, ua: 4, la: 3.8, ar: 1.05, ul: 3.8, ll: 3.6, lr: 1.1, fur: [98, 40, 26], face: [26, 22, 22], tail: 11, walk: 15, run: 34 }
 };
 export const CREW = Object.keys(SPECIES);
-const CREAM = mat([232, 214, 186], { rim: 0.3 });
+/** Village revamp: every ape is drawn about 25% bigger, to make room for detail. All body lengths scale together, so poses, swings and climbs follow. */
+export const SIZE = 1.25;
+for (const sp of Object.values(SPECIES)) for (const k of ['tl', 'tr', 'pr', 'hr', 'neck', 'ua', 'la', 'ar', 'ul', 'll', 'lr', 'tail']) sp[k] *= SIZE;
+const CREAM = mat([232, 214, 186], { rim: 0.3 }), WHITE = mat([232, 226, 214], { rim: 0.2 }), WHITE_F = mat([190, 184, 172], { rim: 0.2 });
 for (const sp of Object.values(SPECIES)) { sp.m = mat(sp.fur); sp.mf = mat(sp.fur.map(v => v * 0.72)); sp.mface = mat(sp.face, { rim: 0.35 }); }
 
 // ---------- poses: angles in a facing-right frame ----------
@@ -191,12 +194,15 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   const limb = (i, far) => {
     const m = far ? sp.mf : sp.m, [el, hd] = k.arms[i];
     fb.cap(X(k.ch), Y(k.ch), X(el), Y(el), sp.ar * 1.15 * s, sp.ar * s, m); fb.cap(X(el), Y(el), X(hd), Y(hd), sp.ar * s, sp.ar * 0.9 * s, m);
-    fb.ell(X(hd), Y(hd), sp.ar * 1.1 * s, sp.ar * 0.9 * s, far ? sp.mf : sp.mface.b ? mat(sp.face.map(v => (v + sp.fur[0]) / 2)) : m);
+    const handM = key === 'scout' ? (far ? WHITE_F : WHITE) : far ? sp.mf : sp.mface.b ? mat(sp.face.map(v => (v + sp.fur[0]) / 2)) : m;   // the white-handed gibbon
+    fb.ell(X(hd), Y(hd), sp.ar * 1.1 * s, sp.ar * 0.9 * s, handM);
+    if (!far && sp.ar * s > 1.1) { const d = [hd[0] - el[0], hd[1] - el[1]], n = Math.hypot(...d) || 1, tip = [hd[0] + d[0] / n * sp.ar * 0.75, hd[1] + d[1] / n * sp.ar * 0.75]; fb.put(X(tip) - fb.ox, Y(tip), (handM.s || handM).map ? handM.s : sp.mf.s); }   // a finger line
   };
   const leg = (i, far) => {
     const m = far ? sp.mf : sp.m, [kn, ft] = k.legs[i];
     fb.cap(X([0, 0]), Y([0, 0]), X(kn), Y(kn), sp.lr * 1.25 * s, sp.lr * s, m); fb.cap(X(kn), Y(kn), X(ft), Y(ft), sp.lr * s, sp.lr * 0.9 * s, m);
-    fb.ell(X(ft) + sp.lr * 0.6 * s * f, Y(ft), sp.lr * 1.1 * s, sp.lr * 0.7 * s, m);
+    fb.ell(X(ft) + sp.lr * 0.6 * s * f, Y(ft), sp.lr * 1.1 * s, sp.lr * 0.7 * s, key === 'scout' ? (far ? WHITE_F : WHITE) : m);
+    if (!far && sp.lr * s > 1.1) fb.put(X(ft) + sp.lr * 1.5 * s * f - fb.ox, Y(ft) + sp.lr * 0.3 * s, sp.mf.s);   // a toe line
   };
   // far side
   leg(1, true); limb(1, true);
@@ -204,6 +210,14 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
     for (let i = 0; i < segs; i++) { ang += (key === 'ringer' ? 0.32 : 0.1) * (1 + Math.sin(t * 1.5 + i) * 0.2); const p1 = [p0[0] + Math.cos(ang) * sp.tail / segs, p0[1] - Math.sin(ang) * sp.tail / segs]; fb.cap(X(p0), Y(p0), X(p1), Y(p1), sp.lr * 0.8 * s, sp.lr * 0.55 * s, sp.mf); p0 = p1; } }
   // body
   fb.cap(X([0, 0]), Y([0, 0]), X(k.ch), Y(k.ch), sp.pr * s, sp.tr * s, sp.m);
+  { // fur: a few darker strands along the body, and tufts sticking out over the back and shoulders
+    const pp = [Math.cos(q.torso), Math.sin(q.torso)], dark = sp.fur.map(v => v * 0.62), lite = sp.fur.map(v => Math.min(255, v * 1.22 + 6));
+    for (const j of [-0.55, 0, 0.5]) for (let t = 0.15; t < 0.95; t += 0.11) {
+      const bx = k.ch[0] * t + pp[0] * j * lerp(sp.pr, sp.tr, t) * 0.8, by = k.ch[1] * t + pp[1] * j * lerp(sp.pr, sp.tr, t) * 0.8;
+      if (hash(Math.round(t * 20), Math.round(j * 9), key.length) < 0.55) fb.put(X([bx, by]) - fb.ox, Y([bx, by]), j < 0 ? lite : dark);
+    }
+    for (let i = 0; i < 4; i++) { const t = 0.3 + i * 0.2, bx = k.ch[0] * t - pp[0] * lerp(sp.pr, sp.tr, t) * 1.02, by = k.ch[1] * t - pp[1] * lerp(sp.pr, sp.tr, t) * 1.02; fb.put(X([bx, by]) - fb.ox, Y([bx, by]), sp.mf.b || dark); }
+  }
   if (key === 'chief') { const mid = [k.ch[0] * 0.45 - Math.cos(q.torso) * sp.tr * 0.35, k.ch[1] * 0.45 - Math.sin(q.torso) * sp.tr * 0.35]; fb.ell(X(mid), Y(mid), sp.tr * 0.9 * s, sp.tr * 0.55 * s, mat([150, 152, 160]), q.torso * f + Math.PI / 2); }
   if (key === 'smith' && !plain) fb.cap(X([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), Y([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), X([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), Y([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), 2 * s, 2.3 * s, mat([96, 62, 38]));
   if (key === 'clerk') fb.ell(X([k.ch[0] * 0.85, k.ch[1] * 0.85]), Y([k.ch[0] * 0.85, k.ch[1] * 0.85]), sp.tr * 0.95 * s, sp.tr * 0.8 * s, CREAM);   // pale shoulders and chest
@@ -212,17 +226,33 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   const hx = X(k.head), hy = Y(k.head), hr = sp.hr * s, fwd = [Math.cos(k.ha) * f, Math.sin(k.ha)];
   if (key === 'chief') fb.ell(hx - fwd[0] * hr * 0.3, hy - hr * 0.55, hr * 0.7, hr * 0.8, sp.m); // crest
   fb.ell(hx, hy, hr, hr * 0.95, sp.m);
+  for (let i = 0; i < 3; i++) fb.put(hx - fwd[0] * hr * (0.75 + i * 0.12) - fb.ox, hy - hr * (0.55 - i * 0.35), sp.mf.b);   // tufts at the back of the head
   const faceC = [hx + fwd[0] * hr * 0.45, hy + fwd[1] * hr * 0.45 + hr * 0.2];
+  { // ears: big on the chimp, small on the gorilla and orangutan, hidden in the fur on the snow monkey and howler
+    const big = { smith: 0.42, writer: 0.36, scout: 0.3, clerk: 0.32, inspector: 0.28, chief: 0.24, archivist: 0.22 }[key];
+    if (big) fb.ell(hx - fwd[0] * hr * 0.2, hy - hr * 0.05, hr * big, hr * big * 1.15, mat(sp.face.map((v, i) => (v + sp.fur[i]) / 2), { rim: 0.3 }));
+  }
   if (key === 'archivist') fb.ell(hx + fwd[0] * hr * 0.2, hy + hr * 0.1, hr * 1.15, hr * 0.75, sp.mface); // cheek pads
   if (key === 'scout') fb.ell(faceC[0], faceC[1] - hr * 0.1, hr * 0.72, hr * 0.68, mat([232, 226, 214], { rim: 0.2 }));      // white face ring
   if (key === 'clerk') { fb.ell(faceC[0] - fwd[0] * hr * 0.1, faceC[1] - hr * 0.05, hr * 0.8, hr * 0.78, CREAM); fb.ell(hx - fwd[0] * hr * 0.25, hy - hr * 0.6, hr * 0.7, hr * 0.42, mat([22, 16, 14])); }   // pale face, black cap
   fb.ell(faceC[0], faceC[1], hr * 0.58, hr * 0.52, sp.mface);
+  { const brow = sp.face.map((v, i) => Math.min(v, sp.fur[i]) * 0.6);
+    if (['chief', 'smith', 'writer', 'archivist'].includes(key)) fb.cap(hx + fwd[0] * hr * 0.15, hy - hr * 0.38, hx + fwd[0] * hr * 0.75, hy - hr * 0.34, 0.45 * s, 0.4 * s, brow);   // the great apes' brow ridge
+    fb.put(faceC[0] + fwd[0] * hr * 0.42 - fb.ox, faceC[1] - hr * 0.05, sp.face.map(v => v * 0.45));                                                  // nostril
+    fb.put(faceC[0] + fwd[0] * hr * 0.25 - fb.ox, faceC[1] + hr * 0.32, sp.face.map(v => v * 0.55)); fb.put(faceC[0] + fwd[0] * hr * 0.05 - fb.ox, faceC[1] + hr * 0.34, sp.face.map(v => v * 0.6));   // mouth line
+  }
+  if (key === 'inspector') for (const dy of [-0.15, 0.05]) fb.put(faceC[0] + fwd[0] * hr * 0.1 - fb.ox, faceC[1] + hr * dy, [70, 110, 210]);   // the mandrill's blue muzzle ridges
+  if (key === 'writer') for (const d of [-1, 1]) fb.put(hx + fwd[0] * hr * 0.05 * d - fwd[0] * hr * 0.3 - fb.ox, hy - hr * 0.95, sp.mf.b);   // the bonobo's parted hair
+  if (key === 'sage') for (let i = 0; i < 6; i++) { const a = -0.8 + i * 0.45; fb.put(hx + Math.cos(a) * hr * 1.05 * -fwd[0] - fb.ox, hy + Math.sin(a) * hr * 1.0 + hr * 0.2, [196, 186, 172]); }   // the snow monkey's fluffy ruff
+  if (key === 'archivist') fb.ell(faceC[0] - fwd[0] * hr * 0.1, faceC[1] + hr * 0.75, hr * 0.42, hr * 0.38, mat([150, 70, 30]));   // the orangutan's beard
+  if (key === 'chief') fb.ell(hx - fwd[0] * hr * 0.35, hy - hr * 0.95, hr * 0.42, hr * 0.22, mat([110, 108, 116]));   // grey in the crest
   if (key === 'inspector') { fb.cap(faceC[0] - fwd[0] * hr * 0.2, faceC[1] - hr * 0.5, faceC[0] + fwd[0] * hr * 0.55, faceC[1] + hr * 0.1, hr * 0.22, hr * 0.28, mat([214, 48, 46])); fb.put(faceC[0] - fb.ox, faceC[1] + hr * 0.1, [80, 120, 210]); fb.ell(faceC[0] - fwd[0] * hr * 0.3, faceC[1] + hr * 0.6, hr * 0.5, hr * 0.32, mat([224, 196, 86])); }
   if (key === 'writer') fb.put(faceC[0] + fwd[0] * hr * 0.4 - fb.ox, faceC[1] + hr * 0.25, [210, 126, 140]);
   if (key === 'ringer') fb.ell(faceC[0] - fwd[0] * hr * 0.2, faceC[1] + hr * 0.6, hr * 0.45, hr * 0.42, sp.mf); // throat beard
   // eye: one dark pixel with a glint of light
   const ex = hx + fwd[0] * hr * 0.45 - fb.ox, ey = hy - hr * 0.2;
   fb.put(ex, ey, key === 'scout' || key === 'chief' || key === 'writer' || key === 'ringer' ? [10, 8, 8] : [24, 16, 14]);
+  if (hr > 3.2) { fb.put(ex + (fwd[0] > 0 ? 1 : -1), ey, [10, 8, 8]); fb.put(ex, ey - 1, [230, 220, 200]); }   // bigger heads: a wider eye with a glint
   if (key === 'archivist') { for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) fb.put(ex + dx, ey + dy, [210, 200, 160]); fb.put(ex, ey, [24, 16, 14]); } // spectacles
   // accessories
   if (key === 'chief') for (let i = 0; i < 3; i++) fb.cap(hx - fwd[0] * hr * 0.4 + (i - 1) * 1.6 * s * f, hy - hr * 1.1, hx - fwd[0] * hr * 0.8 + (i - 1) * 2.4 * s * f, hy - hr * 2.4 - (i === 1 ? 1.5 : 0) * s, 0.9 * s, 0.5 * s, mat(i === 1 ? C.gold : C.red));

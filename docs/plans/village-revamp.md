@@ -18,7 +18,7 @@ Status: APPROVED 2026-11-06; building.
    - Darker, richer bark: deep furrows, knots, moss and lichen patches, and buttress-root shading.
    - Leaf clusters with more edge detail, plus epiphytes and hanging roots. The palette is about 15–20% darker, with the sunset rim kept, so the apes and glowing windows stand out more.
    - The same tree positions, so nothing else moves.
-2. **`feature/ape-detail`: the sprites.**
+2. **`feature/ape-detail`: the sprites.** DONE 2026-11-06.
    - Each ape gets more shading bands, fur tufts on the outline, ears, a brow ridge and nostrils, finger and toe hints, and fuller species markings, such as the Chief's silver saddle, the mandrill's ridged muzzle and the capuchin's cap.
    - The soft toon style stays. The apes are about 25% bigger (the user's choice); hold heights, door sizes and swing lengths are checked against the new size.
 3. **`feature/ape-climb`: climbing.** A new climbing gait for trunks and ladders, built from the research.
@@ -66,3 +66,16 @@ Status: APPROVED 2026-11-06; building.
 - `GREENS.canopy` and `GREENS.jungle` are darker, with deeper shadows. The sunlit tips stay bright.
 - New `aerialRoot()` and `epiphyte()`: 34 aerial roots under each canopy walkway, and ferns clinging to the boughs beside each trunk.
 - The trees are pre-painted, so frames cost no more than before.
+
+## Phase 2 notes (what was built)
+- `cast.js SIZE = 1.25` scales every body length (torso, head, limbs, tail) together, so poses, swings, climbs and grip positions follow. All the swing tests still pass.
+- New detail for everyone:
+  - fur strands along the body and tufts over the back, shoulders and back of the head;
+  - ears, sized per species (biggest on the chimp; none showing on the snow monkey and howler);
+  - a nostril and a mouth line;
+  - finger and toe lines;
+  - on the bigger heads, a two-pixel eye with a glint.
+- Species detail:
+  - a brow ridge on the great apes (gorilla, chimp, bonobo, orangutan) and grey in the Chief's crest;
+  - the gibbon's white hands and feet, and the bonobo's parted hair;
+  - the mandrill's blue muzzle ridges, the snow monkey's fluffy ruff and the orangutan's beard.
