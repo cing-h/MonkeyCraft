@@ -27,6 +27,8 @@ Before changing this plan, also load: memory `monkeycraft-decisions`, and the va
 
 The Sage and Bell-ringer appear on the floor, asleep, so nothing pretends to work when it doesn't.
 
+**Edition 2 (planned 2026-11-07):** the Brain (the village's own local Zettelkasten, which learns the Hermes way) and the Demi-God Sage. See `docs/plans/edition2-brain-and-sage.md`. The Bell-ringer, chat apps, connectors and the desktop app wait until later.
+
 **Milestones you'll be able to see:**
 1. A chat box where one creature (Smith) answers and can run a safe command, with its events listed live.
 2. The village screen replaces the list. The Smith walks, works and asks permission on screen.
