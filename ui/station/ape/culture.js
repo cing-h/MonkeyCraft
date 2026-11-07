@@ -40,7 +40,7 @@ export const TRADES = {
   courier: { lane: 'ground', x: 550, facing: -1, anim: 'look', what: 'carries fruit up to the trees' }
 };
 /** Where each crew member sits at a council (the Chief nearest the great tree), and where the villagers stand to watch. */
-export const COUNCIL_SEATS = { chief: 459, smith: 448, scout: 437, archivist: 426, writer: 499, inspector: 510, sage: 499, ringer: 510 };
+export const COUNCIL_SEATS = { chief: 459, smith: 448, scout: 437, archivist: 426, writer: 499, inspector: 510, sage: 499, ringer: 510, clerk: 520 };
 export const AUDIENCE = [404, 411, 538, 545];
 /** Where the courier takes a basket: up to the Ring, or to the weaver's platform. */
 export const DELIVERIES = [{ lane: 'c1', x: 432 }, { lane: 'c2', x: 900 }];

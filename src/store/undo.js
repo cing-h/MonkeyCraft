@@ -51,17 +51,38 @@ export function makeUndoStore({ fsp, dir, newId, clock }) {
       return { undoId };
     },
     async settleMove(runId, undoId) { await appendDurable(fsp, index(runId), JSON.stringify({ undoId, moved: true }) + '\n'); },
+    /**
+     * A change outside this computer (Google Drive). `label` is what the user sees,
+     * `remote` is what the reverter needs. Settle it once the change really happened.
+     */
+    async saveRemote({ runId, label, remote }) {
+      const undoId = newId('undo');
+      await fsp.mkdir(runDir(runId), { recursive: true });
+      await appendDurable(fsp, index(runId), JSON.stringify({ undoId, path: label, op: 'remote', remote, existed: false, ts: clock.now() }) + '\n');
+      return { undoId };
+    },
+    /** `remote`, if given, replaces the saved one (for facts only known afterwards, such as a new file's id). */
+    async settleRemote(runId, undoId, remote) { await appendDurable(fsp, index(runId), JSON.stringify({ undoId, done: true, ...(remote ? { remote } : {}) }) + '\n'); },
     async list(runId) { return (await records(runId)).filter(r => r.path); },
     /**
      * Undo a job's changes, newest first. `guard(path)` returns a reason the path
      * may no longer be touched (hardline), or null. Returns [{ undoId, path, result }],
-     * where result is 'restored' | 'removed' | 'skipped: …'.
+     * where result is 'restored' | 'removed' | 'moved back' | 'binned' | 'skipped: …'.
+     * `remote(record)` undoes a Google change (see src/google/drive.js).
      */
-    async revert(runId, { guard }) {
+    async revert(runId, { guard, remote }) {
       const out = [];
       for (const r of (await records(runId)).filter(x => x.path).reverse()) {
         const res = { undoId: r.undoId, path: r.path };
         if (r.reverted) { out.push({ ...res, result: 'skipped: already reverted' }); continue; }
+        if (r.op === 'remote') {
+          if (!r.done) { out.push({ ...res, result: 'skipped: the change never finished' }); continue; }
+          if (!remote) { out.push({ ...res, result: "skipped: Google isn't available" }); continue; }
+          let result;
+          try { result = await remote(r); } catch (e) { result = `skipped: ${e.message}`; }
+          if (!result.startsWith('skipped')) await appendDurable(fsp, index(runId), JSON.stringify({ undoId: r.undoId, reverted: true, revertedAt: clock.now() }) + '\n');
+          out.push({ ...res, result }); continue;
+        }
         if (r.op === 'move') {
           if (!r.moved) { out.push({ ...res, result: 'skipped: the move never finished' }); continue; }
           const why = (await guard(r.path)) || (await guard(r.from));

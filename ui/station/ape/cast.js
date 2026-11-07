@@ -1,13 +1,13 @@
 // MonkeyCraft ape village: the cast (species, poses, forward kinematics) and how one ape is drawn.
 
-import { lerp, mat } from './fb.js';
+import { hash, lerp, mat } from './fb.js';
 
 // ---------- the cast ----------
 export const C = {
   wood: [118, 84, 54], dark: [34, 26, 22], thatch: [168, 136, 78], stone: [116, 112, 104], paper: [222, 210, 180], gold: [222, 178, 70],
   leaf: [58, 96, 52], leaf2: [82, 120, 60], bark: [92, 70, 52], grass: [78, 98, 44], dirt: [118, 92, 58], red: [196, 58, 48], rope: [150, 120, 80]
 };
-export const LIGHT = { chief: [196, 132, 255], scout: [96, 232, 240], smith: [255, 146, 56], inspector: [240, 240, 255], archivist: [118, 240, 156], writer: [255, 128, 204], sage: [120, 168, 255], ringer: [255, 222, 86] };
+export const LIGHT = { chief: [196, 132, 255], scout: [96, 232, 240], smith: [255, 146, 56], inspector: [240, 240, 255], archivist: [118, 240, 156], writer: [255, 128, 204], sage: [120, 168, 255], ringer: [255, 222, 86], clerk: [168, 222, 84] };   // the Clerk's is ink (ledger) green
 
 export const SPECIES = {
   chief:     { name: 'THE CHIEF', species: 'Silverback gorilla', role: 'Manager · plans and hands out the work', posture: 'knuckle', canopy: null, tl: 9, tr: 5.6, pr: 4.6, hr: 3.6, neck: 3, ua: 6.5, la: 6, ar: 1.9, ul: 4.4, ll: 4, lr: 2.1, fur: [40, 38, 44], face: [30, 28, 32], tail: 0, walk: 12, run: 24 },
@@ -16,10 +16,39 @@ export const SPECIES = {
   inspector: { name: 'THE INSPECTOR', species: 'Mandrill', role: 'Tester · checks the work', posture: 'quad', canopy: 'branchwalk', tl: 7, tr: 3.5, pr: 3.2, hr: 3, neck: 2.4, ua: 4.6, la: 4.2, ar: 1.3, ul: 4.4, ll: 4, lr: 1.4, fur: [100, 94, 60], face: [212, 52, 48], tail: 3, walk: 15, run: 34 },
   archivist: { name: 'THE ARCHIVIST', species: 'Orangutan', role: 'Archivist · reads and files documents', posture: 'fist', canopy: 'brachiate-slow', tl: 7, tr: 4.6, pr: 4, hr: 3.2, neck: 1.8, ua: 7, la: 6.6, ar: 1.5, ul: 3.2, ll: 3, lr: 1.4, fur: [182, 86, 36], face: [98, 74, 62], tail: 0, walk: 9, run: 20 },
   writer:    { name: 'THE WRITER', species: 'Bonobo', role: 'Writer · drafts and edits text', posture: 'biped', canopy: 'brachiate', tl: 6.6, tr: 3.3, pr: 3, hr: 2.6, neck: 2.3, ua: 5, la: 4.6, ar: 1.1, ul: 4.6, ll: 4.2, lr: 1.3, fur: [34, 30, 36], face: [56, 42, 44], tail: 0, walk: 14, run: 30 },
+  clerk:     { name: 'THE CLERK', species: 'Capuchin', role: 'Clerk · works in Google Docs, Sheets and Slides', posture: 'quad', canopy: 'branchwalk', tl: 5, tr: 2.8, pr: 2.5, hr: 2.4, neck: 1.6, ua: 3.6, la: 3.3, ar: 1, ul: 3.4, ll: 3.1, lr: 1.05, fur: [52, 38, 30], face: [222, 178, 150], tail: 10, walk: 15, run: 34 },
   sage:      { name: 'THE SAGE', species: 'Snow monkey', role: 'Memory keeper · remembers and teaches skills', posture: 'quad', canopy: 'branchwalk', tl: 5.6, tr: 3.5, pr: 3.1, hr: 2.7, neck: 1.8, ua: 3.8, la: 3.4, ar: 1.25, ul: 3.6, ll: 3.2, lr: 1.3, fur: [170, 158, 144], face: [216, 112, 104], tail: 2, walk: 10, run: 24 },
   ringer:    { name: 'THE BELL-RINGER', species: 'Howler monkey', role: 'Timekeeper · runs scheduled jobs', posture: 'quad', canopy: 'branchwalk', tl: 6, tr: 3, pr: 2.8, hr: 2.5, neck: 2, ua: 4, la: 3.8, ar: 1.05, ul: 3.8, ll: 3.6, lr: 1.1, fur: [98, 40, 26], face: [26, 22, 22], tail: 11, walk: 15, run: 34 }
 };
 export const CREW = Object.keys(SPECIES);
+// how each species climbs: cycle rate, how long each limb grips, limb ranges and the footfall order up and down
+const DIAG = [0, 0.5, 0.75, 0.25], LAT = [0.25, 0.75, 0, 0.5];      // near hand, far hand, near foot, far foot
+export const CLIMB_STYLE = {
+  // freq: cycles in rad/s; duty: share of the cycle each limb grips; rise: body rise per cycle × arm length; reach: how high the top hand grips × arm length
+  ape:    { freq: 7, duty: 0.75, rise: 0.75, reach: 0.82, footHi: 0.05, lean: 0.08, tail: -0.4, up: DIAG, down: LAT },
+  heavy:  { freq: 4.6, duty: 0.78, rise: 0.6, reach: 0.72, footHi: 0.12, lean: 0.18, tail: 0, up: DIAG, down: LAT },                 // the gorilla: slow, heavy, leaning out
+  gibbon: { freq: 9, duty: 0.7, rise: 0.8, reach: 0.9, footHi: 0, lean: 0.05, tail: 0, tuck: true, up: [0, 0.5, 0.8, 0.3], down: LAT },   // hand over hand, legs tucked
+  four:   { freq: 5, duty: 0.75, rise: 0.7, reach: 0.85, footHi: -0.15, lean: 0.1, tail: 0, up: DIAG, down: LAT },                   // the orangutan: four hands, feet gripping high
+  monkey: { freq: 10, duty: 0.65, rise: 0.75, reach: 0.8, footHi: 0.05, lean: 0.12, tail: -0.15, up: [0, 0.5, 0.6, 0.1], down: [0.15, 0.65, 0, 0.5] }   // quick and springy, tail braced
+};
+const CLIMB_OF = { chief: 'heavy', scout: 'gibbon', archivist: 'four', inspector: 'monkey', clerk: 'monkey', sage: 'monkey', ringer: 'monkey' };
+for (const [k, sp] of Object.entries(SPECIES)) sp.cl = CLIMB_STYLE[CLIMB_OF[k] || 'ape'];
+/** Climbing speed in px/s: the body rises about as far per cycle as a gripping hand travels, so hands never slide. */
+/** How far the body rises in one climbing cycle (px). */
+export const climbRise = sp => sp.cl.rise * Math.min(sp.ua + sp.la, (sp.ul + sp.ll) * 1.6);
+/** Climbing speed in px/s: one rise per cycle, so a gripping hand or foot never slides on the bark. */
+export const climbSpeed = sp => climbRise(sp) * sp.cl.freq / TAU;
+/** Two-link reach in the pose convention (radians from straight down, + forward): the angles that put the end at (dx, dy). bend −1: the elbow points down/back; +1: the knee points up/forward. */
+export function ik(l1, l2, dx, dy, bend) {
+  const d = Math.max(0.01, Math.min(Math.hypot(dx, dy), (l1 + l2) * 0.999)), base = Math.atan2(dx, dy);
+  const al = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))));
+  const a = base + bend * al, ex = Math.sin(a) * l1, ey = Math.cos(a) * l1;
+  return [a, Math.atan2(dx - ex, dy - ey) - a];
+}
+/** Village revamp: every ape is drawn about 25% bigger, to make room for detail. All body lengths scale together, so poses, swings and climbs follow. */
+export const SIZE = 1.25;
+for (const sp of Object.values(SPECIES)) for (const k of ['tl', 'tr', 'pr', 'hr', 'neck', 'ua', 'la', 'ar', 'ul', 'll', 'lr', 'tail']) sp[k] *= SIZE;
+const CREAM = mat([232, 214, 186], { rim: 0.3 }), WHITE = mat([232, 226, 214], { rim: 0.2 }), WHITE_F = mat([190, 184, 172], { rim: 0.2 });
 for (const sp of Object.values(SPECIES)) { sp.m = mat(sp.fur); sp.mf = mat(sp.fur.map(v => v * 0.72)); sp.mface = mat(sp.face, { rim: 0.35 }); }
 
 // ---------- poses: angles in a facing-right frame ----------
@@ -86,11 +115,31 @@ export const P = {
       lift: 1.9 * pos(Math.sin(2 * p)), tail: 0.3
     };
   },
-  // climbing: reach, grip, pull — the body surges up on the pull (see climbRate in the scene)
-  climb(sp, p) {
-    const s = Math.sin(p), s2 = Math.sin(p + Math.PI);
-    return { torso: -0.05 + 0.06 * s, plant: 'none', head: 0.3 - 0.1 * s, sh: [2.75 + 0.45 * s, 2.75 + 0.45 * s2], el: [-0.35 - 0.55 * pos(-s), -0.35 - 0.55 * pos(-s2)],
-      hip: [1.15 + 0.55 * s2, 1.15 + 0.55 * s], kn: [-1.55 - 0.45 * s2, -1.55 - 0.45 * s], tail: -0.4, lift: 0 };
+  // climbing (village revamp), from how primates really climb: going UP, a diagonal sequence (a hand moves
+  // with the opposite foot) with one limb moving at a time, so three keep gripping; elbows bent and pointing
+  // down on the pull, the body close to the trunk. Going DOWN: rump-first, a lateral sequence led by the foot.
+  // Every gripping hand and foot is pinned to a point on the bark (x = the trunk's face, in front of the body):
+  // relative to the body it slides back by exactly the body's rise, so in the world it stays still. The joint
+  // angles are then solved from where each hand and foot must be (two-link IK). p: 2π per cycle.
+  climb(sp, p, down = false) {
+    const cl = sp.cl || CLIMB_STYLE.ape, D = cl.duty, cyc = p / TAU, R = climbRise(sp), torso = cl.lean + 0.04 * Math.sin(2 * p);
+    const order = down ? cl.down : cl.up;                       // [near hand, far hand, near foot, far foot] phase offsets
+    const at = off => {                                         // where in its stroke a limb is: w 0 = top of the stroke, 1 = bottom; sw = lifted off
+      let u = ((cyc + off) % 1 + 1) % 1; if (down) u = 1 - u;
+      if (u < D) return { w: u / D, sw: 0 };
+      const k = (u - D) / (1 - D); return { w: 1 - k * k * (3 - 2 * k), sw: Math.sin(Math.PI * k) };
+    };
+    const [h0, h1, f0, f1] = order.map(at), Tx = sp.pr + 0.8, L = sp.ua + sp.la, LL = sp.ul + sp.ll;
+    const ch = [Math.sin(torso) * sp.tl, -Math.cos(torso) * sp.tl];
+    const handTop = ch[1] - L * cl.reach, footTop = -sp.pr * 0.4 + cl.footHi * LL;
+    const arm = h => { const y = handTop + h.w * R * D, x = Tx - 1.6 * h.sw * sp.ar; return ik(sp.ua, sp.la, x - ch[0], y - ch[1], -1); };
+    const leg = f => {
+      if (cl.tuck) return [1.55 + 0.25 * f.w, -1.9 + 0.2 * f.sw];          // the gibbon: legs tucked up, barely touching
+      const y = footTop + f.w * R * D, x = Tx - 1.4 * f.sw * sp.lr; return ik(sp.ul, sp.ll, x, y, 1);
+    };
+    const a0 = arm(h0), a1 = arm(h1), l0 = leg(f0), l1 = leg(f1);
+    return { torso, plant: 'none', climb: true, head: down ? 0.45 : -0.35, sh: [a0[0], a1[0]], el: [a0[1], a1[1]],
+      hip: [l0[0], l1[0]], kn: [l0[1], l1[1]], tail: cl.tail, lift: 0 };
   },
   // pendulum swing under a branch. theta = body angle (− behind the grip, + ahead), u = 0..1 through this swing.
   hang(sp, theta, u, fast) {
@@ -189,36 +238,66 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   const limb = (i, far) => {
     const m = far ? sp.mf : sp.m, [el, hd] = k.arms[i];
     fb.cap(X(k.ch), Y(k.ch), X(el), Y(el), sp.ar * 1.15 * s, sp.ar * s, m); fb.cap(X(el), Y(el), X(hd), Y(hd), sp.ar * s, sp.ar * 0.9 * s, m);
-    fb.ell(X(hd), Y(hd), sp.ar * 1.1 * s, sp.ar * 0.9 * s, far ? sp.mf : sp.mface.b ? mat(sp.face.map(v => (v + sp.fur[0]) / 2)) : m);
+    const handM = key === 'scout' ? (far ? WHITE_F : WHITE) : far ? sp.mf : sp.mface.b ? mat(sp.face.map(v => (v + sp.fur[0]) / 2)) : m;   // the white-handed gibbon
+    fb.ell(X(hd), Y(hd), sp.ar * 1.1 * s, sp.ar * 0.9 * s, handM);
+    if (!far && sp.ar * s > 1.1) { const d = [hd[0] - el[0], hd[1] - el[1]], n = Math.hypot(...d) || 1, tip = [hd[0] + d[0] / n * sp.ar * 0.75, hd[1] + d[1] / n * sp.ar * 0.75]; fb.put(X(tip) - fb.ox, Y(tip), (handM.s || handM).map ? handM.s : sp.mf.s); }   // a finger line
   };
   const leg = (i, far) => {
     const m = far ? sp.mf : sp.m, [kn, ft] = k.legs[i];
     fb.cap(X([0, 0]), Y([0, 0]), X(kn), Y(kn), sp.lr * 1.25 * s, sp.lr * s, m); fb.cap(X(kn), Y(kn), X(ft), Y(ft), sp.lr * s, sp.lr * 0.9 * s, m);
-    fb.ell(X(ft) + sp.lr * 0.6 * s * f, Y(ft), sp.lr * 1.1 * s, sp.lr * 0.7 * s, m);
+    fb.ell(X(ft) + sp.lr * 0.6 * s * f, Y(ft), sp.lr * 1.1 * s, sp.lr * 0.7 * s, key === 'scout' ? (far ? WHITE_F : WHITE) : m);
+    if (!far && sp.lr * s > 1.1) fb.put(X(ft) + sp.lr * 1.5 * s * f - fb.ox, Y(ft) + sp.lr * 0.3 * s, sp.mf.s);   // a toe line
   };
   // far side
   leg(1, true); limb(1, true);
-  if (sp.tail) { const a = (q.tail ?? 0.5), base = [-sp.pr * 0.6, -sp.pr * 0.2]; let p0 = base, ang = -Math.PI / 2 - a; const segs = Math.max(2, Math.round(sp.tail / 2.5));
+  // q.roll: a somersault turns the tail's root with the body
+  if (sp.tail) { const a = (q.tail ?? 0.5), rl = q.roll || 0, base = [-sp.pr * 0.6 * Math.cos(rl) + sp.pr * 0.2 * Math.sin(rl), -sp.pr * 0.6 * Math.sin(rl) - sp.pr * 0.2 * Math.cos(rl)]; let p0 = base, ang = -Math.PI / 2 - a - rl; const segs = Math.max(2, Math.round(sp.tail / 2.5));
     for (let i = 0; i < segs; i++) { ang += (key === 'ringer' ? 0.32 : 0.1) * (1 + Math.sin(t * 1.5 + i) * 0.2); const p1 = [p0[0] + Math.cos(ang) * sp.tail / segs, p0[1] - Math.sin(ang) * sp.tail / segs]; fb.cap(X(p0), Y(p0), X(p1), Y(p1), sp.lr * 0.8 * s, sp.lr * 0.55 * s, sp.mf); p0 = p1; } }
   // body
   fb.cap(X([0, 0]), Y([0, 0]), X(k.ch), Y(k.ch), sp.pr * s, sp.tr * s, sp.m);
+  { // fur: a few darker strands along the body, and tufts sticking out over the back and shoulders
+    const pp = [Math.cos(q.torso), Math.sin(q.torso)], dark = sp.fur.map(v => v * 0.62), lite = sp.fur.map(v => Math.min(255, v * 1.22 + 6));
+    for (const j of [-0.55, 0, 0.5]) for (let t = 0.15; t < 0.95; t += 0.11) {
+      const bx = k.ch[0] * t + pp[0] * j * lerp(sp.pr, sp.tr, t) * 0.8, by = k.ch[1] * t + pp[1] * j * lerp(sp.pr, sp.tr, t) * 0.8;
+      if (hash(Math.round(t * 20), Math.round(j * 9), key.length) < 0.55) fb.put(X([bx, by]) - fb.ox, Y([bx, by]), j < 0 ? lite : dark);
+    }
+    for (let i = 0; i < 4; i++) { const t = 0.3 + i * 0.2, bx = k.ch[0] * t - pp[0] * lerp(sp.pr, sp.tr, t) * 1.02, by = k.ch[1] * t - pp[1] * lerp(sp.pr, sp.tr, t) * 1.02; fb.put(X([bx, by]) - fb.ox, Y([bx, by]), sp.mf.b || dark); }
+  }
   if (key === 'chief') { const mid = [k.ch[0] * 0.45 - Math.cos(q.torso) * sp.tr * 0.35, k.ch[1] * 0.45 - Math.sin(q.torso) * sp.tr * 0.35]; fb.ell(X(mid), Y(mid), sp.tr * 0.9 * s, sp.tr * 0.55 * s, mat([150, 152, 160]), q.torso * f + Math.PI / 2); }
   if (key === 'smith' && !plain) fb.cap(X([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), Y([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), X([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), Y([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), 2 * s, 2.3 * s, mat([96, 62, 38]));
+  if (key === 'clerk') fb.ell(X([k.ch[0] * 0.85, k.ch[1] * 0.85]), Y([k.ch[0] * 0.85, k.ch[1] * 0.85]), sp.tr * 0.95 * s, sp.tr * 0.8 * s, CREAM);   // pale shoulders and chest
   if (key === 'archivist') for (const i of [0, 1]) { const [el] = k.arms[i]; fb.cap(X(el), Y(el), X([el[0] - 0.5, el[1] + 2.5]), Y([el[0] - 0.5, el[1] + 2.5]), 1.1 * s, 0.4 * s, i ? sp.mf : sp.m); } // shaggy arm hair
   // head
   const hx = X(k.head), hy = Y(k.head), hr = sp.hr * s, fwd = [Math.cos(k.ha) * f, Math.sin(k.ha)];
   if (key === 'chief') fb.ell(hx - fwd[0] * hr * 0.3, hy - hr * 0.55, hr * 0.7, hr * 0.8, sp.m); // crest
   fb.ell(hx, hy, hr, hr * 0.95, sp.m);
+  for (let i = 0; i < 3; i++) fb.put(hx - fwd[0] * hr * (0.75 + i * 0.12) - fb.ox, hy - hr * (0.55 - i * 0.35), sp.mf.b);   // tufts at the back of the head
   const faceC = [hx + fwd[0] * hr * 0.45, hy + fwd[1] * hr * 0.45 + hr * 0.2];
+  { // ears: big on the chimp, small on the gorilla and orangutan, hidden in the fur on the snow monkey and howler
+    const big = { smith: 0.42, writer: 0.36, scout: 0.3, clerk: 0.32, inspector: 0.28, chief: 0.24, archivist: 0.22 }[key];
+    if (big) fb.ell(hx - fwd[0] * hr * 0.2, hy - hr * 0.05, hr * big, hr * big * 1.15, mat(sp.face.map((v, i) => (v + sp.fur[i]) / 2), { rim: 0.3 }));
+  }
   if (key === 'archivist') fb.ell(hx + fwd[0] * hr * 0.2, hy + hr * 0.1, hr * 1.15, hr * 0.75, sp.mface); // cheek pads
   if (key === 'scout') fb.ell(faceC[0], faceC[1] - hr * 0.1, hr * 0.72, hr * 0.68, mat([232, 226, 214], { rim: 0.2 }));      // white face ring
+  if (key === 'clerk') { fb.ell(faceC[0] - fwd[0] * hr * 0.1, faceC[1] - hr * 0.05, hr * 0.8, hr * 0.78, CREAM); fb.ell(hx - fwd[0] * hr * 0.25, hy - hr * 0.6, hr * 0.7, hr * 0.42, mat([22, 16, 14])); }   // pale face, black cap
   fb.ell(faceC[0], faceC[1], hr * 0.58, hr * 0.52, sp.mface);
+  { const brow = sp.face.map((v, i) => Math.min(v, sp.fur[i]) * 0.6);
+    if (['chief', 'smith', 'writer', 'archivist'].includes(key)) fb.cap(hx + fwd[0] * hr * 0.15, hy - hr * 0.38, hx + fwd[0] * hr * 0.75, hy - hr * 0.34, 0.45 * s, 0.4 * s, brow);   // the great apes' brow ridge
+    fb.put(faceC[0] + fwd[0] * hr * 0.42 - fb.ox, faceC[1] - hr * 0.05, sp.face.map(v => v * 0.45));                                                  // nostril
+    fb.put(faceC[0] + fwd[0] * hr * 0.25 - fb.ox, faceC[1] + hr * 0.32, sp.face.map(v => v * 0.55)); fb.put(faceC[0] + fwd[0] * hr * 0.05 - fb.ox, faceC[1] + hr * 0.34, sp.face.map(v => v * 0.6));   // mouth line
+  }
+  if (key === 'inspector') for (const dy of [-0.15, 0.05]) fb.put(faceC[0] + fwd[0] * hr * 0.1 - fb.ox, faceC[1] + hr * dy, [70, 110, 210]);   // the mandrill's blue muzzle ridges
+  if (key === 'writer') for (const d of [-1, 1]) fb.put(hx + fwd[0] * hr * 0.05 * d - fwd[0] * hr * 0.3 - fb.ox, hy - hr * 0.95, sp.mf.b);   // the bonobo's parted hair
+  if (key === 'sage') for (let i = 0; i < 6; i++) { const a = -0.8 + i * 0.45; fb.put(hx + Math.cos(a) * hr * 1.05 * -fwd[0] - fb.ox, hy + Math.sin(a) * hr * 1.0 + hr * 0.2, [196, 186, 172]); }   // the snow monkey's fluffy ruff
+  if (key === 'archivist') fb.ell(faceC[0] - fwd[0] * hr * 0.1, faceC[1] + hr * 0.75, hr * 0.42, hr * 0.38, mat([150, 70, 30]));   // the orangutan's beard
+  if (key === 'chief') fb.ell(hx - fwd[0] * hr * 0.35, hy - hr * 0.95, hr * 0.42, hr * 0.22, mat([110, 108, 116]));   // grey in the crest
   if (key === 'inspector') { fb.cap(faceC[0] - fwd[0] * hr * 0.2, faceC[1] - hr * 0.5, faceC[0] + fwd[0] * hr * 0.55, faceC[1] + hr * 0.1, hr * 0.22, hr * 0.28, mat([214, 48, 46])); fb.put(faceC[0] - fb.ox, faceC[1] + hr * 0.1, [80, 120, 210]); fb.ell(faceC[0] - fwd[0] * hr * 0.3, faceC[1] + hr * 0.6, hr * 0.5, hr * 0.32, mat([224, 196, 86])); }
   if (key === 'writer') fb.put(faceC[0] + fwd[0] * hr * 0.4 - fb.ox, faceC[1] + hr * 0.25, [210, 126, 140]);
   if (key === 'ringer') fb.ell(faceC[0] - fwd[0] * hr * 0.2, faceC[1] + hr * 0.6, hr * 0.45, hr * 0.42, sp.mf); // throat beard
   // eye: one dark pixel with a glint of light
   const ex = hx + fwd[0] * hr * 0.45 - fb.ox, ey = hy - hr * 0.2;
   fb.put(ex, ey, key === 'scout' || key === 'chief' || key === 'writer' || key === 'ringer' ? [10, 8, 8] : [24, 16, 14]);
+  if (hr > 3.2) { fb.put(ex + (fwd[0] > 0 ? 1 : -1), ey, [10, 8, 8]); fb.put(ex, ey - 1, [230, 220, 200]); }   // bigger heads: a wider eye with a glint
   if (key === 'archivist') { for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) fb.put(ex + dx, ey + dy, [210, 200, 160]); fb.put(ex, ey, [24, 16, 14]); } // spectacles
   // accessories
   if (key === 'chief') for (let i = 0; i < 3; i++) fb.cap(hx - fwd[0] * hr * 0.4 + (i - 1) * 1.6 * s * f, hy - hr * 1.1, hx - fwd[0] * hr * 0.8 + (i - 1) * 2.4 * s * f, hy - hr * 2.4 - (i === 1 ? 1.5 : 0) * s, 0.9 * s, 0.5 * s, mat(i === 1 ? C.gold : C.red));
@@ -227,13 +306,16 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   if (key === 'sage') { fb.cap(hx - fwd[0] * hr, hy - hr * 0.45, hx + fwd[0] * hr * 0.4, hy - hr * 0.8, 0.8 * s, 0.8 * s, mat([80, 110, 200])); for (let i = 0; i < 4; i++) fb.put(X(k.ch) + (i - 1.5) * s - fb.ox, Y(k.ch) + 1.5 * s + Math.abs(i - 1.5) * 0.5, [120, 170, 255]); }
   if (key === 'ringer') fb.cap(X(k.ch) - 2 * s * f, Y(k.ch) + 0.5 * s, X(k.ch) + 2 * s * f, Y(k.ch) + 1 * s, 1 * s, 1 * s, mat(C.gold)); // scarf
   if (key === 'writer') fb.cap(hx - fwd[0] * hr * 0.4, hy - hr * 0.5, hx - fwd[0] * hr * 1.6, hy - hr * 2, 0.6 * s, 0.4 * s, mat([236, 232, 222])); // quill behind the ear
+  if (key === 'clerk') { fb.cap(hx - fwd[0] * hr * 0.2, hy - hr * 0.75, hx + fwd[0] * hr * 1.35, hy - hr * 0.55, 0.55 * s, 0.35 * s, mat([60, 150, 84], { rim: 0.7 })); fb.cap(hx - fwd[0] * hr * 0.9, hy - hr * 0.2, hx - fwd[0] * hr * 1.5, hy - hr * 1.3, 0.35 * s, 0.35 * s, mat(C.gold)); } // ink-green eyeshade, pencil behind the ear
   // near side
   leg(0, false); limb(0, false);
   const hand = k.arms[0][1], hX = X(hand), hY = Y(hand);
-  if (key === 'chief' && q.plant !== 'all') fb.cap(hX, hY - 9 * s, hX, hY + 3 * s, 0.8 * s, 0.8 * s, mat(C.wood));
-  if (key === 'smith' && q.plant !== 'hand') { fb.cap(hX, hY, hX + 3 * s * f, hY - 2 * s, 0.6 * s, 0.6 * s, mat(C.wood)); fb.ell(hX + 3.5 * s * f, hY - 2.4 * s, 1.5 * s, 1.1 * s, mat([120, 126, 136])); }
-  if (key === 'inspector' && q.plant !== 'all') { fb.cap(hX, hY, hX + 2 * s * f, hY - 2.5 * s, 0.5 * s, 0.5 * s, mat(C.wood)); fb.ell(hX + 2.6 * s * f, hY - 3.6 * s, 1.5 * s, 1.5 * s, mat([180, 220, 230], { rim: 0.8 })); }
-  if (key === 'ringer' && q.plant !== 'all') fb.ell(hX, hY + 1.6 * s, 1.5 * s, 1.8 * s, mat(C.gold));
+  if (key === 'chief' && q.plant !== 'all' && !q.climb) fb.cap(hX, hY - 9 * s, hX, hY + 3 * s, 0.8 * s, 0.8 * s, mat(C.wood));
+  if (key === 'smith' && q.plant !== 'hand' && !q.climb) { fb.cap(hX, hY, hX + 3 * s * f, hY - 2 * s, 0.6 * s, 0.6 * s, mat(C.wood)); fb.ell(hX + 3.5 * s * f, hY - 2.4 * s, 1.5 * s, 1.1 * s, mat([120, 126, 136])); }
+  if (key === 'inspector' && q.plant !== 'all' && !q.climb) { fb.cap(hX, hY, hX + 2 * s * f, hY - 2.5 * s, 0.5 * s, 0.5 * s, mat(C.wood)); fb.ell(hX + 2.6 * s * f, hY - 3.6 * s, 1.5 * s, 1.5 * s, mat([180, 220, 230], { rim: 0.8 })); }
+  if (key === 'ringer' && q.plant !== 'all' && !q.climb) fb.ell(hX, hY + 1.6 * s, 1.5 * s, 1.8 * s, mat(C.gold));
+  if (key === 'clerk' && q.plant === 'all' && !q.sitting) { const b = [-sp.tl * 0.1, -sp.tr * 0.9]; fb.cap(X(b) - 2 * s * f, Y(b), X(b) + 2 * s * f, Y(b) - 0.4 * s, 1.1 * s, 1.1 * s, mat(C.paper)); }   // a roll of papers carried on its back
+  if (key === 'clerk' && q.plant !== 'all' && !q.climb) { fb.rect(hX - 1.6 * s, hY - 1.2 * s, hX + 1.6 * s, hY + 1.6 * s, C.paper); fb.put(hX - fb.ox, hY, [60, 150, 84]); }   // a ledger page in hand
   if (key === 'scout' && q.plant === 'feet' && !q.sitting) fb.ell(X([0, 0]) - 1.5 * s * f, Y([0, 0]) + 0.5 * s, 1.8 * s, 1.4 * s, mat([120, 90, 50])); // satchel
   return { headX: hx, headY: hy - hr };
 }

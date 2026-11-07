@@ -211,7 +211,7 @@ function syncStrip(now) {
     const m = modes[i], li = el('li', m + (filter === c.id ? ' sel' : ''));
     const home = HOMES[c.id];
     li.append(el('span', 'n', c.name.toUpperCase()), el('span', 'st', m === 'asleep' ? `Asleep · wakes in ${wakes[c.id]}` : MODE_TEXT[m]));
-    if (home) li.append(el('span', 'home', `HOME · ${home.story.toUpperCase()} · ${home.plot ? `PLOT ${home.plot.toUpperCase()}` : home.place.toUpperCase()}`));
+    if (home) li.append(el('span', 'home', `HOME · ${home.story.toUpperCase()} · ${home.place.toUpperCase()}${home.plot ? ` (PLOT ${home.plot.toUpperCase()})` : ''}`));
     li.tabIndex = 0; li.onclick = () => setFilter(c.id); li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilter(c.id); } };
     ul.append(li);
   });
@@ -336,7 +336,7 @@ for (const c of crew) { names[c.id] = c.name; wakes[c.id] = c.wakes; }
 state = initialState(crew);
 
 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), councilOf: id => inCouncil(state.creatures[id]), reduced });
+station = makeStation($('scene'), { modeOf: (id, now) => modeOf(state.creatures[id], now ?? Date.now()), councilOf: id => inCouncil(state.creatures[id]), jobsActive: () => Object.values(state.creatures).some(c => c.active || c.asks.length), reduced });   // the crew only play when no job is running or waiting
 syncCouncil();
 if (mailOpen.size) station.mail(true, false);   // requests opened before the village was built
 // scrolling the village: buttons, arrow keys and drag; a click without a drag picks a crew member
@@ -421,6 +421,7 @@ async function openSettings() {
   for (const k of LIMIT_KEYS) { const i = $(`lim-${k}`), r = options.ranges[k]; i.min = r[0]; i.max = r[1]; i.value = effective.limits[k]; }
   $('chatter-on').checked = chatterOn;
   $('settings-error').hidden = true;
+  await loadGoogle();
   $('settings').showModal();
 }
 $('open-settings').onclick = () => openSettings().catch(e => alert('Could not load settings: ' + e.message));
@@ -435,6 +436,39 @@ $('settings-form').addEventListener('submit', async e => {
   if (!res.ok) { const er = $('settings-error'); er.textContent = res.data.error || 'Could not save.'; er.hidden = false; return; }
   $('settings').close(); loadSpend();
 });
+
+// ---------- Google (the Clerk) ----------
+async function loadGoogle(note) {
+  const g = await fetch('/api/google').then(r => r.json());
+  $('google-status').textContent = note || (g.connected ? `Google is connected${g.connectedAt ? ` (since ${new Date(g.connectedAt).toLocaleDateString()})` : ''}.`
+    : g.lastError || (g.hasKey ? 'Your key is saved. Press Connect Google to sign in.' : 'Not set up yet: follow the one-time setup below.'));
+  $('google-setup').open = !g.hasKey;
+  $('google-key').hidden = $('google-save-key').hidden = g.connected;
+  $('google-connect').hidden = g.connected; $('google-connect').disabled = !g.hasKey;
+  $('google-disconnect').hidden = !g.connected;
+  $('picker-setup').hidden = !g.connected; $('picker-setup').open = g.connected && !g.hasPickerKey;
+  $('google-pick').hidden = !(g.connected && g.hasPickerKey);
+}
+const googleErr = msg => { const er = $('settings-error'); er.textContent = msg; er.hidden = false; };
+$('google-save-key').onclick = async () => {
+  const res = await post('/api/google/key', { key: $('google-key').value });
+  if (!res.ok) return googleErr(res.data.error || 'Could not save the key.');
+  $('google-key').value = ''; $('settings-error').hidden = true; loadGoogle();
+};
+$('google-connect').onclick = async () => {
+  const res = await post('/api/google/connect', {});
+  if (!res.ok) return googleErr(res.data.error || 'Could not start the sign-in.');
+  window.open(res.data.url, '_blank', 'noopener');
+  loadGoogle('Finish signing in on the Google tab. This updates when you come back.');
+};
+$('picker-save-key').onclick = async () => {
+  const res = await post('/api/google/picker-key', { key: $('picker-key').value });
+  if (!res.ok) return googleErr(res.data.error || 'Could not save the picker key.');
+  $('picker-key').value = ''; $('settings-error').hidden = true; loadGoogle('The picker key is saved. Press "Let the Clerk open a file…" to choose files.');
+};
+$('google-pick').onclick = () => window.open('/api/google/picker', '_blank', 'noopener');
+$('google-disconnect').onclick = async () => { if (confirm('Disconnect Google? The Clerk will stop working in Drive until you connect again.')) { await post('/api/google/disconnect', {}); loadGoogle(); } };
+window.addEventListener('focus', () => { if ($('settings').open) loadGoogle().catch(() => {}); });
 
 loadSpend(); loadGrants();
 if (location.hash === '#settings') openSettings().catch(() => {});

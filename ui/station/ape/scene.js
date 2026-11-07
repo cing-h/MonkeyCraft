@@ -15,7 +15,7 @@
 
 import { makeToucan, drawToucan } from './toucan.js';
 import { FB, GROUND, H, STORIES, SUN, TOP, W, WORLD, hash, mat, mixc } from './fb.js';
-import { AGILE, CREW, LIGHT, P, SPECIES, TAU, blendPose, bodyLen, drawApe, placeApe, pos } from './cast.js';
+import { AGILE, CREW, LIGHT, P, SPECIES, TAU, blendPose, bodyLen, climbSpeed, drawApe, placeApe, pos } from './cast.js';
 import { noise1 } from './scenery.js';
 import { DOORS, PERCH_Y, TRUNKS, WATER, branchY, buildLayers, groundY } from './world.js';
 import { makeVillagers, stepVillager, villagerPose } from './villagers.js';
@@ -27,6 +27,9 @@ import { climbLevel, hangs, holdY, pickWander, route, surfaceY } from './lanes.j
 import { FOLK } from './villagers.js';
 import { AUDIENCE, COUNCIL_SEATS, DELIVERIES, RING, TRADES, glyph, gourd, makeGatherings } from './culture.js';
 import { walkY } from './canopy.js';
+import { LODGE } from './houses.js';
+import { GAMES, drawFruit, drawNet, drawRipples, makePlay, makeTag, paintPlayground, stepTag } from './play.js';
+import { VINES, floorY, makeVineRider, makeVineSway, ridesVines, vineChain } from './vines.js';
 
 
 // ---------- 5×5 plate glyphs ----------
@@ -41,13 +44,14 @@ export const CREW_IDS = CREW;
 export const SCENE_W = W, SCENE_H = H;
 export const ZOOMS = [1, 1.5, 2, 3];   // 3: the whole village (960×540) in one view
 
-export function makeStation(canvas, { modeOf, councilOf = () => false, reduced = false }) {   // councilOf(id, now): is it at a council (a real council job)?
+export function makeStation(canvas, { modeOf, councilOf = () => false, jobsActive = null, reduced = false }) {   // jobsActive(now): is any job running or waiting? (the crew only play when none is)   // councilOf(id, now): is it at a council (a real council job)?
   // zoom: the view can show more of the world (1× = 320×180 … 3× = the whole village, 960×540)
   const ctx = canvas.getContext('2d');
   let zoom = 1, VW = W, VH = H, img, fb, glowW, glowWho;
   const sizeView = () => { VW = Math.round(W * zoom); VH = Math.round(H * zoom); canvas.width = VW; canvas.height = VH; img = ctx.createImageData(VW, VH); fb = new FB(VW, VH); glowW = new Float32Array(VW * VH); glowWho = new Uint8Array(VW * VH); };
   sizeView();
   const L = buildLayers(), frame = buildFrame(), villagers = makeVillagers(L.back.w);
+  paintPlayground(L.mid);   // the playground's fixed things (play.js)
   let t = 0, cam = 330, camY = 0, goalY = null, seed = 11;   // camY: the world y at the top of the screen (0 = the ground village)
   const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) >>> 0) / 4294967296;
   const sparks = [];
@@ -58,6 +62,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
   // a swing along the low branch or under a canopy walkway (see swing.js)
   const crewBrachiator = (a, sp) => { const g = AGILE[sp.canopy], lane = a.lane; return makeBrachiator({ R: (sp.ua + sp.la) * 0.9 * a.s, halfPeriod: g.T * Math.sqrt(a.s), amp: g.amp, ricochet: sp.canopy === 'brachiate-fast', branchY: x => holdY(lane, x), x0: a.x, lo: 30, hi: WORLD - 30, dir: a.facing || 1 }); };
   const toucan = makeToucan();
+  const sway = makeVineSway();   // the long lianas (vines.js)
   const flies = Array.from({ length: 5 }, (_, i) => ({ x: 100 + i * 180, y: 90, c: [[255, 170, 40], [90, 160, 255], [255, 110, 200], [250, 230, 80], [120, 220, 160]][i], ph: i * 1.7 }));
   const ID = Object.fromEntries(CREW.map((k, i) => [k, i + 1]));
   const actors = {};
@@ -72,7 +77,8 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
   // top: a swinger climbs up onto the walkway at the end (to sit at the Ring, say), instead of hanging under it
   const topY = (lane, x) => walkY(lane === 'c1' ? 1 : 2, x) - 5;
   const mount = (a, lane, x, up) => { const sp = SPECIES[a.key], hang = climbLevel(lane, x, sp), top = topY(lane, x); return { k: 'climb', x, dx: 0, from: lane, to: lane, y0: up ? hang : top, y1: up ? top : hang, top: up }; };
-  function plan(a, lane, x, { top = false } = {}) {
+  function plan(a, lane, x, { top = false, vines = false } = {}) {
+    if (a.vr) { a.vr.finish(); a.legs = [{ k: 'vine', dest: { lane, x, top } }]; return; }   // on a vine: finish there, then go on
     const cl = a.climbY !== undefined && a.legs[0] && a.legs[0].k === 'climb' ? a.legs[0] : null;
     const legs = [], sp = SPECIES[a.key];
     let from = a.lane, at = a.x;
@@ -84,7 +90,27 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     const trip = route(from, at, lane, x);
     if (top && hangs(lane, sp)) trip.push(mount(a, lane, x, true));
     a.legs = [...legs, ...trip];
+    addVines(a, lane, x, top, vines);
   }
+  // A long trip along one story may go by vine (vines.js): stand under the first vine, jump, swing from vine
+  // to vine and land on the floor; the rest of the trip is planned from wherever it lands.
+  function addVines(a, lane, x, top, always = false) {
+    if (!ridesVines(a.key) || !['ground', 'c1', 'c2'].includes(lane) || (!always && rnd() > (reduced ? 0.2 : 0.75))) return;
+    const L = a.legs, prev = L[L.length - 2];
+    if (prev && prev.k === 'drop') return;
+    const x0 = !prev ? a.x : prev.k === 'climb' ? prev.x - (prev.dx || 0) : prev.x;
+    if (!prev && a.lane !== lane) return;
+    const busy = new Set(sway.st.flatMap((v, i) => v.held ? [i] : []));
+    const chain = vineChain(a.key, a.s, lane, x0, x, busy); if (!chain.length) return;
+    const dir = Math.sign(x - x0), stand = VINES[chain[0]].x - dir * 14, sp = SPECIES[a.key];
+    const legs = L.slice(0, -1), onTop = legs.length === 1 && legs[0].k === 'climb' && legs[0].y0 !== undefined && !legs[0].top;   // was about to climb down off the walkway: stay up
+    if (onTop) legs.length = 0;
+    legs.push({ k: 'move', x: stand });
+    if (hangs(lane, sp) && !onTop && !(a.top && !prev)) legs.push(mount(a, lane, stand, true));   // swingers climb up onto the walkway first
+    legs.push({ k: 'vine', chain, dir, dest: { lane, x, top } });
+    a.legs = legs;
+  }
+  function dropVine(a) { if (!a.vr) return; for (const v of sway.st) if (v.held === a.vr) v.held = null; a.vr = null; }
   function setAnim(a, anim, blendT = 0.22) { if (a.anim !== anim) { a.prev = a.q; a.blend = 0; a.anim = anim; a.blendT = blendT; } }
 
   // The Chief's free time (chief.js): rest poses on the lodge platform, and now and then a stroll through the village.
@@ -110,7 +136,14 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     const k = a.tasks[0];
     if (!k.arrived) {
       const there = a.lane === k.lane && Math.abs(a.x - k.x) < 1 && (!k.top || a.top || !hangs(k.lane, SPECIES[a.key]));
-      if (there) k.arrived = true; else { plan(a, k.lane, k.x, { top: k.top }); return; }
+      if (there) k.arrived = true; else { plan(a, k.lane, k.x, { top: k.top, vines: k.vines }); return; }
+    }
+    if (k.play && k.play !== 'course') {   // at the playground: wait for a turn, then play (see stepPlay); the vine course is just a trip
+      const busy = k.play !== 'tag' && everyone.some(b => b !== a && b.play && b.play.kind === k.play);
+      if (busy) { a.facing = k.facing; return; }
+      a.play = makePlay(k.play, { key: a.key, s: a.s, x: a.x, rnd, sway, reduced, game: k.game });
+      if (k.game) k.game.players.push(a.play);
+      return;
     }
     if ((k.t -= dt) > 0) return;
     if ('carry' in k) a.carry = k.carry;
@@ -123,7 +156,8 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     const crew = CREW.map(k => actors[k]).filter(a => a.mode === 'idle' && rnd() < (a.key === 'chief' ? 0.5 : 0.45)).slice(0, 3);   // free crew may join; busy crew never do
     const sit = (a, seat, anim) => { a.tasks = [{ gather: true, lane: 'c1', x: seat.x, anim, facing: seat.facing, t: Infinity, top: true }]; a.rest = null; };
     crew.forEach(a => sit(a, rest.shift(), 'sit'));
-    folk.forEach((a, i) => { const seat = i === 0 ? drum : rest.shift(); if (seat) sit(a, seat, seat.drum ? 'drum' : 'sit'); a.carry = false; });
+    const near = a => (a.play ? 1e6 : 0) + (a.lane === 'c1' ? 0 : a.lane === 'ground' ? 600 : 300) + Math.abs(a.x - 480);   // the free villager nearest the Ring drums
+    [...folk].sort((a, b) => near(a) - near(b)).forEach((a, i) => { const seat = i === 0 ? drum : rest.shift(); if (seat) { a.play?.stop(); sit(a, seat, seat.drum ? 'drum' : 'sit'); } a.carry = false; });   // a villager at play finishes its go first
   }
   function endGathering() { for (const a of everyone) if (a.tasks?.[0]?.gather) { a.tasks = null; a.wait = 1 + rnd() * 4; if (a.key === 'chief') a.linger = 0; } }
   // a real council: the villagers come to watch (one drums softly), and gatherings wait until it's over
@@ -134,7 +168,42 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
   function endAudience() { for (const a of folk) if (a.tasks?.[0]?.audience) { a.tasks = null; a.wait = 1 + rnd() * 4; } }
   let lanternsLit = 0; const flares = [];
 
+  // ---------- the playground (play.js) ----------
+  let jobsNow = false, mailOpen = false, tag = null;
+  const playing = () => everyone.filter(a => a.play).map(a => a.play);
+  function choosePlay(a) {
+    const kinds = Object.keys(GAMES).filter(k => GAMES[k].ok(a.key) && (!GAMES[k].folkOnly || a.folk) && (k !== 'tag' || !tag || tag.over));
+    if (!kinds.length) return false;
+    const kind = kinds[Math.floor(rnd() * kinds.length)];
+    if (kind === 'course') {   // the Canopy 2 vine course: out along the vines and back
+      a.tasks = [{ play: 'course', lane: 'c2', x: 60, anim: 'look', facing: 1, t: 0.5, top: true, vines: true }, { play: 'course', lane: 'c2', x: 900, anim: 'look', facing: -1, t: 1, top: true, vines: true }, { play: 'course', lane: 'c2', x: 60, anim: 'look', facing: 1, t: 0.5, top: true, vines: true }];
+      return true;
+    }
+    if (kind === 'tag') {      // gather a few free villagers on the ground for a game of tag
+      tag = makeTag();
+      const others = folk.filter(b => b !== a && !b.tasks && !b.play && !b.vr && b.lane === 'ground').slice(0, 2);
+      for (const [i, b] of [a, ...others].entries()) { b.tasks = [{ play: 'tag', game: tag, lane: 'ground', x: GAMES.tag.x + i * 16, anim: 'look', facing: 1, t: Infinity }]; b.legs = []; }
+      return true;
+    }
+    const waiting = everyone.filter(b => b !== a && b.tasks?.[0]?.play === kind).length;   // take turns: queue beside it
+    a.tasks = [{ play: kind, lane: 'ground', x: Math.max(6, GAMES[kind].x - 8 * waiting), anim: 'look', facing: 1, t: Infinity }];
+    return true;
+  }
+  function stepPlay(a, dt) {
+    const p = a.play, e = p.step(dt);
+    if (e === 'splash') for (let i = 0; i < 14; i++) sparks.push({ x: p.x + (rnd() - 0.5) * 6, y: WATER - 1, vx: (rnd() - 0.5) * 30, vy: -20 - rnd() * 40, life: 0.8, c: [210, 230, 240], g: 140 });
+    if (e === 'hoop') flares.push({ x: GAMES.toss.x + 18, y: 86, life: 0.6 });
+    if (p.phase === 'shake' && p.t < 0.6 && rnd() < 0.5) sparks.push({ x: p.x + (rnd() - 0.5) * 8, y: groundY(p.x) - 6 - rnd() * 8, vx: (rnd() - 0.5) * 24, vy: -6 - rnd() * 10, life: 0.5, c: [200, 222, 236], g: 120 });   // shaking off the water
+    a.x = p.x; a.facing = p.facing; a.lane = 'ground'; a.top = false; a.atDoor = false; setAnim(a, 'play', 0.12);
+    if (p.done()) {
+      a.play = null; if (a.tasks?.[0]?.play) a.tasks.shift(); if (!a.tasks?.length) a.tasks = null;
+      a.wait = 1 + rnd() * 3; a.spd = 0;
+    }
+  }
+
   function update(dt, now) {
+    jobsNow = mailOpen || (jobsActive ? !!jobsActive(now) : CREW.some(k => ['working', 'ready', 'talking', 'asking'].includes(modeOf(k, now))));
+    if (tag) { stepTag(tag, dt); if (tag.over && !everyone.some(a => a.play?.kind === 'tag' || a.tasks?.[0]?.game === tag)) tag = null; }
     const g = gatherings.step(dt), councilNow = CREW.some(k => actors[k].council);
     if (councilNow && !councilOn) { endGathering(); gathering = false; startAudience(); } else if (!councilNow && councilOn) endAudience();
     councilOn = councilNow;
@@ -142,8 +211,12 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     for (const a of everyone) {
       const sp = SPECIES[a.key], mode = a.folk ? 'idle' : modeOf(a.key, now), d = a.folk ? a.home : DOORS[a.key];
       a.mode = mode; a.blend = Math.min(1, a.blend + dt / (a.blendT || 0.22));
+      if (!a.folk && (jobsNow || mode !== 'idle') && (a.play || a.tasks?.some(k => k.play))) {   // a job has started: stop playing and go back to the station
+        a.play?.stop(); if (a.tasks) a.tasks = null; a.backHome = true;
+      }
+      if (a.backHome && !a.play) { a.backHome = false; if (mode === 'idle') plan(a, d.lane, d.x); }
       if (mode !== 'working') a.inside = false;
-      if (mode === 'asleep') { Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true, climbY: undefined, rest: null, top: false, tasks: null }); setAnim(a, 'sleep'); continue; }
+      if (mode === 'asleep') { dropVine(a); a.play = null; Object.assign(a, { lane: d.lane, x: d.x, legs: [], sw: null, air: null, atDoor: true, climbY: undefined, rest: null, top: false, tasks: null }); setAnim(a, 'sleep'); continue; }
       const home = mode !== 'idle';
       if (a.key === 'chief' && home && !a.called) { a.called = true; a.rest = null; chiefIdle.interrupt(); }   // a job sends him straight back to his station
       if (!home) a.called = false; else if (a.tasks) a.tasks = null;   // a job comes before any gathering
@@ -154,21 +227,35 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       if (home && !council && !goingHome && !(a.atDoor && a.lane === d.lane)) { plan(a, d.lane, d.x); a.legs[a.legs.length - 1].home = true; }
       if (council && !goingCouncil && !a.atSeat) { plan(a, 'c1', seatX, { top: true }); a.legs[a.legs.length - 1].council = true; a.atDoor = false; }
       if (!home && (goingHome || goingCouncil) && !a.air && !(a.br && a.br.mode === 'flight') && a.anim !== 'climb') a.legs = [];
-      if (!home && !a.legs.length && !a.air && a.tasks?.length) doTask(a, dt);
-      else if (!home && !a.legs.length && !a.air && a.key === 'chief' && !a.folk) chiefFree(a, dt);
-      else if (!home && !a.legs.length && !a.air) {
+      if (a.play) {}
+      else if (!home && !a.legs.length && !a.air && !a.vr && a.tasks?.length) doTask(a, dt);
+      else if (!home && !a.legs.length && !a.air && !a.vr && a.key === 'chief' && !a.folk) chiefFree(a, dt);
+      else if (!home && !a.legs.length && !a.air && !a.vr) {
         a.wait -= dt;
         if (a.wait <= 0) {
-          if (a.folk && rnd() < 0.5) a.tasks = tradeTasks(a);   // villagers ply their trades
+          if ((a.folk ? rnd() < 0.35 : !jobsNow && rnd() < 0.25) && choosePlay(a)) {}   // off to play (the crew only when no job is running or waiting)
+          else if (a.folk && rnd() < 0.5) a.tasks = tradeTasks(a);   // villagers ply their trades
           else { const go = pickWander(sp, a.lane, rnd, a.folk ? a.home.lane : null); plan(a, go.lane, go.x); }
           a.wait = (a.folk ? 4 : 2) + rnd() * 4;
         }
       }
       const leg = a.legs[0];
-      if (a.land > 0) { a.land -= dt; setAnim(a, 'land'); }
+      if (a.play) stepPlay(a, dt);
+      else if (a.land > 0) { a.land -= dt; setAnim(a, 'land'); }
       else if (a.air) {                                     // a leap down from the canopy
         const r = a.air; r.vy += 170 * dt; r.x += r.vx * dt; r.y += r.vy * dt; a.x = r.x; setAnim(a, 'leap');
         if (r.y >= groundY(a.x)) { a.lane = 'ground'; a.air = null; a.land = 0.28; a.spd *= 0.4; a.legs.shift(); }
+      } else if (a.vr || (leg && leg.k === 'vine' && leg.chain)) {   // riding the vines (vines.js)
+        if (!a.vr) { a.br = null; a.spd = 0; a.vr = makeVineRider({ key: a.key, s: a.s, chain: leg.chain, x: a.x, dir: leg.dir, sway, rnd, flips: !reduced, hurry: home, reduced }); }
+        const ev = a.vr.step(dt);
+        if (ev === 'catch') { const v = VINES[a.vr.chain[a.vr.i]]; shake(v.x, v.ay + 2, 1, a.vr.lane === 'ground' ? 2 : 4); }
+        a.x = a.vr.mid()[0]; a.facing = a.vr.dir; setAnim(a, 'vine', 0.12);
+        if (a.vr.done()) {
+          const lane = a.vr.lane; dropVine(a);
+          a.lane = lane; a.top = lane !== 'ground'; a.land = 0.28; a.atDoor = false;
+          const v = a.legs[0]?.k === 'vine' ? a.legs.shift() : null;
+          if (v && v.dest) { plan(a, v.dest.lane, v.dest.x, { top: v.dest.top }); const end = a.legs[a.legs.length - 1]; if (end) { if (v.home) end.home = true; if (v.council) end.council = true; } }
+        }
       } else if (leg && leg.k === 'drop') {
         if (a.br) {                                        // let go of the branch: the swing's own speed carries into the fall
           const [cx, cy] = a.br.chest(), [vx, vy] = a.br.velocity();
@@ -201,8 +288,11 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
         a.br = null; a.x = leg.x - (leg.dx || 0); a.facing = 1; setAnim(a, 'climb');
         const y0 = leg.y0 ?? climbLevel(leg.from || 'ground', leg.x, sp), y1 = leg.y1 ?? climbLevel(leg.to || 'canopy', leg.x, sp), dir = Math.sign(y1 - y0) || -1;
         a.climbY = a.climbY ?? y0;
-        const surge = 0.3 + 0.7 * pos(Math.sin(a.phase + Math.PI)), step = (home ? 30 : 14) * (dir > 0 ? 1.25 : 1) * surge * dt;   // a little quicker going down, and hurrying home
-        a.phase += dt * (home ? 7 : 5);
+        // the research-based climb (cast.js P.climb): the body rises as far as a gripping hand travels, so the cycle
+        // rate sets the speed; coming down is slower (0.8×); hurrying home quickens the cycle, not the slide
+        const hurry = home ? 1.6 : 1, down = dir > 0, rate = sp.cl.freq * hurry * (down ? 0.8 : 1);
+        const surge = 0.8 + 0.2 * Math.sin(2 * a.phase), step = climbSpeed(sp) * hurry * (down ? 0.8 : 1) * surge * dt;
+        a.phase += dt * rate; a.climbDown = down;
         if ((y1 - a.climbY) * dir <= step) { a.lane = leg.to || 'canopy'; a.top = !!leg.top; a.climbY = undefined; a.legs.shift(); a.spd = 0; if (leg.council) a.atSeat = true; } else a.climbY += dir * step;
       } else {
         // standing still: hold a hang, or idle on the ground / branch
@@ -229,6 +319,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       }
       a.inside = mode === 'working' && a.atDoor;
       if (a.inside && a.key === 'smith' && t - (a.ls || 0) > 0.1) { a.ls = t; sparks.push({ x: 187.5 + (rnd() - 0.5) * 3, y: 57, vx: (rnd() - 0.5) * 6, vy: -10 - rnd() * 8, life: 1.2, c: [255, 150, 60], g: -2 }); }
+      if (a.inside && a.key === 'smith' && t - (a.lsm || 0) > 0.22) { a.lsm = t; const c = L.spots.chimney; sparks.push({ x: c.x + (rnd() - 0.5) * 2, y: c.y - 1, vx: 2 + rnd() * 2, vy: -5 - rnd() * 2, life: 3.2, c: [196, 190, 196], g: 0.6, smoke: true }); }   // chimney smoke
       if (a.inside && a.key === 'sage' && t - (a.ls || 0) > 0.15) { a.ls = t; sparks.push({ x: 762 + rnd() * 28, y: GROUND - 2, vx: (rnd() - 0.5) * 2, vy: -6 - rnd() * 4, life: 1.6, c: [210, 220, 230], g: 0, steam: true }); }
       // the tail follows its pose like a spring: it swings and settles on its own
       const want = a.q ? (a.q.tail ?? 0.5) : 0.5; a.tailV += ((want - a.tailA) * 60 - a.tailV * 9) * dt; a.tailA += a.tailV * dt;
@@ -242,6 +333,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     for (const v of villagers) if (stepVillager(v, dt, rnd) === 'catch') shake(v.b.hx, v.b.branchY(v.b.hx), 0.55, v.fast ? 3 : 1);
     for (let i = leaves.length - 1; i >= 0; i--) { const l = leaves[i]; l.life -= dt; l.ph += dt * 5; l.vy = Math.min(9, l.vy + 18 * dt); l.vx *= 0.97; l.x += (l.vx + Math.sin(l.ph) * 6) * dt; l.y += l.vy * dt; if (l.life <= 0 || l.y > WATER) leaves.splice(i, 1); }
     toucan.update(dt);
+    sway.step(dt, t);
     for (const f of flies) { f.ph += dt; f.x += Math.sin(f.ph * 0.7) * 10 * dt + 4 * dt; f.y = 92 + Math.sin(f.ph * 1.3) * 8 + Math.sin(f.ph * 5) * 1.5; if (f.x > WORLD) f.x = 0; }
     for (let i = flares.length - 1; i >= 0; i--) if ((flares[i].life -= dt) <= 0) flares.splice(i, 1);
     for (let i = sparks.length - 1; i >= 0; i--) { const s = sparks[i]; s.life -= dt; s.vy += s.g * dt; s.x += s.vx * dt; s.y += s.vy * dt; if (s.life <= 0) sparks.splice(i, 1); }
@@ -252,9 +344,11 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     switch (a.anim) {
       case 'walk': return P.walk(sp, a.phase);
       case 'run': return P.run(sp, a.phase);
-      case 'climb': return P.climb(sp, a.phase);
+      case 'climb': return P.climb(sp, a.phase, !!a.climbDown);
       case 'brach': return brachiatePose(sp, a.br, a.s, { fast: sp.canopy === 'brachiate-fast' }).q;
       case 'leap': return P.leap(sp, a.air ? a.air.vy : 0);
+      case 'vine': return a.vr ? a.vr.pose().q : P.stand(sp, t);
+      case 'play': return a.play ? a.play.pose().q : P.stand(sp, t);
       case 'land': return P.land(sp, Math.max(0, a.land / 0.28));
       default: return (P[a.anim] || P.stand)(sp, t);
     }
@@ -305,6 +399,29 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
       }
     }
   };
+  // the long lianas: from the anchor down to the hand of whoever holds one (the rest hangs on below it),
+  // or swinging free with a little lag along their length
+  const VINE_M = { ground: mat([86, 92, 50], { rim: 0.7 }), river: mat([86, 92, 50], { rim: 0.7 }), c1: mat([88, 96, 52], { rim: 0.7 }), c2: mat([98, 106, 58], { rim: 0.8 }) };
+  const LEAF = [[64, 116, 52], [104, 156, 70]], LEAFM = mat([66, 112, 54], { rim: 0.6 });
+  function drawLianas() {
+    VINES.forEach((v, i) => {
+      if (!onScreen(v.ay - 4, v.ay + v.len + 2) || v.x < cam - 40 || v.x > cam + VW + 40) return;
+      const st = sway.st[i], held = st.held && st.held.hand && st.held.hand();
+      const grip = held ? Math.hypot(held[0] - v.x, held[1] - v.ay) : v.len;
+      let x = v.x, y = v.ay, px = x, py = y;
+      for (let l = 1; l <= v.len; l++) {
+        const a = l < grip ? st.ang : st.ang * Math.max(0, 1 - (l - grip) / 10), bend = held ? 0 : -st.w * 0.05 * (l / v.len);
+        const curl = held && l < grip ? 0 : Math.sin(l * 0.13 + i * 1.7) * 0.22;   // a free liana hangs in a gentle S
+        x += Math.sin(a + bend) + curl; y += Math.cos(a + bend);
+        if (l % 3 === 0 || l === v.len) { fb.cap(px, py, x, y, 0.75, 0.75, VINE_M[v.lane]); px = x; py = y; }   // a woody liana, about two pixels thick
+        if (l % 5 === 3) { const sd = (l / 5) & 1 ? 1 : -1; fb.put(x + sd * 1.5 - cam, y, LEAF[1]); fb.put(x + sd * 2.5 - cam, y + 1, LEAF[0]); }   // a leaf now and then
+      }
+      fb.put(x - cam, y + 1, LEAF[1]); fb.put(x - 1 - cam, y, LEAF[0]); fb.put(x + 1 - cam, y, LEAF[0]);   // a leafy tip
+      fb.ell(v.x - 1, v.ay, v.lane === 'ground' ? 1.6 : 4, v.lane === 'ground' ? 1.2 : 2.6, LEAFM);   // where it hangs from: a knot on the branch, or a clump of leaves
+      if (v.lane !== 'ground') fb.ell(v.x + 3, v.ay - 1, 3, 2, LEAFM);
+    });
+  }
+  const blendPut = (x, y, c, a) => { const yy = Math.floor(y - fb.oy); if (x < 0 || yy < 0 || x >= VW || yy >= VH) return; const o = (yy * VW + x) * 4; fb.d[o] += (c[0] - fb.d[o]) * a; fb.d[o + 1] += (c[1] - fb.d[o + 1]) * a; fb.d[o + 2] += (c[2] - fb.d[o + 2]) * a; };
   const onScreen = (y0, y1) => y1 > fb.oy && y0 < fb.oy + VH;   // is any of world rows y0..y1 on screen?
   function draw(now) {
     fb.id.fill(-1); fb.pid = -1; fb.oy = Math.round(camY);
@@ -355,23 +472,37 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     }
     // the council banner on the Chief's lodge, raised while a council report is waiting to be read
     if (bannerOn && onScreen(PERCH_Y - 40, PERCH_Y)) {
-      const px = 534; fb.rect(px, PERCH_Y - 38, px + 1, PERCH_Y, [96, 70, 44]);
+      const px = LODGE.bannerX; fb.rect(px, PERCH_Y - 38, px + 1, PERCH_Y, [96, 70, 44]);
       for (let y = 0; y < 16; y++) { const wave = Math.round(Math.sin(t * 3 + y * 0.5) * 0.8); fb.rect(px + 1 + wave, PERCH_Y - 37 + y, px + 11 + wave, PERCH_Y - 36 + y, y % 5 === 4 ? [214, 150, 60] : [178, 52, 42]); }
       glyph(fb, 'scroll', px + 4, PERCH_Y - 32, [232, 222, 196]);
     }
     for (const l of L.lights) {
       const a = actors[l.key], lit = a && a.inside;
       if (l.chimney) { if (lit) fb.rect(l.x0, l.y0, l.x1, l.y1, [255, 170, 80]); continue; }
+      if (l.forge) {   // the forge's mouth: banked embers, roaring and flickering while the Smith works
+        if (!lit) { for (let x = l.x0 + 1; x < l.x1 - 1; x += 2) fb.put(x - cam, l.y1 - 1, [120, 40, 24]); continue; }
+        for (let y = l.y0; y < l.y1; y++) for (let x = l.x0; x < l.x1; x++) { const h = hash(x, y, Math.floor(t * 12)); fb.put(x - cam, y, y > l.y1 - 2 || h > 0.6 ? [255, 214, 120] : h > 0.25 ? [255, 150, 50] : [220, 80, 30]); }
+        for (let y = l.y0 - 5; y < l.y1 + 4; y++) for (let x = l.x0 - 5; x < l.x1 + 5; x++) { const dx = Math.max(l.x0 - x, 0, x - l.x1 + 1), dy = Math.max(l.y0 - y, 0, y - l.y1 + 1), dd = Math.hypot(dx, dy); if (dd > 0 && dd < 5.5) fb.add(x - cam, y, [255, 150, 60], (0.2 + 0.05 * Math.sin(t * 13)) / dd); }
+        continue;
+      }
       const c = lit ? LIGHT[l.key] : [70, 52, 36];
       if (l.bell) { if (lit) for (let y = l.y0 - 3; y < l.y1 + 3; y++) for (let x = l.x0 - 3; x < l.x1 + 3; x++) if (hash(x, y, Math.floor(t * 6)) < 0.14) fb.add(x - cam, y, LIGHT.ringer, 0.28); continue; }
       fb.rect(l.x0, l.y0, l.x1, l.y1, c);
       if (lit) for (let y = l.y0 - 3; y < l.y1 + 3; y++) for (let x = l.x0 - 3; x < l.x1 + 3; x++) { const dx = Math.max(l.x0 - x, 0, x - l.x1 + 1), dy = Math.max(l.y0 - y, 0, y - l.y1 + 1), dd = Math.hypot(dx, dy); if (dd > 0 && dd < 3.5) fb.add(x - cam, y, c, 0.14 / dd); }
+    }
+    drawLianas();
+    drawNet(fb, playing(), cam);
+    { // the Scout's flag on the lookout, fluttering in the breeze (scenery)
+      const f = L.spots.flag;
+      if (onScreen(f.y - 2, f.y + 8)) for (let i = 0; i < 9; i++) for (let j = 0; j < 5; j++) { const w = Math.round(Math.sin(t * 5 - i * 0.7) * (i / 9) * 1.4); fb.put(f.x + 1 + i - cam, f.y + 1 + j + w, j === 2 && i > 1 && i < 7 ? [232, 226, 214] : i < 4 || (i + j) % 3 ? [60, 150, 170] : [44, 120, 140]); }
     }
     const drawActor = a => {
       const sp = SPECIES[a.key], target = poseFor(a), q = blendPose(a.prev, target, a.blend * a.blend * (3 - 2 * a.blend)); q.tail = a.tailA; a.q = q;
       let at;
       if (a.anim === 'climb') at = { mode: 'pelvis', x: a.x, y: a.climbY };
       else if (a.anim === 'brach' && a.br) { const p = brachiatePose(sp, a.br, a.s, { fast: sp.canopy === 'brachiate-fast' }); at = { mode: 'pelvis', x: p.px, y: p.py }; if (a.blend >= 1) { Object.assign(q, p.q); q.tail = a.tailA; } }
+      else if (a.anim === 'play' && a.play) { const p = a.play.pose(); at = p.at; if (a.blend >= 1) { Object.assign(q, p.q); q.tail = p.q.roll ? p.q.tail : a.tailA; } }
+      else if (a.anim === 'vine' && a.vr) { const p = a.vr.pose(); at = p.ground ? { mode: 'ground', x: a.x, y: floorY(a.vr.lane, a.x) } : { mode: 'pelvis', x: p.px, y: p.py }; if (a.blend >= 1) { Object.assign(q, p.q); q.tail = p.q.roll ? p.q.tail : a.tailA; } }
       else if (a.anim === 'leap') at = { mode: 'pelvis', x: a.x, y: a.air ? a.air.y - 4 : groundY(a.x) - 6 };
       else at = { mode: 'ground', x: a.x, y: surfaceY(a.lane, a.x) - (a.lane === 'canopy' ? 1.5 : 0) };
       // When the way the body rests changes (stand up from lying down, start a climb, land), ease the
@@ -396,9 +527,10 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     for (const k of CREW) { const a = actors[k]; if (a.inside) { heads[k] = null; continue; } fb.pid = ID[k]; heads[k] = drawActor(a); }
     fb.pid = -1;
     glowOutline();
+    drawFruit(fb, playing(), cam);
     drawToucan(fb, toucan.pose());
     for (const l of leaves) if (l.par === 1) { fb.put(l.x - cam, l.y, l.c); if (Math.sin(l.ph) > 0) fb.put(l.x - cam + 1, l.y, l.c); }
-    for (const s of sparks) { if (s.steam) { fb.add(Math.round(s.x - cam), Math.round(s.y), s.c, 0.35 * s.life); fb.add(Math.round(s.x - cam) + 1, Math.round(s.y), s.c, 0.2 * s.life); } else fb.put(s.x - cam, s.y, s.c); }
+    for (const s of sparks) { if (s.smoke) { const r = 1 + (3.2 - s.life) * 0.9, a = Math.min(1, s.life / 1.5) * 0.7; for (let dy = -Math.ceil(r); dy <= r; dy++) for (let dx = -Math.ceil(r); dx <= r; dx++) if (dx * dx + dy * dy <= r * r) blendPut(Math.round(s.x + dx - cam), Math.round(s.y + dy), s.c, a * (1 - Math.hypot(dx, dy) / (r + 1))); continue; } if (s.steam) { fb.add(Math.round(s.x - cam), Math.round(s.y), s.c, 0.35 * s.life); fb.add(Math.round(s.x - cam) + 1, Math.round(s.y), s.c, 0.2 * s.life); } else fb.put(s.x - cam, s.y, s.c); }
     for (const f of flies) { const x = Math.round(f.x - cam), y = Math.round(f.y), up = Math.sin(f.ph * 18) > 0; fb.put(x, y, [40, 30, 30]); fb.put(x - 1, y - (up ? 1 : 0), f.c); fb.put(x + 1, y - (up ? 1 : 0), f.c); }
     for (let i = 0; i < 14; i++) { const x = ((hash(i, 93) * WORLD + Math.sin(t * 0.3 + i) * 20) - cam), y = 70 + hash(i, 94) * 40 + Math.sin(t * 0.8 + i * 2) * 5; if (x > -2 && x < W + 2 && Math.sin(t * 2.3 + i * 1.7) > 0.3) fb.add(x, y, [200, 255, 140], 0.7); } // fireflies
     fb.ox = 0;
@@ -417,6 +549,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
         for (let x = 0; x < len; x++) fb.add(x0 + x, y, [190, 200, 190], 0.32);   // (add takes world rows)
       }
     }
+    fb.ox = cam; drawRipples(fb, playing(), cam); fb.ox = 0;
     blit(L.fore, 1.3);
     if (zoom === 1) { fb.oy = 0; blit(frame, 0, true); drawVines(fb, t); fb.oy = cy; }   // the foliage frame is fixed to the screen (left out when zoomed out, so it hides nothing)
     // plates over heads
@@ -432,9 +565,9 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
 
   const clampCam = x => Math.max(0, Math.min(WORLD - VW, x)), clampY = y => Math.max(TOP, Math.min(H - VH, y));   // H: the bottom of the world
   const storyOf = y => STORIES.reduce((b, s, i) => Math.abs(s.camY - y) < Math.abs(STORIES[b].camY - y) ? i : b, 0);
-  const worldYOf = a => a.anim === 'climb' && a.climbY !== undefined ? a.climbY : a.air ? a.air.y : surfaceY(a.lane, a.x);
+  const worldYOf = a => a.play ? a.play.y() : a.vr ? a.vr.mid()[1] : a.anim === 'climb' && a.climbY !== undefined ? a.climbY : a.air ? a.air.y : surfaceY(a.lane, a.x);
   return {
-    _actors: actors, _villagers: villagers, _folk: folk, _gatherings: gatherings, _lanterns: () => lanternsLit, _council: () => councilOn, _heads: () => ({ ...heads, ...Object.fromEntries(fheads.map((h, i) => [`f:${i}`, h])) }), _chiefIdle: chiefIdle,
+    _actors: actors, _playing: playing, _jobsNow: () => jobsNow, _villagers: villagers, _folk: folk, _gatherings: gatherings, _lanterns: () => lanternsLit, _council: () => councilOn, _heads: () => ({ ...heads, ...Object.fromEntries(fheads.map((h, i) => [`f:${i}`, h])) }), _chiefIdle: chiefIdle,
     step(now, dt = 0.05) {
       t += dt;
       if (goalY !== null) { camY += (goalY - camY) * Math.min(1, reduced ? 1 : dt * 6); if (Math.abs(goalY - camY) < 0.5) { camY = goalY; goalY = null; } }
@@ -488,7 +621,7 @@ export function makeStation(canvas, { modeOf, councilOf = () => false, reduced =
     /** Is a gathering under way at the Ring? (scenery) */
     gathering: () => gathering,
     /** Is a request to Claude Code open? The toucan is away exactly while one is. `animate` false snaps (replayed history). */
-    mail: (open, animate = true) => toucan.setAway(open, animate && !reduced),
+    mail: (open, animate = true) => { mailOpen = !!open; return toucan.setAway(open, animate && !reduced); },
     /** Chatter bubbles to show now, each with where its speaker's head is, in CSS px relative to the canvas. */
     chatter() {
       const r = canvas.getBoundingClientRect(), pos = new Map();

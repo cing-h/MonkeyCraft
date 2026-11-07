@@ -8,7 +8,7 @@
 
 import { SUN, TOP, WORLD, bayer, hash, lerp, mat, mixc } from './fb.js';
 import { C } from './cast.js';
-import { GREENS, flower, foliage, trunk } from './scenery.js';
+import { GREENS, aerialRoot, epiphyte, flower, foliage, trunk } from './scenery.js';
 
 export const TRUNKS = [50, 232, 480, 664, 912];
 export const BIG_TRUNK = 480;
@@ -158,7 +158,7 @@ function foliageMass(fb, cx, cy, w, h, pal, seed, n = 12, blooms = 0) {
 }
 
 /** The canopy stories in the village layer (parallax 1): trunks, boughs, leaves, lianas, flowers, walkways, ladders and plots. */
-export function paintCanopy(mid) {
+export function paintCanopy(mid, taken = new Set()) {
   // the great trunks carry on up through both stories
   for (const tx of TRUNKS) trunk(mid, tx, TOP, 16, trunkR(tx, 16), trunkR(tx, TOP), C.bark, tx + 7);
   for (const s of [1, 2]) {
@@ -193,11 +193,14 @@ export function paintCanopy(mid) {
     // lianas looping between neighbouring boughs, and vines hanging below the walkway
     for (let i = 0; i < 9; i++) { const x = 40 + i * 104 + hash(i, s, 40) * 30; loop(mid, x, base - 40 - hash(i, s, 41) * 20, x + 30 + hash(i, s, 42) * 30, base - 36 - hash(i, s, 43) * 20, 8 + hash(i, s, 44) * 10, s, i + s * 20); }
     for (let i = 0; i < 26; i++) { const x = 30 + hash(i, s, 50) * (WORLD - 60), y = walkY(s, x) + 4; liana(mid, x, y, 8 + hash(i, s, 51) * 30, 500 + i + s * 40, s); }
+    // aerial roots hanging from the walkway and boughs, and ferns clinging to the boughs (village revamp)
+    for (let i = 0; i < 34; i++) { const x = 26 + hash(i, s, 70) * (WORLD - 52); aerialRoot(mid, x, walkY(s, x) + 3, 10 + hash(i, s, 71) * 34, i * 13 + s * 101); }
+    TRUNKS.forEach((tx, i) => { for (const side of [-1, 1]) for (let k = 0; k < 2; k++) { const x = tx + side * (trunkR(tx, base - 20) + 3 + k * 14 + hash(i, s, side, k) * 8); epiphyte(mid, x, base - 18 - hash(i, s, k, 72) * 26, i * 7 + k + s * 31 + side, tone(GREENS.jungle, s)); } });
     // flowers on the boughs and the platform edges
     for (let i = 0; i < 14; i++) { const x = 30 + hash(i, s, 63) * (WORLD - 60); bromeliad(mid, x, walkY(s, x) - 0.5, i + s * 50); }
   }
   for (const l of LADDERS) ladder(mid, l.x, walkY(2, l.x) + 2, walkY(1, l.x));
-  for (const p of PLOTS) plotMarker(mid, p);
+  for (const p of PLOTS) if (!taken.has(p.id)) plotMarker(mid, p);
 }
 
 /** The sky above the ground village's sunset, deepening to evening blue at the top of the world, with high wisps. */

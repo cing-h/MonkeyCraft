@@ -1,28 +1,39 @@
 // MonkeyCraft ape village: scenery painters (leaf clumps, canopies, bark, palms, bananas, flowers, bushes, ferns).
 
-import { hash, lerp, mat } from './fb.js';
+import { hash, lerp, mat, shade } from './fb.js';
 import { C } from './cast.js';
 
 // ---------- scenery painters ----------
 export const GREENS = {
-  canopy: [[24, 52, 34], [40, 82, 44], [66, 116, 52], [110, 156, 70]],
-  jungle: [[22, 60, 44], [34, 90, 56], [58, 126, 64], [104, 168, 84]],
+  // darker, deeper greens (village revamp): the shadows sink further, the sunlit tips still catch the light
+  canopy: [[14, 34, 24], [28, 60, 36], [50, 92, 44], [104, 148, 64]],
+  jungle: [[12, 40, 32], [24, 68, 46], [44, 102, 56], [96, 150, 76]],
   palm: [[28, 66, 36], [50, 104, 46], [86, 142, 58], [140, 186, 84]],
   banana: [[44, 90, 40], [76, 132, 52], [118, 172, 70], [170, 210, 104]]
 };
 export const noise1 = (x, s) => { const i = Math.floor(x), f = x - i, a = hash(i, s), b = hash(i + 1, s); return a + (b - a) * f * f * (3 - 2 * f); };
-/** A clump of leaves: jagged edge, lit from the upper left, speckled with leaf texture. pal = [dark, mid, light, highlight]. */
+/** A clump of leaves: jagged edge, lit from the upper left, speckled with leaf texture, with leaf tips poking out of the rim. pal = [dark, mid, light, highlight]. */
 export function foliage(fb, cx, cy, rx, ry, pal, seed = 0, rough = 1) {
   const e = Math.max(rx, ry) * 1.25 + 1, ox = fb.ox;
+  const edgeAt = ang => 1 + rough * (0.16 * (noise1((ang + Math.PI) * 4.2, seed) - 0.5) * 2 + 0.09 * (noise1((ang + Math.PI) * 11, seed + 1) - 0.5) * 2);
   for (let y = Math.floor(cy - e); y <= Math.ceil(cy + e); y++) for (let x = Math.floor(cx - e); x <= Math.ceil(cx + e); x++) {
     const u = (x + 0.5 - cx) / rx, v = (y + 0.5 - cy) / ry, d = Math.hypot(u, v), ang = Math.atan2(v, u);
-    const edge = 1 + rough * (0.16 * (noise1((ang + Math.PI) * 4.2, seed) - 0.5) * 2 + 0.09 * (noise1((ang + Math.PI) * 11, seed + 1) - 0.5) * 2);
+    const edge = edgeAt(ang);
     if (d > edge) continue;
-    const lit = -u * 0.45 - v * 0.75 + 0.25 + (1 - d) * 0.25, cell = hash(x >> 1, y >> 1, seed + 7), px = hash(x, y, seed + 9);
-    let val = lit + (cell - 0.5) * 0.55 * rough + (px - 0.5) * 0.18;
+    const lit = -u * 0.45 - v * 0.75 + 0.2 + (1 - d) * 0.22, cell = hash(x >> 1, y >> 1, seed + 7), px = hash(x, y, seed + 9);
+    let val = lit + (cell - 0.5) * 0.6 * rough + (px - 0.5) * 0.2;
     if (d > edge - 0.12) val -= 0.25;                       // darker rim of the clump
-    const i = val > 0.55 ? 3 : val > 0.18 ? 2 : val > -0.25 ? 1 : 0;
+    if (hash(x >> 1, y, seed + 11) < 0.07 && val > -0.2) val -= 0.45;   // little gaps between leaves
+    const i = val > 0.6 ? 3 : val > 0.2 ? 2 : val > -0.22 ? 1 : 0;
     fb.put(x - ox, y, (i === 3 && px > 0.55) ? pal[2] : pal[i]);
+  }
+  // single leaves poking out of the rim, pointing outward: 2–3 px blades, lit on the upper-left side
+  if (rx < 2.5) return;
+  const n = Math.round((rx + ry) * 0.9 * rough);
+  for (let k = 0; k < n; k++) {
+    const ang = hash(k, seed, 21) * Math.PI * 2, r = edgeAt(ang), dx = Math.cos(ang), dy = Math.sin(ang);
+    const bx = cx + dx * rx * r * 0.96, by = cy + dy * ry * r * 0.96, len = 1.5 + hash(k, seed, 22) * 1.8, litSide = -dx * 0.5 - dy * 0.8 > 0.1;
+    for (let t = 0.5; t <= len; t += 0.7) fb.put(bx + dx * t + dy * 0.3 * (hash(k, seed, 23) - 0.5) - ox, by + dy * t * 0.8 + 0.25 * t, t > len - 0.8 ? (litSide ? pal[3] : pal[1]) : (litSide ? pal[2] : pal[0]));
   }
 }
 /** A canopy: clusters of clumps, dark ones behind, lit ones in front. */
@@ -31,11 +42,40 @@ export function canopy(fb, cx, cy, w, h, pal, seed, n = 12) {
   for (let i = 0; i < n; i++) { const a = hash(i, seed, 1), b = hash(i, seed, 2); foliage(fb, cx + (a - 0.5) * w, cy + (b - 0.3) * h * 0.6, w * (0.16 + hash(i, seed, 3) * 0.1), h * (0.2 + hash(i, seed, 4) * 0.12), dark, seed + i, 1); }
   for (let i = 0; i < n; i++) { const a = hash(i, seed, 5), b = hash(i, seed, 6); foliage(fb, cx + (a - 0.5) * w * 0.85, cy + (b - 0.5) * h * 0.6, w * (0.13 + hash(i, seed, 7) * 0.09), h * (0.17 + hash(i, seed, 8) * 0.1), pal, seed + 40 + i, 1); }
 }
-/** Bark: a trunk with vertical streaks. */
+/**
+ * Bark (village revamp): a darker round trunk, lit from the left, with furrows that wrap round it
+ * (closer together toward the edges), sunlit ridges beside them, a few knots, moss on the shaded
+ * side and flecks of lichen.
+ */
 export function trunk(fb, x, y0, y1, r0, r1, tone = C.bark, seed = 0) {
-  const m = mat(tone, { rim: 0.4 });
-  fb.cap(x, y0, x, y1, r1, r0, m);
-  for (let k = 0; k < r0 * 1.6; k++) { const sx = x + (hash(k, seed, 1) - 0.5) * r0 * 1.4; for (let y = y0; y < y1; y++) if (hash(Math.floor(sx), y >> 2, seed) < 0.55 && Math.abs(sx - x) < lerp(r1, r0, (y - y0) / (y1 - y0)) - 0.6) fb.put(sx - fb.ox, y, m.s); }
+  const m = mat(tone.map(v => v * 0.8), { rim: 0.35 }), deep = m.s.map(v => v * 0.6), ridge = m.l;
+  const moss = mat([46, 74, 38], { rim: 0.3 }), lichen = [132, 142, 118];
+  const span = Math.max(1, y1 - y0);
+  const knots = Array.from({ length: Math.max(1, Math.round(span / 46)) }, (_, i) => ({ y: lerp(y0 + 4, y1 - 4, hash(i, seed, 61)), u: (hash(i, seed, 62) - 0.5) * 1.1, s: 0.9 + hash(i, seed, 63) * 1.1 }));
+  for (let y = Math.floor(y0); y < y1; y++) {
+    const r = lerp(r1, r0, (y - y0) / span);
+    for (let xx = Math.floor(x - r - 1); xx <= Math.ceil(x + r + 1); xx++) {
+      const u = (xx + 0.5 - x) / r; if (Math.abs(u) > 1) continue;
+      const nz = Math.sqrt(1 - u * u);
+      let c = shade(m, u, 0, nz);
+      // furrows: their phase follows the angle round the trunk, so they bunch up near the edges
+      // long fissures that wander slowly, widening and narrowing; a dark core, a shaded lip, a sunlit ridge beside them
+      const ph = Math.asin(u) / (Math.PI / 2) * r * 0.6 + noise1(y / 24, seed) * 1.5 + noise1(y / 9, seed + 1) * 0.35, fr = ph - Math.floor(ph);
+      const wdt = 0.12 + 0.12 * noise1(y / 6, seed + 9) + (hash(Math.floor(ph), Math.floor(y / 7), seed + 8) < 0.06 ? 0.14 : 0);   // now and then a wide split
+      if (Math.abs(u) < 0.95 && fr < wdt * 0.55) c = deep;
+      else if (Math.abs(u) < 0.95 && fr < wdt) c = m.s;
+      else if (fr < wdt + 0.1 && u < 0.4 && Math.abs(u) < 0.9) c = ridge;
+      else if (hash(Math.floor(ph), Math.floor(y / 3), seed + 7) < 0.05) c = m.s;            // a short cross-crack
+      if (u > 0.2 && noise1(y / 7 + seed * 0.37, seed + 4) > 0.64 && hash(xx, y, seed + 5) < 0.8) c = shade(moss, u, 0, nz);   // moss on the shaded side
+      if (hash(xx, y, seed + 6) < 0.012 && u < 0.6) c = lichen;
+      for (const k of knots) {
+        const dy = (y - k.y) / (k.s * 1.7), du = (u - k.u) * r / k.s, d = Math.hypot(du, dy);
+        if (d < 1) c = d > 0.5 ? deep : m.b;
+      }
+      if (Math.abs(u) > 0.93 && u > 0) c = deep;        // a crisp shaded edge
+      fb.put(xx - fb.ox, y, c);
+    }
+  }
 }
 export function palm(fb, x, base, h, bend, seed, pal = GREENS.palm, scale = 1) {
   let px = x, py = base, ang = -Math.PI / 2 + bend * 0.25;
@@ -87,5 +127,19 @@ export function fern(fb, x, y, seed, s = 1) {
   for (let f = 0; f < 6; f++) {
     let a = -Math.PI / 2 + (f - 2.5) * 0.38, fx = x, fy = y; const len = (9 + hash(f, seed) * 6) * s;
     for (let k = 0; k < len; k++) { a += (f < 3 ? -1 : 1) * 0.05; fx += Math.cos(a); fy += Math.sin(a); fb.put(fx - fb.ox, fy, GREENS.jungle[1]); if (k % 2) { fb.put(fx - fb.ox - 1, fy + 1, GREENS.jungle[2]); fb.put(fx - fb.ox + 1, fy + 1, GREENS.jungle[0]); } }
+  }
+}
+
+/** An aerial root: hangs from a bough in a slow wiggle, dark and thin, with a pale growing tip. */
+export function aerialRoot(fb, x, y, len, seed) {
+  const m = [70, 54, 42], tip = [170, 150, 112];
+  let px = x;
+  for (let k = 0; k < len; k++) { px += (noise1(k / 6, seed) - 0.5) * 0.5; fb.put(px - fb.ox, y + k, k > len - 2 ? tip : (hash(k >> 2, seed) < 0.3 ? [56, 44, 34] : m)); }
+}
+/** A small epiphyte fern clinging to a bough: a fan of short fronds. */
+export function epiphyte(fb, x, y, seed, pal = GREENS.jungle) {
+  for (let f = 0; f < 5; f++) {
+    const a = -Math.PI / 2 + (f - 2) * 0.55 + (hash(f, seed) - 0.5) * 0.3, len = 3 + hash(f, seed, 2) * 3;
+    for (let k = 1; k <= len; k++) { const fx = x + Math.cos(a) * k, fy = y + Math.sin(a) * k + k * k * 0.06; fb.put(fx - fb.ox, fy, k > len - 1 ? pal[3] : f < 2 ? pal[2] : pal[1]); }
   }
 }

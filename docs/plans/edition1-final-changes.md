@@ -13,7 +13,7 @@ Each item records what the user asked for, the decisions already made, and an ou
 
 ## 1. The Clerk: a capuchin who works in Google Docs, Sheets and Slides
 
-Added 2026-11-06.
+Added 2026-11-06. **DONE** (branches `feature/clerk-google` → `-docs` → `-sheets` → `-slides` → `-crew`; build notes in `docs/plans/the-clerk.md`).
 
 **What the user wants:** a crew member who writes papers in Google Docs, makes slideshows in Google Slides, works in Google Sheets, and so on.
 

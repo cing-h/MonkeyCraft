@@ -12,7 +12,7 @@
 export const REST_POSES = ['sit', 'lieSide', 'lieBack', 'lean'];
 export const LADDER_X = 466;                 // the rope ladder down from the lodge platform
 export const LEAN_SPOT = { x: 461, facing: -1 };   // back against the great tree's trunk
-const SPOTS = [[414, 452], [497, 524]];      // open planks either side of the trunk and ladder
+export const CHIEF_SPOTS = [[414, 452], [497, 524]];      // open planks either side of the trunk and ladder
 
 export const TIMING = {
   normal:  { rest: [20, 60], walk: [240, 480], settle: [1, 3], linger: [4, 9], blend: 0.7 },
@@ -27,7 +27,7 @@ export function makeChiefIdle({ rnd, reduced = false }) {
     const choices = REST_POSES.filter(p => p !== pose);
     pose = choices[Math.floor(rnd() * choices.length)];
     if (pose === 'lean') return { kind: 'rest', pose, ...LEAN_SPOT };
-    const [lo, hi] = SPOTS[rnd() < 0.6 ? 0 : 1];
+    const [lo, hi] = CHIEF_SPOTS[rnd() < 0.6 ? 0 : 1];
     return { kind: 'rest', pose, x: Math.round(lo + rnd() * (hi - lo)), facing: rnd() < 0.5 ? -1 : 1 };
   };
   return {

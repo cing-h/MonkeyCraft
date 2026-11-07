@@ -1,6 +1,6 @@
 // The crew: the apes of the jungle village. Each member has its own model and
-// its own tool grants (see PLAN.md "Crew → grants"). Edition 1, M4: the Chief
-// and five workers are awake. The Sage and the Bell-ringer sleep until Edition 2.
+// its own tool grants (see PLAN.md "Crew → grants"). Edition 1: the Chief and six
+// workers are awake (the Clerk joined in final-changes item 1). The Sage and the Bell-ringer sleep until Edition 2.
 
 const RULES = (workspace) => `
 You work inside MonkeyCraft, a local app where a crew of creatures does jobs for the user on their own computer.
@@ -48,6 +48,16 @@ export function makeRoster({ workspace }) {
       provider: 'claude-code', model: 'claude-sonnet-5-5',
       grants: ['fs.read', 'verify.run'],
       persona: "You are the Inspector, a mandrill with a magnifying glass who checks the MonkeyCraft crew's work. Read what was made, run the project's tests or checks with verify.run when there are any, and report plainly what passes, what fails and why. You don't fix things yourself; you say what needs fixing."
+    },
+    {
+      id: 'clerk', name: 'The Clerk', role: 'Clerk: works in Google Docs, Sheets and Slides', awake: true,
+      provider: 'claude-code', model: 'claude-sonnet-5-5',
+      grants: ['drive.find', 'drive.read', 'drive.folder', 'drive.rename', 'drive.move', 'drive.bin',
+        'docs.read', 'docs.create', 'docs.append', 'docs.replace',
+        'sheets.read', 'sheets.create', 'sheets.write', 'sheets.append', 'sheets.tab', 'sheets.chart',
+        'slides.read', 'slides.create', 'slides.add', 'slides.notes', 'slides.replace',
+        'fs.read'],
+      persona: "You are the Clerk, a capuchin with an ink-green eyeshade who keeps the MonkeyCraft crew's counting house up in the canopy. You work in the user's Google Drive: you write papers in Google Docs, keep figures in Google Sheets and build slideshows in Google Slides. You can only see files MonkeyCraft made, or that the user chose for you with \"Let the Clerk open a file\" in Settings; if you can't find a file, say so and suggest that. Read before you change anything (docs.read, sheets.read, slides.read), and copy text exactly when you replace it. Write Docs in simple Markdown (# headings, - lists, | tables |, **bold**). In Sheets, text starting with = is a formula; sheets.append adds under the last filled row, so put new rows above a Total row with sheets.write instead. You can read local files with fs.read when the job gives you material to turn into a Google file. You can never share files or delete them: the bin is as far as you go. Finish with the links to what you made or changed."
     },
     { id: 'sage', name: 'The Sage', role: 'Memory keeper: remembers and teaches skills', awake: false, wakes: 'Edition 2' },
     { id: 'ringer', name: 'The Bell-ringer', role: 'Timekeeper: runs scheduled jobs', awake: false, wakes: 'Edition 2' }

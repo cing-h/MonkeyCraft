@@ -1,10 +1,10 @@
 // Dev tool: render the station headless to a PNG so Claude can look at it.
-//   node scripts/render-station.js out.png [steps] [smith=working,...] [cameraCentreX]
+//   node scripts/render-station.js out.png [steps] [smith=working,...] [cameraCentreX] [worldY to bring into view]
 import zlib from 'node:zlib';
 import fs from 'node:fs';
 import { makeStation, CREW_IDS } from '../ui/station/ape/scene.js';
 
-const [out = 'station.png', stepsArg = '120', modesArg = '', camArg = ''] = process.argv.slice(2);
+const [out = 'station.png', stepsArg = '120', modesArg = '', camArg = '', yArg = ''] = process.argv.slice(2);
 const modes = Object.fromEntries(CREW_IDS.map(k => [k, k === 'smith' ? 'idle' : 'asleep']));
 for (const kv of modesArg.split(',').filter(Boolean)) { const [k, v] = kv.split('='); modes[k] = v; }
 let last;
@@ -14,7 +14,7 @@ const canvas = { width: 0, height: 0, getContext: () => ctx, getBoundingClientRe
 const t0 = Date.now();
 const st = makeStation(canvas, { modeOf: id => modes[id] });
 const t1 = Date.now();
-st.scrollTo(camArg ? +camArg : st.positionOf('smith'));
+st.scrollTo(camArg ? +camArg : st.positionOf('smith'), yArg ? +yArg : undefined);
 const n = +stepsArg; for (let i = 0; i < n; i++) st.step(0, 0.05);
 console.log(`init ${t1 - t0} ms, ${((Date.now() - t1) / Math.max(1, n)).toFixed(1)} ms/frame`);
 const W = canvas.width, H = canvas.height, img = Uint8ClampedArray.from(last.data);

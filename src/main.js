@@ -21,6 +21,17 @@ import { makeFsEdit } from './tools/fs-edit.js';
 import { makeFsMove } from './tools/fs-move.js';
 import { makeVerifyRun } from './tools/verify-run.js';
 import { makeWebFetch } from './tools/web-fetch.js';
+import { makeGoogleAuth } from './google/auth.js';
+import { makeGoogleApi } from './google/api.js';
+import { makeDrive } from './google/drive.js';
+import { makeDriveTools } from './tools/google-drive.js';
+import { makeDocs } from './google/docs.js';
+import { makeDocsTools } from './tools/google-docs.js';
+import { makeSheets } from './google/sheets.js';
+import { makeSheetsTools } from './tools/google-sheets.js';
+import { makeSlides } from './google/slides.js';
+import { makeSlidesTools } from './tools/google-slides.js';
+import { googleRoutes } from './routes/google.js';
 import { makeCrewTools } from './crew/orchestrate.js';
 import { makeCouncil, makeCouncilTools } from './crew/council.js';
 import { councilRoutes } from './routes/council.js';
@@ -112,6 +123,13 @@ async function main() {
   const bus = makeBus({ clock, journal, log: m => console.warn(m) });
   const consent = makeConsentBroker({ newId, grants, log: m => console.warn(m) });
   const roster = makeRoster({ workspace: realWorkspace });
+  // Google (the Clerk): sign-in kept in data/google/, which the tools can never read
+  const googleAuth = makeGoogleAuth({ fsp, dir: path.join(dataDir, 'google'), fetchImpl: fetch, clock, randomBytes, redirectUri: `http://127.0.0.1:${PORT}/api/google/callback` });
+  const ga = await googleAuth.load();
+  if (!ga.ok) console.warn(`The Google sign-in couldn't be read (${ga.error}); Google is not connected.`);
+  const googleApi = makeGoogleApi({ auth: googleAuth, fetchImpl: fetch });
+  const drive = makeDrive({ api: googleApi }), docs = makeDocs({ api: googleApi }), sheets = makeSheets({ api: googleApi });
+  const slides = makeSlides({ api: googleApi, newObjectId: () => `mc${randomBytes(9).toString('hex')}` });
   const shell = makeShellExec({ spawn: trackedSpawn('shell'), pathEnv, baseEnv: process.env, killProcessGroup });
   let council = null;   // made once the run host exists (below); the council tools look it up when they run
   const registry = makeRegistry([
@@ -122,6 +140,10 @@ async function main() {
     shell,
     makeVerifyRun({ shell }),
     makeWebFetch({ fetchImpl: fetch, lookup: host => dns.lookup(host, { all: true }) }),
+    ...makeDriveTools({ auth: googleAuth, drive, undo }),
+    ...makeDocsTools({ auth: googleAuth, drive, docs, undo, clock }),
+    ...makeSheetsTools({ auth: googleAuth, drive, sheets, undo, clock }),
+    ...makeSlidesTools({ auth: googleAuth, drive, slides, undo, clock }),
     ...makeCrewTools({ roster }),
     ...makeAskClaudeTools({ mailbox }),
     ...makeCouncilTools({ roster, clock, councils: { get: id => council?.councils.get(id) } })
@@ -140,6 +162,7 @@ async function main() {
     bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken,
     mcpUrl: runId => `http://127.0.0.1:${PORT}/mcp/${runId}`,
     limits: LIMITS, undo, guardPath,
+    remoteUndo: r => googleAuth.status().connected ? drive.revertChange(r) : "skipped: Google isn't connected",
     onRunEnd: runId => mailbox.askerEnded(runId)
   });
   await runs.init();
@@ -160,11 +183,11 @@ async function main() {
 
   const server = makeServer({
     port: PORT,
-    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken }), ...councilRoutes({ council })]
+    routes: [...staticRoutes({ fsp, uiDir: path.join(ROOT, 'ui') }), ...apiRoutes({ bus, runs, consent, grants, roster, journal, ledger, clock, limits: LIMITS }), ...settingsRoutes({ store: settings, roster, providers, limits: LIMITS, apply: applySettings }), ...mcpRoutes({ runs }), ...linkRoutes({ session: link, mailbox, token: linkToken }), ...councilRoutes({ council }), ...googleRoutes({ auth: googleAuth })]
   });
   await server.listen();
   console.log(`MonkeyCraft is running: http://127.0.0.1:${PORT}/`);
-  console.log(`Workspace: ${realWorkspace}  ·  Claude Code: ${claudePath}  ·  Anthropic API: ${apiKey ? 'key found' : 'no key'}`);
+  console.log(`Workspace: ${realWorkspace}  ·  Claude Code: ${claudePath}  ·  Anthropic API: ${apiKey ? 'key found' : 'no key'}  ·  Google: ${googleAuth.status().connected ? 'connected' : 'not connected'}`);
 
   let stopping = false;
   const shutdown = async sig => {

@@ -27,7 +27,7 @@ const WORKER_PREAMBLE = `The Chief has given you this task as part of a larger j
 const MAX_REPORT = 8000;
 const LIVENESS = { idleMs: 450_000, toolMs: 1_200_000 };
 
-export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null, onRunEnd = () => {} }) {
+export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null, remoteUndo = null, onRunEnd = () => {} }) {
   const active = new Map(); // runId -> run
   const dayStart = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const today = { day: -1, usd: 0 };
@@ -221,9 +221,9 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
       if (!undo) return { error: 'Undo is not available.' };
       const evs = await journal.read(runId);
       if (!evs.length) return { error: 'No such job.' };
-      const results = await undo.revert(runId, { guard: guardPath });
+      const results = await undo.revert(runId, { guard: guardPath, remote: remoteUndo ? r => remoteUndo(r) : undefined });
       const emit = bus.emitFor(runId, evs[0].agentId, Math.max(...evs.map(e => e.seq)) + 1);
-      for (const r of results) if (r.result === 'restored' || r.result === 'removed' || r.result === 'moved back') emit('undo.reverted', { undoId: r.undoId, path: r.path });
+      for (const r of results) if (['restored', 'removed', 'moved back', 'binned'].includes(r.result)) emit('undo.reverted', { undoId: r.undoId, path: r.path });
       await journal.flush();
       return { results };
     },
