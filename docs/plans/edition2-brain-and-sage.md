@@ -1,6 +1,6 @@
 # Edition 2: the Brain and the Demi-God Sage
 
-Status: APPROVED 2026-11-07. Building phase 1.
+Status: MVP REVIEW (2026-11-07). Phases 1–3 are built and pushed on their branches (`feature/brain-vault` → `brain-recall` → `sage-interview`). Phase 4 (`feature/brain-learning`) is built but held, unpushed, until the with/without test (`docs/plans/brain-eval.md`) shows the Brain helps. Phases 5–6 wait for the same evidence. The user's rule from now on: MVP first, prove each feature before building more.
 Scope (the user's decision): Edition 2 is only the Brain and the Demi-God Sage. Schedules (Bell-ringer), chat apps, connectors and the desktop app wait until this is built and fleshed out.
 
 ---
