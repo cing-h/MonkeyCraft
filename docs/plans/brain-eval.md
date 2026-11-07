@@ -1,6 +1,6 @@
 # The with/without test: does the Brain make the crew better?
 
-Status: DESIGN, waiting for the user's approval (written 2026-11-07). Nothing is built yet.
+Status: APPROVED 2026-11-07. Waiting for the user's Sage interview and their own jobs (Part 2), then the runner is built with 2 jobs first.
 
 ## Part 1: In plain words
 
