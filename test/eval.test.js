@@ -33,7 +33,10 @@ test('eval jobs: eight, with the agreed checks', () => {
   const J = id => JOBS.find(j => j.id === id);
   assert.equal(J(7).check(res({ finalText: '17% of 2,340 is 397.8.' })).pass, true);
   assert.equal(J(7).check(res({ finalText: 'about 400' })).pass, false);
-  assert.equal(J(3).check(res({ tools: [{ tool: 'verify.run', args: '{"command":"npm test"}', ok: true }] })).pass, true);
+  assert.equal(J(3).check(res({ tools: [{ tool: 'verify.run', args: '{"command":"npm test","cwd":"/home/u/monkeycraft"}', ok: true }] })).pass, true);
+  assert.equal(J(3).check(res({ tools: [{ tool: 'shell.exec', args: '{"command":"cd ~/monkeycraft && npm test"}', ok: false }] })).note, 'found MonkeyCraft and tried its tests');
+  assert.equal(J(3).check(res({ tools: [{ tool: 'shell.exec', args: '{"command":"npm test"}', ok: false }] })).pass, false, 'the tests, but not in MonkeyCraft');
+  assert.equal(J(7).check(res({ finalText: 'It is 397.80.' })).pass, true);
   assert.equal(J(3).check(res()).pass, false);
   assert.equal(J(4).check(res({ finalText: 'In your Zettelkasten, under wiki/Shub/.' })).pass, true);
   assert.equal(J(6).check(res({ files: { created: {}, changed: {}, deleted: ['test-folder/run-1.log'] } })).pass, true);

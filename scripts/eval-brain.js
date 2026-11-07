@@ -133,7 +133,9 @@ async function judge(dir) {
 async function report(dir) {
   const { pairs } = await pairsOf(dir);
   let picks = {}; try { picks = JSON.parse(await fsp.readFile(path.join(dir, 'picks.json'), 'utf8')); } catch {}
-  const text = summarise({ runs: await loadRuns(dir), pairs, picks, jobs: JOBS });
+  // checks are scored again from the current jobs file, so a fixed check applies to runs already made
+  const runs = (await loadRuns(dir)).map(r => { const j = JOBS.find(x => x.id === r.job); return { ...r, check: j?.check ? j.check(r) : null }; });
+  const text = summarise({ runs, pairs, picks, jobs: JOBS });
   await fsp.writeFile(path.join(dir, 'report.md'), text);
   console.log(text);
 }
