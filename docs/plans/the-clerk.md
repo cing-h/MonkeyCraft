@@ -19,7 +19,7 @@ A capuchin crew member who works in Google Docs, Sheets and Slides through Googl
    - Edits to a document not made in the same job: a backup copy goes in Drive first, once per document per job. Revert can't undo a Docs edit itself (the APIs have no version restore), so it points to the backup instead.
 3. **`feature/clerk-sheets`:** create a sheet; read and write ranges, formulas and charts. DONE 2026-11-06, live-checked.
 4. **`feature/clerk-slides`:** turn an outline into a deck with speaker notes. DONE 2026-11-06, live-checked.
-5. **`feature/clerk-crew`: the Clerk in the roster and the village.**
+5. **`feature/clerk-crew`: the Clerk in the roster and the village.** DONE 2026-11-06, with a live job.
    - Sprite, poses, the ink-green glow, the counting house on Canopy 1, and chatter (*"Chirr-chirr."*).
    - The Chief can hand it work (Scout → Writer → Clerk).
    - Every create or edit asks first with a preview, and "Revert this job" bins the files the job created.
@@ -69,3 +69,10 @@ Before Phase 1's live check, the user does the guided Google Cloud setup: create
   - An unused subtitle box on the title slide is removed.
 - `src/tools/google-slides.js` has five tools: `slides.read`, `slides.create`, `slides.add`, `slides.notes` and `slides.replace`. Replace covers the slides only, not the speaker notes.
 - **Live-checked 2026-11-06** with create, add, notes, replace and read. The PDF export showed real bullets with an indent level, bold, italic, a centred title slide and the subtitle. The test deck was binned.
+
+## Phase 5 notes (what was built)
+- **Roster:** the Clerk is awake. It has the 21 Google tools plus `fs.read`, and no shell or local writes. Its persona covers the `drive.file` limits, reading before replacing, Markdown, formulas, and putting new rows above a Total row instead of appending.
+- **Cast:** a capuchin with a pale face and shoulders, a black cap, an ink-green eyeshade, a pencil behind its ear and a long tail. It carries a roll of papers when walking on all fours and a ledger page in its hand otherwise. Its glow is ink green, `[168, 222, 84]`.
+- **Home:** the counting house on plot c1-b (Canopy 1, above the Writer). It's a two-storey wood house with a slate roof, three windows and an attic window that glow while it works, a sign over the door, and paper stacks on the platform. That plot's "free" marker is gone, which leaves 3 free plots on Canopy 1.
+- **Village:** a seat at the Council Ring (x 520). Its chatter lines were already written in item 3. The roster card shows "Canopy 1 · the counting house (plot c1-b)".
+- **Live job 2026-11-06:** the user's Claude Code subscription (Sonnet) ran it directly, at 2 turns and about $0.03. It made a Doc with a heading and three bullets, asking once, and replied with the link. "Revert this job" then binned the Doc.

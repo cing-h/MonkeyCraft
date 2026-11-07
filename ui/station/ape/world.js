@@ -3,7 +3,7 @@
 import { FB, GROUND, H, TOP, W, WORLD, bayer, hash, mat, mixc } from './fb.js';
 import { C } from './cast.js';
 import { GREENS, banana, bush, canopy, fern, flower, foliage, palm, trunk } from './scenery.js';
-import { TRUNKS, paintCanopy, paintCanopyBack, paintHighSky } from './canopy.js';
+import { PLOTS, TRUNKS, paintCanopy, paintCanopyBack, paintHighSky } from './canopy.js';
 import { paintCulture } from './culture.js';
 export { TRUNKS };
 
@@ -13,14 +13,16 @@ export const groundY = x => GROUND + Math.sin(x / 29) * 0.8;
 export const WATER = 122;
 export const DOORS = {
   chief: { lane: 'perch', x: 446 }, scout: { lane: 'canopy', x: 70 }, smith: { lane: 'ground', x: 166 }, archivist: { lane: 'ground', x: 302 },
-  writer: { lane: 'ground', x: 398 }, inspector: { lane: 'ground', x: 606 }, sage: { lane: 'ground', x: 734 }, ringer: { lane: 'ground', x: 848 }
+  writer: { lane: 'ground', x: 398 }, inspector: { lane: 'ground', x: 606 }, sage: { lane: 'ground', x: 734 }, ringer: { lane: 'ground', x: 848 },
+  clerk: { lane: 'c1', x: 352 }
 };
 export const PERCH_Y = 34;
 /** Where each crew member lives: the story and the place (shown in the roster). A crew member who moves into a canopy plot gets `plot` (see canopy.js PLOTS). */
 export const HOMES = {
   chief: { story: 'Ground', place: 'the lodge in the great tree' }, scout: { story: 'Ground', place: 'the lookout on the low branch' },
   smith: { story: 'Ground', place: 'the smithy' }, archivist: { story: 'Ground', place: 'the archive on stilts' }, writer: { story: 'Ground', place: 'the lantern-lit hut' },
-  inspector: { story: 'Ground', place: 'the workshop' }, sage: { story: 'Ground', place: 'the bathhouse' }, ringer: { story: 'Ground', place: 'the bell tower' }
+  inspector: { story: 'Ground', place: 'the workshop' }, sage: { story: 'Ground', place: 'the bathhouse' }, ringer: { story: 'Ground', place: 'the bell tower' },
+  clerk: { story: 'Canopy 1', place: 'the counting house', plot: 'c1-b' }
 };
 
 export function buildLayers() {
@@ -85,7 +87,7 @@ export function buildLayers() {
   back.fog = 0;
   // the village (parallax 1)
   const mid = layer(1, true, true);
-  paintCanopy(mid);
+  paintCanopy(mid, new Set(Object.values(HOMES).map(h => h.plot).filter(Boolean)));   // taken plots get a house, not a "free" marker
   // the bank: grass lip, then a cut-away of earth and stones down to the water
   for (let x = 0; x < WORLD; x++) {
     const top = groundY(x);
@@ -167,6 +169,18 @@ export function buildLayers() {
   hut(830, 866, 32, 26, 12, { overhang: 4, roof: [120, 96, 70] }); lights.push({ key: 'ringer', bell: true, x0: 844, y0: 22, x1: 852, y1: 30 });
   mid.ell(848, 26, 4, 4.2, mat(C.gold));
   hut(836, 860, GROUND, 96, 86, { overhang: 3 }); door(848, GROUND); windowAt('ringer', 839, 99, 843, 103);
+  // the Clerk's counting house (capuchin) on its Canopy 1 plot: a tall, narrow house with a shingle roof, paper stacked all round
+  {
+    const p = PLOTS.find(q => q.id === HOMES.clerk.plot), base = p.y, cx = p.x;
+    hut(cx - 12, cx + 12, base, base - 27, base - 41, { overhang: 3, wall: [150, 112, 72], roof: [78, 82, 100] });
+    door(cx, base, 8);
+    mid.rect(cx - 5, base - 11, cx + 5, base - 9, mat(C.wood).s); for (let x = cx - 4; x < cx + 4; x += 2) mid.put(x, base - 10, [168, 222, 84]);   // a sign over the door with a ledger rule
+    for (const [x, y] of [[cx - 9, base - 20], [cx + 5, base - 20]]) windowAt('clerk', x, y, x + 4, y + 5);
+    windowAt('clerk', cx + 7, base - 8, cx + 10, base - 3);
+    mid.rect(cx - 2, base - 36, cx + 2, base - 32, [44, 32, 26]); lights.push({ key: 'clerk', x0: cx - 2, y0: base - 36, x1: cx + 2, y1: base - 32 });   // the attic window
+    const pm = mat(C.paper);                                                                                    // stacks of paper and ledgers on the platform
+    for (const [x, n] of [[cx - 18, 5], [cx - 15, 3], [cx + 15, 4], [cx + 18, 6]]) for (let i = 0; i < n; i++) mid.rect(x - 2 + (i % 2) * 0.5, base - 1 - i, x + 2 + (i % 2) * 0.5, base - i, i % 3 === 2 ? [96, 140, 92] : i % 2 ? pm.s : pm.b);
+  }
   // scout's lookout (gibbon) on the canopy branch
   const by = branchY(70);
   hut(58, 84, by - 1, by - 16, by - 30, { overhang: 4 }); door(70, by - 1, 8); windowAt('scout', 76, by - 13, 81, by - 8);

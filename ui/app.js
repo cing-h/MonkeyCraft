@@ -211,7 +211,7 @@ function syncStrip(now) {
     const m = modes[i], li = el('li', m + (filter === c.id ? ' sel' : ''));
     const home = HOMES[c.id];
     li.append(el('span', 'n', c.name.toUpperCase()), el('span', 'st', m === 'asleep' ? `Asleep · wakes in ${wakes[c.id]}` : MODE_TEXT[m]));
-    if (home) li.append(el('span', 'home', `HOME · ${home.story.toUpperCase()} · ${home.plot ? `PLOT ${home.plot.toUpperCase()}` : home.place.toUpperCase()}`));
+    if (home) li.append(el('span', 'home', `HOME · ${home.story.toUpperCase()} · ${home.place.toUpperCase()}${home.plot ? ` (PLOT ${home.plot.toUpperCase()})` : ''}`));
     li.tabIndex = 0; li.onclick = () => setFilter(c.id); li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilter(c.id); } };
     ul.append(li);
   });

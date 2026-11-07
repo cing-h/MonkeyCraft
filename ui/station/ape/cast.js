@@ -7,7 +7,7 @@ export const C = {
   wood: [118, 84, 54], dark: [34, 26, 22], thatch: [168, 136, 78], stone: [116, 112, 104], paper: [222, 210, 180], gold: [222, 178, 70],
   leaf: [58, 96, 52], leaf2: [82, 120, 60], bark: [92, 70, 52], grass: [78, 98, 44], dirt: [118, 92, 58], red: [196, 58, 48], rope: [150, 120, 80]
 };
-export const LIGHT = { chief: [196, 132, 255], scout: [96, 232, 240], smith: [255, 146, 56], inspector: [240, 240, 255], archivist: [118, 240, 156], writer: [255, 128, 204], sage: [120, 168, 255], ringer: [255, 222, 86] };
+export const LIGHT = { chief: [196, 132, 255], scout: [96, 232, 240], smith: [255, 146, 56], inspector: [240, 240, 255], archivist: [118, 240, 156], writer: [255, 128, 204], sage: [120, 168, 255], ringer: [255, 222, 86], clerk: [168, 222, 84] };   // the Clerk's is ink (ledger) green
 
 export const SPECIES = {
   chief:     { name: 'THE CHIEF', species: 'Silverback gorilla', role: 'Manager · plans and hands out the work', posture: 'knuckle', canopy: null, tl: 9, tr: 5.6, pr: 4.6, hr: 3.6, neck: 3, ua: 6.5, la: 6, ar: 1.9, ul: 4.4, ll: 4, lr: 2.1, fur: [40, 38, 44], face: [30, 28, 32], tail: 0, walk: 12, run: 24 },
@@ -16,10 +16,12 @@ export const SPECIES = {
   inspector: { name: 'THE INSPECTOR', species: 'Mandrill', role: 'Tester · checks the work', posture: 'quad', canopy: 'branchwalk', tl: 7, tr: 3.5, pr: 3.2, hr: 3, neck: 2.4, ua: 4.6, la: 4.2, ar: 1.3, ul: 4.4, ll: 4, lr: 1.4, fur: [100, 94, 60], face: [212, 52, 48], tail: 3, walk: 15, run: 34 },
   archivist: { name: 'THE ARCHIVIST', species: 'Orangutan', role: 'Archivist · reads and files documents', posture: 'fist', canopy: 'brachiate-slow', tl: 7, tr: 4.6, pr: 4, hr: 3.2, neck: 1.8, ua: 7, la: 6.6, ar: 1.5, ul: 3.2, ll: 3, lr: 1.4, fur: [182, 86, 36], face: [98, 74, 62], tail: 0, walk: 9, run: 20 },
   writer:    { name: 'THE WRITER', species: 'Bonobo', role: 'Writer · drafts and edits text', posture: 'biped', canopy: 'brachiate', tl: 6.6, tr: 3.3, pr: 3, hr: 2.6, neck: 2.3, ua: 5, la: 4.6, ar: 1.1, ul: 4.6, ll: 4.2, lr: 1.3, fur: [34, 30, 36], face: [56, 42, 44], tail: 0, walk: 14, run: 30 },
+  clerk:     { name: 'THE CLERK', species: 'Capuchin', role: 'Clerk · works in Google Docs, Sheets and Slides', posture: 'quad', canopy: 'branchwalk', tl: 5, tr: 2.8, pr: 2.5, hr: 2.4, neck: 1.6, ua: 3.6, la: 3.3, ar: 1, ul: 3.4, ll: 3.1, lr: 1.05, fur: [52, 38, 30], face: [222, 178, 150], tail: 10, walk: 15, run: 34 },
   sage:      { name: 'THE SAGE', species: 'Snow monkey', role: 'Memory keeper · remembers and teaches skills', posture: 'quad', canopy: 'branchwalk', tl: 5.6, tr: 3.5, pr: 3.1, hr: 2.7, neck: 1.8, ua: 3.8, la: 3.4, ar: 1.25, ul: 3.6, ll: 3.2, lr: 1.3, fur: [170, 158, 144], face: [216, 112, 104], tail: 2, walk: 10, run: 24 },
   ringer:    { name: 'THE BELL-RINGER', species: 'Howler monkey', role: 'Timekeeper · runs scheduled jobs', posture: 'quad', canopy: 'branchwalk', tl: 6, tr: 3, pr: 2.8, hr: 2.5, neck: 2, ua: 4, la: 3.8, ar: 1.05, ul: 3.8, ll: 3.6, lr: 1.1, fur: [98, 40, 26], face: [26, 22, 22], tail: 11, walk: 15, run: 34 }
 };
 export const CREW = Object.keys(SPECIES);
+const CREAM = mat([232, 214, 186], { rim: 0.3 });
 for (const sp of Object.values(SPECIES)) { sp.m = mat(sp.fur); sp.mf = mat(sp.fur.map(v => v * 0.72)); sp.mface = mat(sp.face, { rim: 0.35 }); }
 
 // ---------- poses: angles in a facing-right frame ----------
@@ -204,6 +206,7 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   fb.cap(X([0, 0]), Y([0, 0]), X(k.ch), Y(k.ch), sp.pr * s, sp.tr * s, sp.m);
   if (key === 'chief') { const mid = [k.ch[0] * 0.45 - Math.cos(q.torso) * sp.tr * 0.35, k.ch[1] * 0.45 - Math.sin(q.torso) * sp.tr * 0.35]; fb.ell(X(mid), Y(mid), sp.tr * 0.9 * s, sp.tr * 0.55 * s, mat([150, 152, 160]), q.torso * f + Math.PI / 2); }
   if (key === 'smith' && !plain) fb.cap(X([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), Y([Math.cos(q.torso) * 1.6, Math.sin(q.torso) * 1.6]), X([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), Y([k.ch[0] * 0.8 + Math.cos(q.torso) * 2.2, k.ch[1] * 0.8 + Math.sin(q.torso) * 2.2]), 2 * s, 2.3 * s, mat([96, 62, 38]));
+  if (key === 'clerk') fb.ell(X([k.ch[0] * 0.85, k.ch[1] * 0.85]), Y([k.ch[0] * 0.85, k.ch[1] * 0.85]), sp.tr * 0.95 * s, sp.tr * 0.8 * s, CREAM);   // pale shoulders and chest
   if (key === 'archivist') for (const i of [0, 1]) { const [el] = k.arms[i]; fb.cap(X(el), Y(el), X([el[0] - 0.5, el[1] + 2.5]), Y([el[0] - 0.5, el[1] + 2.5]), 1.1 * s, 0.4 * s, i ? sp.mf : sp.m); } // shaggy arm hair
   // head
   const hx = X(k.head), hy = Y(k.head), hr = sp.hr * s, fwd = [Math.cos(k.ha) * f, Math.sin(k.ha)];
@@ -212,6 +215,7 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   const faceC = [hx + fwd[0] * hr * 0.45, hy + fwd[1] * hr * 0.45 + hr * 0.2];
   if (key === 'archivist') fb.ell(hx + fwd[0] * hr * 0.2, hy + hr * 0.1, hr * 1.15, hr * 0.75, sp.mface); // cheek pads
   if (key === 'scout') fb.ell(faceC[0], faceC[1] - hr * 0.1, hr * 0.72, hr * 0.68, mat([232, 226, 214], { rim: 0.2 }));      // white face ring
+  if (key === 'clerk') { fb.ell(faceC[0] - fwd[0] * hr * 0.1, faceC[1] - hr * 0.05, hr * 0.8, hr * 0.78, CREAM); fb.ell(hx - fwd[0] * hr * 0.25, hy - hr * 0.6, hr * 0.7, hr * 0.42, mat([22, 16, 14])); }   // pale face, black cap
   fb.ell(faceC[0], faceC[1], hr * 0.58, hr * 0.52, sp.mface);
   if (key === 'inspector') { fb.cap(faceC[0] - fwd[0] * hr * 0.2, faceC[1] - hr * 0.5, faceC[0] + fwd[0] * hr * 0.55, faceC[1] + hr * 0.1, hr * 0.22, hr * 0.28, mat([214, 48, 46])); fb.put(faceC[0] - fb.ox, faceC[1] + hr * 0.1, [80, 120, 210]); fb.ell(faceC[0] - fwd[0] * hr * 0.3, faceC[1] + hr * 0.6, hr * 0.5, hr * 0.32, mat([224, 196, 86])); }
   if (key === 'writer') fb.put(faceC[0] + fwd[0] * hr * 0.4 - fb.ox, faceC[1] + hr * 0.25, [210, 126, 140]);
@@ -227,6 +231,7 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   if (key === 'sage') { fb.cap(hx - fwd[0] * hr, hy - hr * 0.45, hx + fwd[0] * hr * 0.4, hy - hr * 0.8, 0.8 * s, 0.8 * s, mat([80, 110, 200])); for (let i = 0; i < 4; i++) fb.put(X(k.ch) + (i - 1.5) * s - fb.ox, Y(k.ch) + 1.5 * s + Math.abs(i - 1.5) * 0.5, [120, 170, 255]); }
   if (key === 'ringer') fb.cap(X(k.ch) - 2 * s * f, Y(k.ch) + 0.5 * s, X(k.ch) + 2 * s * f, Y(k.ch) + 1 * s, 1 * s, 1 * s, mat(C.gold)); // scarf
   if (key === 'writer') fb.cap(hx - fwd[0] * hr * 0.4, hy - hr * 0.5, hx - fwd[0] * hr * 1.6, hy - hr * 2, 0.6 * s, 0.4 * s, mat([236, 232, 222])); // quill behind the ear
+  if (key === 'clerk') { fb.cap(hx - fwd[0] * hr * 0.2, hy - hr * 0.75, hx + fwd[0] * hr * 1.35, hy - hr * 0.55, 0.55 * s, 0.35 * s, mat([60, 150, 84], { rim: 0.7 })); fb.cap(hx - fwd[0] * hr * 0.9, hy - hr * 0.2, hx - fwd[0] * hr * 1.5, hy - hr * 1.3, 0.35 * s, 0.35 * s, mat(C.gold)); } // ink-green eyeshade, pencil behind the ear
   // near side
   leg(0, false); limb(0, false);
   const hand = k.arms[0][1], hX = X(hand), hY = Y(hand);
@@ -234,6 +239,8 @@ export function drawApe(fb, key, q, at, facing, scale = 1, t = 0, plain = false)
   if (key === 'smith' && q.plant !== 'hand') { fb.cap(hX, hY, hX + 3 * s * f, hY - 2 * s, 0.6 * s, 0.6 * s, mat(C.wood)); fb.ell(hX + 3.5 * s * f, hY - 2.4 * s, 1.5 * s, 1.1 * s, mat([120, 126, 136])); }
   if (key === 'inspector' && q.plant !== 'all') { fb.cap(hX, hY, hX + 2 * s * f, hY - 2.5 * s, 0.5 * s, 0.5 * s, mat(C.wood)); fb.ell(hX + 2.6 * s * f, hY - 3.6 * s, 1.5 * s, 1.5 * s, mat([180, 220, 230], { rim: 0.8 })); }
   if (key === 'ringer' && q.plant !== 'all') fb.ell(hX, hY + 1.6 * s, 1.5 * s, 1.8 * s, mat(C.gold));
+  if (key === 'clerk' && q.plant === 'all' && !q.sitting) { const b = [-sp.tl * 0.1, -sp.tr * 0.9]; fb.cap(X(b) - 2 * s * f, Y(b), X(b) + 2 * s * f, Y(b) - 0.4 * s, 1.1 * s, 1.1 * s, mat(C.paper)); }   // a roll of papers carried on its back
+  if (key === 'clerk' && q.plant !== 'all') { fb.rect(hX - 1.6 * s, hY - 1.2 * s, hX + 1.6 * s, hY + 1.6 * s, C.paper); fb.put(hX - fb.ox, hY, [60, 150, 84]); }   // a ledger page in hand
   if (key === 'scout' && q.plant === 'feet' && !q.sitting) fb.ell(X([0, 0]) - 1.5 * s * f, Y([0, 0]) + 0.5 * s, 1.8 * s, 1.4 * s, mat([120, 90, 50])); // satchel
   return { headX: hx, headY: hy - hr };
 }

@@ -205,3 +205,41 @@ test('picker: the key is checked, the app id comes from the client id, and the s
   assert.equal(s.auth.status().hasPickerKey, true);
   assert.match((await s.auth.pickerSession()).error, /isn't connected/, 'a new client id drops the old sign-in');
 });
+
+// ---------- the Clerk in the crew (phase 5) ----------
+test('the Clerk: awake, with every Google tool plus fs.read and nothing that touches the shell or local files', async () => {
+  const { makeRoster } = await import('../src/crew/roster.js');
+  const { makeCrewTools } = await import('../src/crew/orchestrate.js');
+  const r = makeRoster({ workspace: '/w' }), c = r.get('clerk');
+  assert.equal(c.awake, true);
+  assert.deepEqual(c.grants.filter(g => !/^(drive|docs|sheets|slides)\./.test(g)), ['fs.read']);
+  assert.equal(c.grants.filter(g => g.startsWith('docs.')).length, 4);
+  assert.equal(c.grants.filter(g => g.startsWith('sheets.')).length, 6);
+  assert.equal(c.grants.filter(g => g.startsWith('slides.')).length, 5);
+  assert.equal(c.grants.filter(g => g.startsWith('drive.')).length, 6);
+  assert.match(c.systemPrompt, /capuchin/);
+  for (const other of r.ids().filter(id => id !== 'clerk')) assert.ok(!(r.get(other).grants || []).some(g => /^(drive|docs|sheets|slides)\./.test(g)), `${other} has no Google tools`);
+  const dispatch = makeCrewTools({ roster: r }).find(t => t.name === 'crew.dispatch');
+  assert.ok(dispatch.inputSchema.properties.worker.enum.includes('clerk'), 'the Chief can hand the Clerk work');
+  assert.match(dispatch.description, /clerk \(The Clerk: Clerk: works in Google Docs, Sheets and Slides\)/);
+});
+
+test('the Clerk in the village: a capuchin with its own glow, a home on plot c1-b, a door there, sounds and a council seat', async () => {
+  const { SPECIES, LIGHT, CREW } = await import('../ui/station/ape/cast.js');
+  const { DOORS, HOMES } = await import('../ui/station/ape/world.js');
+  const { PLOTS } = await import('../ui/station/ape/canopy.js');
+  const { SOUNDS } = await import('../ui/station/ape/chatter-lines.js');
+  const { COUNCIL_SEATS } = await import('../ui/station/ape/culture.js');
+  assert.ok(CREW.includes('clerk'));
+  assert.equal(SPECIES.clerk.species, 'Capuchin');
+  const others = Object.entries(LIGHT).filter(([k]) => k !== 'clerk').map(([, c]) => c);
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  assert.ok(others.every(c => dist(c, LIGHT.clerk) > 60), 'the ink-green glow is distinct from every other colour');
+  assert.deepEqual(HOMES.clerk, { story: 'Canopy 1', place: 'the counting house', plot: 'c1-b' });
+  const plot = PLOTS.find(p => p.id === 'c1-b');
+  assert.deepEqual(DOORS.clerk, { lane: 'c1', x: plot.x });
+  assert.ok(SOUNDS.clerk.length >= 4);
+  assert.equal(typeof COUNCIL_SEATS.clerk, 'number');
+  const taken = new Set(Object.values(HOMES).map(h => h.plot).filter(Boolean));
+  assert.equal(PLOTS.filter(p => p.story === 1 && !taken.has(p.id)).length, 3, 'three free plots left on Canopy 1');
+});

@@ -158,7 +158,7 @@ function foliageMass(fb, cx, cy, w, h, pal, seed, n = 12, blooms = 0) {
 }
 
 /** The canopy stories in the village layer (parallax 1): trunks, boughs, leaves, lianas, flowers, walkways, ladders and plots. */
-export function paintCanopy(mid) {
+export function paintCanopy(mid, taken = new Set()) {
   // the great trunks carry on up through both stories
   for (const tx of TRUNKS) trunk(mid, tx, TOP, 16, trunkR(tx, 16), trunkR(tx, TOP), C.bark, tx + 7);
   for (const s of [1, 2]) {
@@ -197,7 +197,7 @@ export function paintCanopy(mid) {
     for (let i = 0; i < 14; i++) { const x = 30 + hash(i, s, 63) * (WORLD - 60); bromeliad(mid, x, walkY(s, x) - 0.5, i + s * 50); }
   }
   for (const l of LADDERS) ladder(mid, l.x, walkY(2, l.x) + 2, walkY(1, l.x));
-  for (const p of PLOTS) plotMarker(mid, p);
+  for (const p of PLOTS) if (!taken.has(p.id)) plotMarker(mid, p);
 }
 
 /** The sky above the ground village's sunset, deepening to evening blue at the top of the world, with high wisps. */
