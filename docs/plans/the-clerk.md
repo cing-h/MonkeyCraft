@@ -15,6 +15,8 @@ A capuchin crew member who works in Google Docs, Sheets and Slides through Googl
    - Drive: find, open, rename, move to folder, and bin. Changing sharing and deleting outright are never offered.
    - A simulated Google server for the tests.
 2. **`feature/clerk-docs`:** create a document; write and revise it (headings, lists, tables, exact edits). A backup copy is made in Drive before editing any file the user already had.
+   - **Picker (decided 2026-11-06, user chose it):** a "Let the Clerk open a file" button opens Google's own file picker. Each file the user picks is shared with MonkeyCraft, one at a time (still `drive.file`). This needs an API key: one more setup step (enable the Picker API, then create an API key). The app id is the number at the start of the client id.
+   - Edits to a document not made in the same job: a backup copy goes in Drive first, once per document per job. Revert can't undo a Docs edit itself (the APIs have no version restore), so it points to the backup instead.
 3. **`feature/clerk-sheets`:** create a sheet; read and write ranges, formulas and charts.
 4. **`feature/clerk-slides`:** turn an outline into a deck with speaker notes.
 5. **`feature/clerk-crew`: the Clerk in the roster and the village.**
