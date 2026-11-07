@@ -217,3 +217,17 @@ Added 2026-11-06. The user asked for it to be built right after item 4. **DONE**
 - Uses the existing pose blending, so the changes are smooth. Reduced motion means fewer, slower changes.
 - Checks: tests for the timing (he changes rest poses more often than he walks, and walks less often than the other crew) and that a job interrupts him, plus screenshots of each rest pose.
 
+
+## 7. Village revamp: richer apes, darker trees, real climbing, vine swings with flips, better houses, and a playground
+
+Added 2026-11-06, while the Clerk was being finished. Build plan: `docs/plans/village-revamp.md`.
+
+**Status: BUILT 2026-11-07.** All six steps are on stacked, pushed branches: `feature/darker-trees` → `feature/ape-detail` → `feature/ape-climb` → `feature/vine-swings` → `feature/houses` → `feature/playground`. They're waiting for the user's look and merge.
+
+**What the user wants:**
+- A slight revamp of the monkey sprites, making them a little more detailed.
+- Trees reskinned to be a little more detailed and darker.
+- A better climbing animation for each monkey, based on research into how monkeys really climb.
+- Hanging vines the monkeys can swing on across great distances of the village, with good air time and flips off the vine.
+- More effort in every monkey's house, and a significantly more complex abode for the Chief.
+- A recreational area where the monkeys play, with play behaviour to match. Only non-agent monkeys (the villagers) play there, unless the agents have no jobs to do.
