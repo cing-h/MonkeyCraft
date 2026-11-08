@@ -97,3 +97,12 @@ test('MCP handler: initialize, list, call, notifications, errors', async () => {
   const boom = await handleMcp({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'x' } }, { ...deps, callTool: async () => { throw new Error('kaput'); } });
   assert.equal(boom.error.code, -32603);
 });
+
+test('a used-up subscription limit is explained plainly, not shown as a mysterious failure', async () => {
+  const { explainFailure } = await import('../src/providers/claude-code.js');
+  const r = explainFailure("You've hit your 5-hour limit · resets 1:10pm (America/New_York)", 'success');
+  assert.equal(r.code, 'usage_limit');
+  assert.match(r.message, /usage limit is used up \(it resets 1:10pm \(America\/New_York\)\)/);
+  assert.deepEqual(explainFailure('Something broke', 'success'), { message: 'Something broke', code: 'error' }, 'never the code "success" for a failure');
+  assert.deepEqual(explainFailure('Too many turns', 'error_max_turns'), { message: 'Too many turns', code: 'error_max_turns' });
+});

@@ -95,7 +95,7 @@ export function makeClaudeCodeProvider({ spawn, claudePath, baseEnv, killProcess
           let reason = result ? result.reason : 'error';
           if (signal?.aborted) reason = signal.reason === 'halt' ? 'halted' : signal.reason === 'budget' || signal.reason === 'stale' ? signal.reason : 'cancelled';
           else if (!result && !spawnErr) emit('run.error', { message: `Claude Code exited (code ${code}) without a result.${stderr ? ' ' + stderr.trim().split('\n').slice(-3).join(' ') : ''}`, code: initSeen ? 'no_result' : 'cli_failed' });
-          else if (result && result.reason !== 'done' && result.text) emit('run.error', { message: result.text.slice(0, 500), code: result.subtype || 'error' });
+          else if (result && result.reason !== 'done' && result.text) emit('run.error', explainFailure(result.text, result.subtype));
           for (const o of parser.openBuiltins()) { const b = BUILTINS[o.name] || { tool: `builtin.${o.name}` }; emit('agent.tool_result', { callId: o.id, tool: b.tool, ok: true, isError: false, summary: 'finished', effectUnknown: true }); onTaint(b.tool); }
           const r = result || { usd: 0, priced: false, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, turns: 0, text: '' };
           if (result) emit('agent.cost', { usd: r.usd, priced: r.priced, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cacheReadTokens: r.cacheReadTokens, cacheWriteTokens: r.cacheWriteTokens, billing });
@@ -108,4 +108,18 @@ export function makeClaudeCodeProvider({ spawn, claudePath, baseEnv, killProcess
       });
     }
   };
+}
+
+/**
+ * A failed result, in words the user can act on. Claude Code reports running out
+ * of the subscription's usage limit as a plain message (with the subtype
+ * "success"), which used to show as a mysterious failure.
+ */
+export function explainFailure(text, subtype) {
+  const t = String(text || '');
+  if (/hit your .{0,40}limit|usage limit|limit (reached|exceeded)|out of (extra )?usage/i.test(t)) {
+    const resets = /resets?\s+([^\n·]{1,60})/i.exec(t)?.[1]?.trim();
+    return { message: `Your Claude subscription's usage limit is used up${resets ? ` (it resets ${resets})` : ''}, so this job stopped. New jobs will work again after the reset. To keep going sooner, a crew member can use an API key instead (Settings).`, code: 'usage_limit' };
+  }
+  return { message: t.slice(0, 500), code: subtype && subtype !== 'success' ? subtype : 'error' };
 }
