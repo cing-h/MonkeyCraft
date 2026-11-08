@@ -13,7 +13,7 @@ The questions for each feature: does it make the crew's work for the user better
 
 ## Glaring issues
 1. **The core idea of Edition 1 is unproven.** A Chief who delegates to six specialists hasn't been shown to beat one capable ape with all the tools. Delegation adds cost, waiting time and lost context (a worker sees only its task, and the Chief sees only its report). With 20 jobs, we can't know. *Suggested check:* add "Chief + crew vs one ape" to the with/without test later.
-2. **Running out of the subscription limit looks like a mysterious failure.** It happened on 2 of 20 jobs. The Job log shows Claude's raw message as an error with the code `success`, and nothing explains that the limit is the cause or when it resets. *Fix (small):* recognise the limit message and say so plainly.
+2. **Running out of the subscription limit looks like a mysterious failure.** It happened on 2 of 20 jobs. The Job log shows Claude's raw message as an error with the code `success`, and nothing explains that the limit is the cause or when it resets. **FIXED 2026-11-07** (`feature/limit-message`): the Job log now says the subscription's usage limit is used up, when it resets, and that an API key can keep a crew member going.
 3. **A possible freeze after Scout jobs.**
    - What was seen: headless-Chrome screenshots froze on one frame. Edition 1's interface does it too.
    - What was ruled out: a Node replay of the village code runs fine.
@@ -36,5 +36,5 @@ The questions for each feature: does it make the crew's work for the user better
 
 ## Suggested order (not started)
 1. The Brain with/without test (`docs/plans/brain-eval.md`), which also gives us a harness to test issue 1.
-2. Fix issue 2 (small, clear harm).
+2. ~~Fix issue 2~~ (done 2026-11-07).
 3. Decide on the council's automatic meetings once there is real use.
