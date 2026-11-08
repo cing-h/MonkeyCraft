@@ -1,6 +1,6 @@
 # Edition 2: the Brain and the Demi-God Sage
 
-Status: APPROVED 2026-11-07. Phases 1–3 done; phase 4 (learning after every job) next.
+Status: MVP REVIEW (2026-11-07). Phases 1–3 (the Brain, recall, the Sage's interview) are merged into `main` after the with/without test (`docs/plans/brain-eval.md`) showed the Brain helps: 14–7. Phase 4 (`feature/brain-learning`) is built but held until it is tested the same way. Phases 5–6 wait for the same evidence. The user's rule from now on: MVP first, prove each feature before building more.
 Scope (the user's decision): Edition 2 is only the Brain and the Demi-God Sage. Schedules (Bell-ringer), chat apps, connectors and the desktop app wait until this is built and fleshed out.
 
 ---
