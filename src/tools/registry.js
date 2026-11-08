@@ -10,8 +10,8 @@
 // emits agent.tool_call / agent.tool_result, so the station shows exactly what ran.
 //
 // Tool shape:
-//   { name: 'fs.read', description, inputSchema, capability, scope: 'read'|'write'|'execute',
-//     taints?: true (its results are untrusted, e.g. web pages),
+//   { name: 'fs.read', description, inputSchema, capability, scope: 'read'|'write'|'execute'|'delegate'|'memory',
+//     taints?: true (its results are untrusted, e.g. web pages), privateArgs?: true (arguments are not shown in events),
 //     timeoutMs?, assess?(args, ctx) -> { deny?, error?, summary, outsideWorkspace?, cacheKey?, facts? },
 //     run(args, ctx, facts) -> { content, summary?, isError? } }
 // `deny` is a safety rule (can't be approved); `error` is a plain mistake in the request.
@@ -51,7 +51,7 @@ export function makeRegistry(tools) {
     const tool = byName.get(call.tool) || byWire.get(call.tool);
     const toolName = tool ? tool.name : String(call.tool);
     const args = (call.args && typeof call.args === 'object' && !Array.isArray(call.args)) ? call.args : {};
-    emit('agent.tool_call', { callId, tool: toolName, args });
+    emit('agent.tool_call', { callId, tool: toolName, args: tool?.privateArgs ? { private: true } : args });   // private tools (the interview) never put their words in the journal
     const finish = (isError, content, summary, counts = true) => {
       if (counts && ctx.breaker) {
         const trip = ctx.breaker.record(isError);
@@ -80,7 +80,8 @@ export function makeRegistry(tools) {
         return finish(true, `Locked: this job has read untrusted content (${ctx.taint.source()}), so for safety it can't run commands or change files any more. Nothing ran. Finish with what you can read, and tell the user what is left to do in a new job.`, 'locked: web content was read', false);
       }
 
-      const needsConsent = tool.scope !== 'read' && tool.scope !== 'delegate';   // delegating asks nothing itself: each worker asks for its own actions
+      // delegating asks nothing itself (each worker asks for its own actions); 'memory' (brain.note) is journaled and undoable in the Brain panel instead
+      const needsConsent = tool.scope !== 'read' && tool.scope !== 'delegate' && tool.scope !== 'memory';
       if (needsConsent) {
         const allowed = await ctx.consent.request({
           emit, runId: ctx.runId, interactive: ctx.interactive, signal: ctx.signal, callId, tool: tool.name,

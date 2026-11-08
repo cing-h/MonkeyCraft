@@ -30,7 +30,7 @@ export function makeFsEdit({ fsp, pathEnv, undo }) {
     async assess(args) {
       if (args.new.length !== args.newChars) return { error: `"new" has ${args.new.length} characters but "newChars" says ${args.newChars}, so your arguments were probably cut off. Nothing was changed. Send the edit again.` };
       if (!args.old) return { error: '"old" is empty. Use fs.write to create or replace a whole file. Nothing was changed.' };
-      const c = await checkPath(args.path, pathEnv);
+      const c = await checkPath(args.path, pathEnv, { write: true });
       if (c.error) return { deny: c.error };
       if (c.hardline) return { deny: c.hardline };
       let text;

@@ -1,6 +1,6 @@
 # Edition 2: the Brain and the Demi-God Sage
 
-Status: MVP REVIEW (2026-11-07). Phases 1–3 are built and pushed on their branches (`feature/brain-vault` → `brain-recall` → `sage-interview`). Phase 4 (`feature/brain-learning`) is built but held, unpushed, until the with/without test (`docs/plans/brain-eval.md`) shows the Brain helps. Phases 5–6 wait for the same evidence. The user's rule from now on: MVP first, prove each feature before building more.
+Status: MVP REVIEW (2026-11-07). Phases 1–3 (the Brain, recall, the Sage's interview) are merged into `main` after the with/without test (`docs/plans/brain-eval.md`) showed the Brain helps: 14–7. Phase 4 (`feature/brain-learning`) is built but held until it is tested the same way. Phases 5–6 wait for the same evidence. The user's rule from now on: MVP first, prove each feature before building more.
 Scope (the user's decision): Edition 2 is only the Brain and the Demi-God Sage. Schedules (Bell-ringer), chat apps, connectors and the desktop app wait until this is built and fleshed out.
 
 ---
@@ -69,15 +69,18 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - Settings: the Brain path (default `/mnt/c/Users/hayde/MonkeyCraftBrain`), and a hardline entry for it.
    - Routes `src/routes/brain.js` and a **Brain panel** in the UI: browse, read, undo, lock or unlock, delete (archive).
    - *Check:* tests for journal crash-safety, undo, locks, the hardline block, and search ranking.
+   - **DONE 2026-11-07** (`feature/brain-vault`). As built: locks live in the note itself (`locked: true` in the frontmatter, or a line ending in `%%locked%%`), so they show in Obsidian too; the search index is kept in memory and picks up edits made in Obsidian; the Brain folder is chosen once on first run and saved in settings; cloud-synced folders are refused. The `brain.*` events arrive with phase 2, where the crew first use the Brain.
 2. **`feature/brain-recall`: apes that remember.**
    - Before each run, a recall step builds a short **dossier** (a size budget of about 1.5k tokens): a profile summary (not for network agents), the ape's top lessons for this task, and its active skills. It's appended to the system prompt.
    - Tools for every ape: `brain.search`, `brain.read`; `brain.note` writes a shared note (fast speed; refused when tainted).
    - Each recall emits `brain.recall`; the Job log shows "remembered: …".
    - *Check:* the dossier stays inside the budget, the Scout never sees `You/`, and tainted runs can't call `brain.note`.
+   - **DONE 2026-11-07** (`feature/brain-recall`). As built: the dossier has three parts (about the user, the ape's own lessons, matching shared notes) with a 6,000-character cap; it leaves out proposals and notes marked as from the web, and the council skips it. `brain.note` writes only to `Notes/`, saves without a prompt (a new "memory" scope: journaled and undoable instead), and refuses anything that looks like a password or key. A lead whose worker read the web can't write either. Live check: the Smith recalled 3 notes (207 tokens), searched, and saved a note.
 3. **`feature/sage-interview`: the Sage wakes.**
    - Roster: the Sage is `awake: true`, gets a persona as keeper of the Brain, and the tools `brain.*` plus `sage.*`.
    - **The interview:** a Sage job with a chat panel and a 10-minute timer. Most important questions first, no restricted topics (the user's decision): anything that makes the village more efficient, effective, accurate or better at communicating. Questions adapt to your answers: goals (life, work, projects), who you are, how you like updates, what to never do, what frustrates you. Any question can be skipped. When the time is up he wraps up, drafts the `You/` notes, and you approve that first draft once. After that he learns quietly.
    - *Check:* the timer ends the interview cleanly, nothing is written before you approve, and you can re-run the interview later.
+   - **DONE 2026-11-07** (`feature/sage-interview`). As built: the Sage is awake (golden coat and blue face already; robes and flight in phase 6) with `sage.ask` and `sage.draft_profile`. You start the interview from the Brain panel and can answer, skip or finish early. After that you can edit the draft, leave notes out, then save or throw it away. The conversation is private: it stays in memory until you save, the job's words and these tools' arguments never reach the job journal (only counts and states, `sage.interview`), and Claude Code keeps no session transcript. A backstop stops the job 3 minutes after time is up. Live check with a made-up user: 4 questions (one left waiting 75 s), an accurate 3-note draft, no personal words in the journal, about $0.03.
 4. **`feature/brain-learning`: learning after every job.**
    - After a job ends, a **reflection pass** (cheap model, its own budget) proposes lessons for each ape that worked and quiet profile notes.
      - Untainted, unlocked, and passes the lesson checks: written straight away (fast speed).
@@ -98,5 +101,8 @@ Frontmatter: `title, kind (profile|lesson|skill|note|proposal), ape, source_job,
    - *Check:* the aura brightens only from events, and a screenshot review with the user.
 
 ### The user's answers (2026-11-07)
+- **Web proposals:** when the user approves (Keep) a proposal that came from a job that read the web, it becomes a normal trusted note: the tainted mark is cleared, so it can go in the apes' summaries. Until then, reading one during a job locks that job the way reading a web page does (phase 4).
+- **The Zettelkasten and the Brain stay separate** (settled: no merging).
+- **The Zettelkasten:** the crew may *read* the user's personal Zettelkasten for information, but never change it (a read-only folder setting, enforced like the hardline; built on `feature/brain-recall`). The Brain stays the crew's own notebook; the Zettelkasten is the user's library.
 - **The Sage's look:** he becomes a **golden snub-nosed monkey** (golden fur, blue face). Robes are **blue with gold trim**; the aura stays in his blue light.
 - **The interview:** no restricted topics. Gather as much as is useful for making the village more efficient, effective and accurate, and for communicating with the user better. Ask the most important questions first. In the user's words: "ask whatever you need to become better at your jobs, skills, become smarter, or communicate with me better." The user can still skip any question, and the profile is still stored only in the local Brain.

@@ -225,16 +225,20 @@ test('the Scout\'s own web search is reported from the stream, and Claude Code i
   assert.equal(s[s.indexOf('--tools') + 1], '', 'no built-ins for anyone else');
 });
 
-test('roster: the working crew is awake with the planned tools; the Sage and Bell-ringer sleep', () => {
+test('roster: the working crew and the Sage are awake with the planned tools; the Bell-ringer sleeps', () => {
   const r = makeRoster({ workspace: '/ws' });
-  const g = id => [...r.get(id).grantSet].sort();
+  const brainTools = ['brain.note', 'brain.read', 'brain.search'];   // Edition 2: every awake ape has the Brain
+  for (const id of r.ids().filter(i => r.get(i).awake)) assert.deepEqual([...r.get(id).grantSet].filter(t => t.startsWith('brain.')).sort(), brainTools, id);
+  const g = id => [...r.get(id).grantSet].filter(t => !t.startsWith('brain.')).sort();
   assert.deepEqual(g('chief'), ['claude.ask', 'claude.check', 'crew.dispatch', 'crew.spawn', 'crew.status', 'crew.wait', 'fs.read']);
   assert.deepEqual(g('scout'), ['web.fetch']);
   assert.deepEqual(g('smith'), ['fs.read', 'fs.write', 'shell.exec']);
   assert.deepEqual(g('archivist'), ['fs.move', 'fs.read', 'fs.write']);
   assert.deepEqual(g('writer'), ['fs.edit', 'fs.read', 'fs.write']);
   assert.deepEqual(g('inspector'), ['fs.read', 'verify.run']);
-  assert.equal(r.get('sage').awake, false); assert.equal(r.get('ringer').awake, false);
+  assert.deepEqual(g('sage'), ['sage.ask', 'sage.draft_profile']);   // Edition 2: the Sage is awake, with no file, shell or web tools
+  assert.equal(r.get('sage').awake, true); assert.equal(r.get('ringer').awake, false);
+  assert.deepEqual(r.ids().filter(i => r.get(i).network), ['scout'], 'only the Scout can reach the web');
 });
 
 // ---------- the Archivist's, Writer's and Inspector's tools ----------

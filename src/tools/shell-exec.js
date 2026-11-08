@@ -28,9 +28,9 @@ export function makeShellExec({ spawn, pathEnv, baseEnv, killProcessGroup }) {
       additionalProperties: false
     },
     async assess(args) {
-      const g = checkCommand(args.command, { extra: [pathEnv.dataDir] });
+      const g = checkCommand(args.command, { extra: [pathEnv.dataDir, ...(pathEnv.brainNames || [])], readOnly: pathEnv.readOnlyNames || [] });
       if (!g.ok) return { deny: g.reason };
-      const c = await checkPath(args.cwd || pathEnv.workspace, pathEnv);
+      const c = await checkPath(args.cwd || pathEnv.workspace, pathEnv, { write: true });   // a command can change anything where it runs
       if (c.error) return { deny: `folder: ${c.error}` };
       if (c.hardline) return { deny: c.hardline };
       const where = c.outsideWorkspace ? ` (in ${c.real})` : '';

@@ -1,15 +1,22 @@
 // Path safety. Reach is the whole computer (user decision), so every path is
 // resolved to its real location (symlinks followed) and then checked:
 //   1. hardline: never readable or writable, and no prompt can override it
-//   2. outsideWorkspace: changes here prompt the user every time
+//   2. read-only folders (the user's Zettelkasten): readable, but never changed, and no prompt can override it
+//   3. outsideWorkspace: changes here prompt the user every time
 //
 // Pure apart from the injected `realpath`.
 
 import path from 'node:path';
 
-/** The hardline list. `home` and `dataDir` are absolute. */
-export function hardlineRules({ home, dataDir }) {
+/**
+ * The hardline list. `home`, `dataDir` and `brainDir` are absolute. The Brain is
+ * hardlined for every ordinary tool: only src/brain/* writes it, through its journal.
+ * A Brain on a Windows drive is matched case-insensitively, as Windows does.
+ */
+export function hardlineRules({ home, dataDir, brainDir = null, readOnlyDirs = [] }) {
   const h = p => path.join(home, p);
+  const onWin = p => /^\/mnt\/[a-z]\//i.test(p);
+  const brainWin = brainDir && onWin(brainDir);
   return {
     prefixes: [
       '/etc', '/usr', '/bin', '/sbin', '/lib', '/lib64', '/boot', '/proc', '/sys', '/dev', '/root',
@@ -17,6 +24,8 @@ export function hardlineRules({ home, dataDir }) {
       h('.claude'), h('.claude.json'), h('.netrc'), h('.git-credentials'), h('.npmrc'), h('.pypirc'),
       dataDir
     ],
+    brain: brainDir ? { dir: brainWin ? brainDir.toLowerCase() : brainDir, caseless: brainWin } : null,
+    readOnly: readOnlyDirs.map(d => ({ dir: onWin(d) ? d.toLowerCase() : d, caseless: onWin(d), shown: d })),
     // Windows drives under WSL: compared case-insensitively
     winPrefixes: ['/mnt/c/windows', '/mnt/c/program files', '/mnt/c/program files (x86)', '/mnt/c/programdata'],
     // any segment sequence matching these, case-insensitive (for every Windows user)
@@ -27,8 +36,10 @@ export function hardlineRules({ home, dataDir }) {
 
 const under = (p, prefix) => p === prefix || p.startsWith(prefix.endsWith('/') ? prefix : prefix + '/');
 
-/** Returns the reason a real absolute path is hardlined, or null. */
-export function hardlineReason(real, rules) {
+/** Returns the reason a real absolute path is hardlined, or null. `write`: the path would be changed (read-only folders count). */
+export function hardlineReason(real, rules, { write = false } = {}) {
+  if (rules.brain && under(rules.brain.caseless ? real.toLowerCase() : real, rules.brain.dir)) return 'the Brain (only the brain tools may use it, so every change is journaled)';
+  if (write) for (const r of rules.readOnly || []) if (under(r.caseless ? real.toLowerCase() : real, r.dir)) return `${r.shown} is read-only for the crew (the user's own notes: read them, never change them)`;
   for (const pre of rules.prefixes) if (under(real, pre)) return `protected location ${pre}`;
   const lower = real.toLowerCase();
   for (const pre of rules.winPrefixes) if (under(lower, pre)) return `protected Windows location ${pre}`;
@@ -63,9 +74,9 @@ export async function resolveReal(input, { home, workspace, realpath }) {
   return { error: 'path too deep' };
 }
 
-/** One-stop check: { real, hardline: reason|null, outsideWorkspace } or { error }. */
-export async function checkPath(input, env) {
+/** One-stop check: { real, hardline: reason|null, outsideWorkspace } or { error }. Pass { write: true } when the path would change. */
+export async function checkPath(input, env, opts = {}) {
   const r = await resolveReal(input, env);
   if (r.error) return r;
-  return { real: r.real, hardline: hardlineReason(r.real, env.rules), outsideWorkspace: !isInside(r.real, env.workspace) };
+  return { real: r.real, hardline: hardlineReason(r.real, env.rules, opts), outsideWorkspace: !isInside(r.real, env.workspace) };
 }

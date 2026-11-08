@@ -62,7 +62,13 @@ const TYPES = {
 
   // the council at the Ring (a Chief job with source 'council'): a member's point, and the Chief's verdict for the user
   'council.say': { memberId: 'string', point: 'string', significant: 'boolean' },
-  'council.report': { significant: 'boolean', report: 'string' }
+  'council.report': { significant: 'boolean', report: 'string' },
+
+  // the Brain (Edition 2): what an ape was given from memory before a job, and what it saved
+  'brain.recall': { notes: 'array', tokens: 'integer', profile: 'boolean' },   // notes: the Brain paths in the dossier; profile: whether it held the user's profile
+  'brain.write': { path: 'string', op: ['create', 'replace', 'archive', 'undo'], changeId: 'string' },
+  // the Sage's interview: states and counts only, never the questions or answers (those stay in memory, then the Brain)
+  'sage.interview': { state: ['started', 'asked', 'answered', 'skipped', 'drafted', 'approved', 'discarded'], asked: 'integer', secondsLeft: 'integer?' }
 };
 
 // Every event carries this envelope.

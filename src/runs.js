@@ -27,7 +27,8 @@ const WORKER_PREAMBLE = `The Chief has given you this task as part of a larger j
 const MAX_REPORT = 8000;
 const LIVENESS = { idleMs: 450_000, toolMs: 1_200_000 };
 
-export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null, remoteUndo = null, onRunEnd = () => {} }) {
+// recall({ agent, task }) → { text, notes, tokens, profile }: what the ape remembers from the Brain, added to its instructions.
+export function makeRunHost({ bus, providers, registry, consent, ledger, roster, journal, clock, newId, newToken, mcpUrl, limits, undo, guardPath = async () => null, remoteUndo = null, onRunEnd = () => {}, recall = null }) {
   const active = new Map(); // runId -> run
   const dayStart = ts => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
   const today = { day: -1, usd: 0 };
@@ -62,6 +63,10 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     const left = run.family.limitUsd - run.family.usd;
     let res;
     try {
+      if (recall && !run.shaped) {   // the council and other special shapes bring their own context
+        const mem = await Promise.race([recall({ agent, task: prompt }), new Promise(r => setTimeout(() => r(null), 5000))]).catch(() => null);
+        if (mem?.text) { agent = { ...agent, systemPrompt: `${agent.systemPrompt}\n\n${mem.text}` }; emit('brain.recall', { notes: mem.notes, tokens: mem.tokens, profile: !!mem.profile }); }
+      }
       res = await provider.run({
         agent, prompt: run.parent ? (run.preamble ?? WORKER_PREAMBLE) + prompt : prompt, signal: controller.signal, emit,
         maxBudgetUsd: Math.max(0.05, Math.min(limits.perRunUsd, left)),
@@ -90,7 +95,8 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
 
   // agentOverride: run this crew member in a different shape (the council: no tools, its own instructions and model).
   // preamble: what a worker is told before its task. trigger: 'user' or 'schedule'. poolUsd: a smaller spending pool.
-  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null, source = null, agentOverride = null, preamble = null, trigger = null, poolUsd = null }) {
+  // private: the job's words (agent.token, agent.reasoning) are never emitted or journaled (the Sage's interview).
+  function startRun({ agentId, prompt, interactive = true, allowOverDaily = false, parent = null, source = null, agentOverride = null, preamble = null, trigger = null, poolUsd = null, private: isPrivate = false }) {
     const agent = agentOverride && agentOverride.id === agentId ? agentOverride : roster.get(agentId);
     if (!agent) return { error: `No crew member "${agentId}".` };
     if (!agent.awake) return { error: `${agent.name} is asleep until ${agent.wakes}.` };
@@ -110,13 +116,14 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
     const controller = new AbortController(), raw = bus.emitFor(runId, agentId);
     const stop = reason => { if (!controller.signal.aborted) controller.abort(reason); };
     const run = {
-      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, interactive, stop, parent, source: parent ? null : source, preamble, trigger: parent ? null : trigger,
+      runId, agentId, agent, token: newToken(), controller, grants: agent.grantSet, shaped: !!agentOverride, interactive, stop, parent, source: parent ? null : source, preamble, trigger: parent ? null : trigger,
       taint: makeTaint(), breaker: makeBreaker(), workers: new Map(),
       lastProgress: clock.now(), toolsRunning: 0
     };
     // every event counts as progress; open tool calls lengthen the allowed quiet time
     run.emit = (type, payload) => {
       run.lastProgress = clock.now();
+      if (isPrivate && (type === 'agent.token' || type === 'agent.reasoning')) return null;
       if (type === 'agent.tool_call') run.toolsRunning++;
       else if (type === 'agent.tool_result') run.toolsRunning = Math.max(0, run.toolsRunning - 1);
       return raw(type, payload);
@@ -226,6 +233,14 @@ export function makeRunHost({ bus, providers, registry, consent, ledger, roster,
       for (const r of results) if (['restored', 'removed', 'moved back', 'binned'].includes(r.result)) emit('undo.reverted', { undoId: r.undoId, path: r.path });
       await journal.flush();
       return { results };
+    },
+
+    /** Emit an event on a job, even one that has ended (after the journal's last event). */
+    async emitAfter(runId, type, payload) {
+      const r = active.get(runId); if (r) return !!r.emit(type, payload);
+      const evs = await journal.read(runId); if (!evs.length) return false;
+      const ok = !!bus.emitFor(runId, evs[0].agentId, Math.max(...evs.map(e => e.seq)) + 1)(type, payload);
+      await journal.flush(); return ok;
     },
 
     /** Emit an event on a job that is still running. Returns false if it has ended. */

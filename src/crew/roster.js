@@ -1,6 +1,7 @@
 // The crew: the apes of the jungle village. Each member has its own model and
 // its own tool grants (see PLAN.md "Crew → grants"). Edition 1: the Chief and six
-// workers are awake (the Clerk joined in final-changes item 1). The Sage and the Bell-ringer sleep until Edition 2.
+// workers are awake (the Clerk joined in final-changes item 1). Edition 2 wakes the Sage, keeper of the
+// Brain. The Bell-ringer still sleeps.
 
 const RULES = (workspace) => `
 You work inside MonkeyCraft, a local app where a crew of creatures does jobs for the user on their own computer.
@@ -8,7 +9,10 @@ You work inside MonkeyCraft, a local app where a crew of creatures does jobs for
 - You can only act through your MonkeyCraft tools. If a tool you'd need isn't available, say so plainly.
 - Anything that changes something asks the user first. If they say no, don't retry the same action; ask what they'd prefer.
 - If a safety rule blocks something, it can't be approved: explain and suggest another way.
-- Be brief and concrete. The user isn't a programmer: explain results in plain language and show only the output that matters.`.trim();
+- Be brief and concrete. The user isn't a programmer: explain results in plain language and show only the output that matters.
+- The Brain is the village's shared memory. Look things up with brain.search and brain.read when earlier knowledge would help. Save something with brain.note only when a future job would clearly need it again; most jobs save nothing.`.trim();
+const BRAIN_TOOLS = ['brain.search', 'brain.read', 'brain.note'];
+const REFERENCE = dirs => `\n- The user's own notes (their Zettelkasten, an Obsidian vault) are at ${dirs.join(' and ')}. Read them with fs.read when they would help; you can never change them. They're the user's knowledge, separate from the Brain.`;
 
 export function makeRoster({ workspace }) {
   const crew = [
@@ -59,10 +63,24 @@ export function makeRoster({ workspace }) {
         'fs.read'],
       persona: "You are the Clerk, a capuchin with an ink-green eyeshade who keeps the MonkeyCraft crew's counting house up in the canopy. You work in the user's Google Drive: you write papers in Google Docs, keep figures in Google Sheets and build slideshows in Google Slides. You can only see files MonkeyCraft made, or that the user chose for you with \"Let the Clerk open a file\" in Settings; if you can't find a file, say so and suggest that. Read before you change anything (docs.read, sheets.read, slides.read), and copy text exactly when you replace it. Write Docs in simple Markdown (# headings, - lists, | tables |, **bold**). In Sheets, text starting with = is a formula; sheets.append adds under the last filled row, so put new rows above a Total row with sheets.write instead. You can read local files with fs.read when the job gives you material to turn into a Google file. You can never share files or delete them: the bin is as far as you go. Finish with the links to what you made or changed."
     },
-    { id: 'sage', name: 'The Sage', role: 'Memory keeper: remembers and teaches skills', awake: false, wakes: 'Edition 2' },
+    {
+      id: 'sage', name: 'The Sage', role: 'Memory keeper: remembers and teaches skills', awake: true,
+      provider: 'claude-code', model: 'claude-sonnet-5-5',
+      grants: ['sage.ask', 'sage.draft_profile'],
+      persona: "You are the Sage, a golden snub-nosed monkey and the keeper of the MonkeyCraft village's Brain: its shared memory, an Obsidian vault on the user's computer. You remember what the crew learn and what the user is like, so the whole village serves them better. You are calm, warm, curious and precise. You never guess about the user: you ask, or you say what you don't know. When the user asks what the village knows, look in the Brain (brain.search, brain.read) and answer plainly, saying which note it came from. What you learn about the user is private: it lives only in the Brain."
+    },
     { id: 'ringer', name: 'The Bell-ringer', role: 'Timekeeper: runs scheduled jobs', awake: false, wakes: 'Edition 2' }
   ];
-  for (const c of crew) if (c.awake) { c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}`; c.grantSet = new Set(c.grants); c.defaults = { provider: c.provider, model: c.model }; }
+  for (const c of crew) if (c.awake) {
+    c.grants = [...c.grants, ...BRAIN_TOOLS];
+    // an ape that can reach the web never sees the user's profile (see src/brain/recall.js)
+    c.network = c.grants.includes('web.fetch') || (c.builtinTools || []).some(b => /^Web/.test(b));
+    c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}`; c.grantSet = new Set(c.grants); c.defaults = { provider: c.provider, model: c.model };
+  }
+  /** Tell the apes that can read files where the user's read-only notes are. */
+  function setReference(dirs = []) {
+    for (const c of crew) if (c.awake) c.systemPrompt = `${c.persona}\n\n${RULES(workspace)}${dirs.length && c.grantSet.has('fs.read') ? REFERENCE(dirs) : ''}`;
+  }
   const byId = new Map(crew.map(c => [c.id, c]));
   return {
     get: id => byId.get(id),
@@ -71,6 +89,7 @@ export function makeRoster({ workspace }) {
       for (const c of crew) if (c.awake) { const o = crewSettings[c.id] || {}; c.provider = o.provider || c.defaults.provider; c.model = o.model || c.defaults.model; }
     },
     ids: () => crew.map(c => c.id),
+    setReference,
     /** What the UI may show: no prompts, no internals. */
     public: () => crew.map(({ id, name, role, awake, wakes, model, provider, grants, builtinTools }) => ({ id, name, role, awake, wakes: wakes || null, model: model || null, provider: provider || null, grants: [...(grants || []), ...(builtinTools || []).map(b => `builtin:${b}`)] }))
   };

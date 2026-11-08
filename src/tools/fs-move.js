@@ -19,7 +19,7 @@ export function makeFsMove({ fsp, pathEnv, undo }) {
       additionalProperties: false
     },
     async assess(args) {
-      const a = await checkPath(args.from, pathEnv), b = await checkPath(args.to, pathEnv);
+      const a = await checkPath(args.from, pathEnv, { write: true }), b = await checkPath(args.to, pathEnv, { write: true });
       if (a.error || b.error) return { deny: a.error || b.error };
       if (a.hardline || b.hardline) return { deny: a.hardline || b.hardline };
       if (a.real === pathEnv.workspace || a.real === pathEnv.home || a.real === '/') return { deny: 'the workspace, home or root folder itself' };

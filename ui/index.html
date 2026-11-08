@@ -14,6 +14,7 @@
     <div class="spend" id="spend" title="Today's use. Subscription jobs show Claude Code's API-price estimate, not money charged.">TODAY · —</div>
     <button id="council-report" class="council-note" type="button" hidden title="A council report: the Chief thinks you should know something. Click to read it." aria-label="Read the council report">★ REPORT</button>
     <button id="call-council" type="button" title="Call the crew to the Ring to review recent work. You choose how long the meeting lasts.">Council</button>
+    <button id="open-brain" type="button" title="The village's memory: what the crew have learned, and what they know about you">Brain</button>
     <button id="open-settings" type="button">Settings</button>
     <button id="stop" class="stop" type="button" title="Stop every job right now">STOP</button>
   </header>
@@ -78,6 +79,53 @@
     <div class="settings-btns"><button type="button" id="council-cancel">Cancel</button><button type="submit" id="council-go" class="primary">Call the council</button></div>
   </form>
 </dialog>
+<dialog id="brain-dialog" class="settings brain-dialog" aria-labelledby="brain-title">
+  <div class="brain-head">
+    <h2 id="brain-title">The Brain</h2>
+    <button type="button" id="open-interview" class="primary" title="A ten-minute interview, so the village understands you better">Interview with the Sage</button>
+    <div class="brain-tabs" role="tablist" aria-label="Brain views"><button type="button" role="tab" data-tab="notes" aria-selected="true">Notes</button><button type="button" role="tab" data-tab="history" aria-selected="false">History</button></div>
+    <button type="button" id="brain-close">Close</button>
+  </div>
+  <p class="hint" id="brain-where"></p>
+  <p class="error" id="brain-error" role="alert" hidden></p>
+  <div class="brain-browse" id="brain-browse">
+    <nav class="brain-list" aria-label="Notes in the Brain">
+      <label for="brain-search" class="sr-only">Search the Brain</label>
+      <input id="brain-search" type="search" placeholder="Search the Brain…" autocomplete="off">
+      <ul id="brain-notes"></ul>
+    </nav>
+    <article class="brain-note" id="brain-note" aria-live="polite"><p class="hint">Pick a note to read it. Lock a note or a single line, and the crew can never change it (you still can). Archiving moves a note aside; nothing is ever deleted outright.</p></article>
+  </div>
+  <section id="brain-history" class="brain-history" hidden>
+    <p class="hint">Every change to the Brain, newest first. Undo puts a note back as it was before that change.</p>
+    <ol id="brain-changes"></ol>
+  </section>
+</dialog>
+<dialog id="interview-dialog" class="settings interview-dialog" aria-labelledby="interview-title">
+  <div class="brain-head">
+    <h2 id="interview-title">Interview with the Sage</h2>
+    <span class="iv-clock" id="interview-clock" aria-live="off"></span>
+    <button type="button" id="interview-close">Close</button>
+  </div>
+  <p class="hint">The Sage learns who you are and how you like to work, so the whole village serves you better. Your answers stay private: they're kept only in MonkeyCraft's memory until you save the draft to the Brain, and never written to the job log. While you talk, they go to Claude for thinking, like every job.</p>
+  <p class="error" id="interview-error" role="alert" hidden></p>
+  <div class="iv-chat" id="interview-chat" aria-live="polite"></div>
+  <button type="button" id="interview-start" class="primary">Start the interview (about 10 minutes)</button>
+  <form id="interview-form" class="iv-answer">
+    <div id="interview-answer" class="iv-row" hidden>
+      <label for="interview-text" class="sr-only">Your answer</label>
+      <textarea id="interview-text" rows="2" maxlength="4000" placeholder="Your answer… (Enter to send, Shift+Enter for a new line)"></textarea>
+      <div class="iv-btns"><button type="submit" id="interview-send" class="primary">Send</button><button type="button" id="interview-skip">Skip</button><button type="button" id="interview-finish">Finish now</button></div>
+    </div>
+  </form>
+  <section id="interview-draft" hidden>
+    <h3 class="iv-h">The Sage's draft of your profile</h3>
+    <p class="hint">Edit anything, leave out what you don't want kept, then save. These become notes in the Brain's You folder. You can lock or undo them in the Brain panel.</p>
+    <div id="interview-notes" class="iv-notes"></div>
+    <div class="settings-btns"><button type="button" id="interview-discard">Throw away</button><button type="button" id="interview-save" class="primary">Save to the Brain</button></div>
+  </section>
+  <p class="hint" id="interview-done" hidden>Saved. The crew will use it from their next job. You can run the interview again any time to add more.</p>
+</dialog>
 <dialog id="settings" class="settings" aria-labelledby="settings-title">
   <form method="dialog" id="settings-form">
     <h2 id="settings-title">Settings</h2>
@@ -126,6 +174,14 @@
       <textarea id="google-key" rows="3" placeholder='Paste the downloaded key here: {"installed":{"client_id":…}}' spellcheck="false" autocomplete="off"></textarea>
       <div class="google-btns"><button type="button" id="google-save-key">Save key</button><button type="button" id="google-connect" class="primary">Connect Google</button><button type="button" id="google-pick" class="primary">Let the Clerk open a file…</button><button type="button" id="google-disconnect">Disconnect</button></div>
       <p class="hint">MonkeyCraft only asks for access to the files it makes itself. It can never share files or delete them outright, and every change asks you first.</p>
+    </fieldset>
+    <fieldset>
+      <legend>The Brain</legend>
+      <label class="limits"><span>Folder (open it as a vault in Obsidian)</span><input id="brain-path" type="text" spellcheck="false" autocomplete="off"></label>
+      <p class="hint" id="brain-path-note">The Brain stays on this computer only, so it can't be in OneDrive or another cloud-synced folder. A new folder takes effect when MonkeyCraft restarts.</p>
+      <label for="read-only">Read-only folders, one per line (such as your Zettelkasten)</label>
+      <textarea id="read-only" rows="2" spellcheck="false" autocomplete="off" placeholder="/mnt/c/Users/you/Documents/Notes"></textarea>
+      <p class="hint">The crew may read these for information, but can never change, move or delete anything in them, and no prompt can allow it.</p>
     </fieldset>
     <fieldset>
       <legend>Village</legend>
