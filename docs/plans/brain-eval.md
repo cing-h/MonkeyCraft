@@ -1,6 +1,6 @@
 # The with/without test: does the Brain make the crew better?
 
-Status: APPROVED 2026-11-07. Waiting for the user's Sage interview and their own jobs (Part 2), then the runner is built with 2 jobs first.
+Status: FIRST RESULT IN (2026-11-07): the Brain clears the bar, 14–7 (see Result). The runner is on `feature/brain-eval`.
 
 ## Part 1: In plain words
 
@@ -53,3 +53,20 @@ Each job is chosen so that memory *should* matter, plus two controls where it sh
 - **Blind judging page:** a local HTML file, not published, because it may contain your profile. It shows the pairs in random order with sides hidden. You pick A, B or "same", and the page writes your picks to a local file.
 - **Report:** win rate with a simple confidence note, cost and time differences, harms found, and recall quality (were the recalled notes relevant?).
 - **Smallest version first:** build the runner and 2 jobs, check it end to end, then add the rest.
+
+## Result (first run, 2026-11-07)
+
+48 runs (8 jobs × 2 sides × 3), about $1.24 (subscription estimate); the user judged all 24 pairs blind. Full report: `~/MonkeyCraftEval/2026-11-07T23-33-17/report.md` (local only).
+
+- **The Brain clears the bar:**
+  - it won 14 of the 21 pairs where the user saw a difference (67%; the bar is 60%), with 3 "about the same";
+  - no new harms: automatic checks failed 0 of 15 with the Brain and 1 of 15 without;
+  - +12% cost (the bar is under +25%).
+- **But it is promising, not proven.** With 21 decided pairs, a 14–7 split would happen by chance about 1 time in 10 if the Brain made no difference. A second round would firm it up.
+- **What was really tested is the profile.** Every recall pulled the same 5 `You/` notes (there were no lessons or shared notes yet). So this shows that *knowing the user* helps. It says nothing yet about Brain search, shared notes or learning.
+- **By job:**
+  - clear wins on "what should I work on next" (3–0), running the MonkeyCraft tests (3–0) and the CSV table (3–0);
+  - a loss on "write a short update for my project" (0–3);
+  - ties or near-ties on the Zettelkasten question (both sides already know where it is, from the read-only setting) and on cleaning the test folder.
+- **Time:** the Brain side took longer on average (20 s vs 12 s). The bar didn't cover time.
+- **Open question for the user:** in pairs 2-2 and 2-3 the picks went to the side that wrote the update straight away, but the note on 2-2 prefers the side that asks first (the Brain side). If those picks were meant the other way, the result is 16–5.
